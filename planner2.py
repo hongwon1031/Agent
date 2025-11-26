@@ -163,6 +163,16 @@ STAGE_TOOLS = {
 # ============================================================================
 
 @dataclass
+class DocumentStructure:
+    """LLM이 발견한 문서 계층 구조"""
+    hierarchy_section: Dict  # Title 1 전체 정보 (상품 계층)
+    conditions_section: Dict  # Title 3 전체 정보 (가입 조건)
+    subtitle_to_tables: Dict  # 소제목 → 표 매핑 {"가. 해약환급금 미지급형": ["가입가능 조건"]}
+    hierarchy_title: str  # "1. 보험종목의 명칭"
+    conditions_title: str  # "3. 보험기간, ..."
+
+
+@dataclass
 class DocumentAnalysis:
     """Document analysis result by Planner"""
     stage: Stage
@@ -174,6 +184,8 @@ class DocumentAnalysis:
     column_count: int
     row_span_usage: bool
     sample_content: str  # 실제 내용 일부
+    subtitle_context: str = ""  # 소제목 정보 ("가. 해약환급금 미지급형")
+    discovered_structure: Optional['DocumentStructure'] = None  # 발견한 구조
 
     def to_dict(self):
         return {
@@ -185,7 +197,8 @@ class DocumentAnalysis:
             "text_density": self.text_density,
             "column_count": self.column_count,
             "row_span_usage": self.row_span_usage,
-            "sample_content": self.sample_content[:500]  # 처음 500자만
+            "sample_content": self.sample_content[:500],  # 처음 500자만
+            "subtitle_context": self.subtitle_context
         }
 
 
@@ -238,16 +251,138 @@ class PlannerAgent:
     REAL Planner using OpenAI GPT to select optimal tool combination
     """
 
-    def __init__(self, model: str = "gpt-4o"):
+    def __init__(self, model: str = "gpt-4o", analysis_mode: str = "llm_based"):
+        """
+        Args:
+            model: GPT 모델 (계획 수립용)
+            analysis_mode: 문서 분석 방식
+                - "rule_based": 패턴 매칭 (빠름, 새로운 형식에 취약)
+                - "llm_based": LLM 분석 (유연, 느림, 비용↑)
+                - "hybrid": Rule 먼저 시도, 실패 시 LLM
+        """
         self.tool_registry = TOOL_REGISTRY
         self.model = model
+        self.analysis_mode = analysis_mode
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise RuntimeError("OPENAI_API_KEY not found in environment")
         self.client = OpenAI(api_key=api_key)
+        self._document_structure_cache = None  # 문서 구조 캐싱 (1회만 실행)
 
-    def analyze_document(self, data: Dict, stage: Stage) -> DocumentAnalysis:
-        """문서 특성 분석 (기존 로직 유지)"""
+    def _discover_document_structure(self, data: Dict) -> DocumentStructure:
+        """
+        LLM이 문서 구조를 자동 발견
+        - Title 1: 상품 계층 (유형1, 유형2)
+        - Title 3: 가입 조건 + 소제목 → 표 매핑
+        """
+        # 캐시 확인
+        if self._document_structure_cache is not None:
+            return self._document_structure_cache
+
+        # JSON이 list일 경우 첫 번째 요소 사용
+        if isinstance(data, list):
+            data = data[0] if data else {}
+
+        # 문서 제목 목록 추출 (LLM에게 힌트 제공)
+        titles = []
+        for element in data.get("elements", []):
+            titles.append(element.get("title", ""))
+
+        titles_summary = "\n".join(f"{i+1}. {t}" for i, t in enumerate(titles[:10]))  # 처음 10개만
+
+        # LLM에게 구조 발견 요청
+        discovery_prompt = f"""다음은 보험 약관 문서입니다.
+이 문서의 구조를 분석하여 필요한 정보가 어디에 있는지 찾으세요.
+
+문서 Title 목록:
+{titles_summary}
+
+찾아야 할 정보:
+1. 상품 계층/명칭 정보 (유형1, 유형2 등) → 주로 "보험종목의 명칭" Title
+2. 가입 조건 정보 (보험기간, 납입기간, 나이 등) → 주로 "보험기간, ..." Title
+3. Title 3 내부의 소제목과 표 관계:
+   - 각 소제목(가., 나., ...)
+   - 각 소제목 아래 "가입가능 조건" 표의 위치
+
+출력 형식 (JSON):
+{{
+  "hierarchy_title": "1. 보험종목의 명칭",
+  "conditions_title": "3. 보험기간, 보험료 납입기간, 피보험자 가입나이 및 보험료 납입주기",
+  "subtitle_mappings": [
+    {{"subtitle": "가. 해약환급금 미지급형", "tables": ["가입가능 조건", "가입불가 조건"]}},
+    {{"subtitle": "나. 일반형", "tables": ["가입가능 조건"]}}
+  ]
+}}
+
+반드시 JSON 형식으로만 응답하세요."""
+
+        try:
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a document structure analyzer. Find where the required information is located in insurance documents."
+                    },
+                    {"role": "user", "content": discovery_prompt}
+                ],
+                temperature=0.1,
+                max_tokens=500,
+                response_format={"type": "json_object"}
+            )
+
+            discovery_result = json.loads(response.choices[0].message.content)
+
+            print(f"\n[LLM 문서 구조 발견]")
+            print(json.dumps(discovery_result, indent=2, ensure_ascii=False))
+            print()
+
+            # 실제 섹션 추출
+            hierarchy_title = discovery_result.get("hierarchy_title", "")
+            conditions_title = discovery_result.get("conditions_title", "")
+
+            hierarchy_section = None
+            conditions_section = None
+
+            for element in data.get("elements", []):
+                title = element.get("title", "")
+                if hierarchy_title and hierarchy_title in title:
+                    hierarchy_section = element
+                if conditions_title and conditions_title in title:
+                    conditions_section = element
+
+            # 소제목 → 표 매핑 생성
+            subtitle_to_tables = {}
+            for mapping in discovery_result.get("subtitle_mappings", []):
+                subtitle = mapping.get("subtitle", "")
+                tables = mapping.get("tables", [])
+                subtitle_to_tables[subtitle] = tables
+
+            structure = DocumentStructure(
+                hierarchy_section=hierarchy_section or {},
+                conditions_section=conditions_section or {},
+                subtitle_to_tables=subtitle_to_tables,
+                hierarchy_title=hierarchy_title,
+                conditions_title=conditions_title
+            )
+
+            # 캐싱
+            self._document_structure_cache = structure
+            return structure
+
+        except Exception as e:
+            print(f"LLM 구조 발견 실패: {e}")
+            # Fallback: 하드코딩된 방식
+            return DocumentStructure(
+                hierarchy_section=self._find_section(data, "1.") or {},
+                conditions_section=self._find_section(data, "3.") or {},
+                subtitle_to_tables={},
+                hierarchy_title="1. 보험종목의 명칭",
+                conditions_title="3. 보험기간, ..."
+            )
+
+    def _analyze_document_rule_based(self, data: Dict, stage: Stage) -> DocumentAnalysis:
+        """Rule-based 문서 특성 분석 (패턴 매칭)"""
         # JSON이 list일 경우 첫 번째 요소 사용
         if isinstance(data, list):
             data = data[0] if data else {}
@@ -297,13 +432,120 @@ class PlannerAgent:
             sample_content=text_content[:1000]
         )
 
+    def _analyze_document_llm_based(self, data: Dict, stage: Stage) -> DocumentAnalysis:
+        """LLM-based 문서 특성 분석 (의미론적 이해)"""
+        # JSON이 list일 경우 첫 번째 요소 사용
+        if isinstance(data, list):
+            data = data[0] if data else {}
+
+        # 1. 문서 구조 발견 (캐싱됨)
+        structure = self._discover_document_structure(data)
+
+        # 2. Stage에 따라 관련 섹션 추출
+        subtitle_context = ""
+        if stage == Stage.EXTRACT_DEFINITIONS:
+            # Title 1: 상품 계층
+            sample_data = json.dumps(structure.hierarchy_section, ensure_ascii=False)[:3000]
+        elif stage == Stage.PARSE_CONDITIONS:
+            # Title 3: 가입 조건 + 첫 번째 소제목 정보
+            sample_data = json.dumps(structure.conditions_section, ensure_ascii=False)[:4000]
+            # 소제목 정보 추가
+            if structure.subtitle_to_tables:
+                first_subtitle = list(structure.subtitle_to_tables.keys())[0]
+                subtitle_context = first_subtitle
+        else:
+            # 다른 Stage는 전체 문서
+            sample_data = json.dumps(data, ensure_ascii=False)[:3000]
+
+        # LLM에게 문서 분석 요청
+        analysis_prompt = f"""다음은 보험 약관 문서의 일부입니다.
+이 문서의 구조적 특성을 분석하여 JSON으로 반환하세요.
+
+문서 내용:
+{sample_data}
+
+분석 항목:
+1. has_table: 표가 존재하는가? (true/false)
+2. table_structure: 표의 구조 복잡도 ("none", "regular", "irregular")
+   - regular: 단순한 행/열 구조
+   - irregular: rowspan, colspan 등 복잡한 병합 셀 사용
+3. has_formula: 수식이 존재하는가? (min[], max[] 같은 계산식) (true/false)
+4. formula_complexity: 수식 복잡도 ("none", "simple", "medium", "complex")
+5. text_density: 텍스트 비율 (0.0~1.0, 표가 많으면 낮고 텍스트가 많으면 높음)
+6. column_count: 표의 열 개수 (표가 없으면 0)
+7. row_span_usage: rowspan 같은 셀 병합 사용 여부 (true/false)
+
+출력 형식 (JSON):
+{{
+  "has_table": true,
+  "table_structure": "irregular",
+  "has_formula": false,
+  "formula_complexity": "none",
+  "text_density": 0.3,
+  "column_count": 4,
+  "row_span_usage": true
+}}
+
+반드시 JSON 형식으로만 응답하세요."""
+
+        try:
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini",  # 빠르고 저렴한 모델
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a document structure analyzer. Analyze the given insurance document and return ONLY valid JSON."
+                    },
+                    {"role": "user", "content": analysis_prompt}
+                ],
+                temperature=0.1,
+                max_tokens=300,
+                response_format={"type": "json_object"}
+            )
+
+            analysis_result = json.loads(response.choices[0].message.content)
+
+            print(f"\n[LLM 문서 분석 결과]")
+            print(json.dumps(analysis_result, indent=2, ensure_ascii=False))
+            print()
+
+            return DocumentAnalysis(
+                stage=stage,
+                has_table=analysis_result.get("has_table", False),
+                table_structure=analysis_result.get("table_structure", "none"),
+                has_formula=analysis_result.get("has_formula", False),
+                formula_complexity=analysis_result.get("formula_complexity", "none"),
+                text_density=analysis_result.get("text_density", 0.5),
+                column_count=analysis_result.get("column_count", 0),
+                row_span_usage=analysis_result.get("row_span_usage", False),
+                sample_content=sample_data[:500],
+                subtitle_context=subtitle_context,
+                discovered_structure=structure
+            )
+
+        except Exception as e:
+            print(f"LLM 분석 실패, Rule-based로 폴백: {e}")
+            return self._analyze_document_rule_based(data, stage)
+
     def plan_for_stage(self, data: Dict, stage: Stage) -> ToolPlan:
         """
         REAL GPT-based planning
 
         GPT가 문서 특성과 Tool Registry를 보고 직접 Tool 조합 선택
         """
-        analysis = self.analyze_document(data, stage)
+        # 분석 방식 선택
+        if self.analysis_mode == "rule_based":
+            analysis = self._analyze_document_rule_based(data, stage)
+        elif self.analysis_mode == "llm_based":
+            analysis = self._analyze_document_llm_based(data, stage)
+        elif self.analysis_mode == "hybrid":
+            # Hybrid: Rule 먼저 시도, Title3 섹션이 없으면 LLM 사용
+            analysis = self._analyze_document_rule_based(data, stage)
+            if analysis.table_structure == "none" and analysis.text_density >= 0.9:
+                print("[Hybrid 모드] Rule-based 분석 결과 불확실 → LLM으로 재분석")
+                analysis = self._analyze_document_llm_based(data, stage)
+        else:
+            raise ValueError(f"Unknown analysis_mode: {self.analysis_mode}")
         available_tools = STAGE_TOOLS.get(stage, [])
 
         # Tool 정보를 GPT에게 제공
@@ -331,9 +573,10 @@ class PlannerAgent:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a strategic planner for a multi-agent system. "
-                                   "Your job is to select the optimal tool combination for each stage "
-                                   "based on document characteristics and tool capabilities."
+                        "content": "너는 multi-agent system의 strategic planner이다. "
+                                   "너의 임무는 각 stage에 맞는 최적의 Tool 조합을 선택하는 것이다. "
+                                   "문서 특성과 tool의 기능을 기반으로 판단하여라. "
+                                   "모든 응답은 반드시 한국어로 작성하고, 특히 reasoning 필드는 한국어로 명확하게 설명해야 한다."
                     },
                     {"role": "user", "content": prompt}
                 ],
@@ -372,32 +615,32 @@ DOCUMENT ANALYSIS:
 AVAILABLE TOOLS FOR THIS STAGE:
 {json.dumps(tools_info, indent=2, ensure_ascii=False)}
 
-YOUR TASK:
-Based on the document characteristics and tool capabilities, select the optimal tool combination.
+당신의 임무:
+문서 특성과 도구 능력을 바탕으로 최적의 도구 조합을 선택하세요.
 
-DECISION CRITERIA:
-1. If the document has structured tables with simple patterns -> prefer rule_based tools
-2. If there are formulas (min[], max[]) -> use FormulaAwareConditionParser or its sub-tools
-3. If the document is unstructured or complex -> prefer llm_based tools
-4. Consider speed vs accuracy tradeoff
-5. Always specify a fallback_tool in case the primary tool fails
+선택 기준:
+1. 구조화된 표가 있고 패턴이 단순함 -> rule_based 도구 우선
+2. 수식이 있음 (min[], max[]) -> FormulaAwareConditionParser 또는 하위 도구 사용
+3. 비구조화되었거나 복잡함 -> llm_based 도구 우선
+4. 속도 vs 정확도 트레이드오프 고려
+5. 항상 fallback_tool을 지정하여 실패 대비
 
-OUTPUT FORMAT (JSON):
+출력 형식 (JSON):
 {{
-  "primary_tools": ["ToolName1", "ToolName2", ...],  // Main tool pipeline (can be single tool or multiple tools in sequence)
-  "fallback_tool": "FallbackToolName",  // Tool to use if primary fails (optional but recommended)
-  "params": {{}},  // Any parameters for the tools (optional)
-  "estimated_confidence": 0.85,  // Your confidence in this plan (0.0 to 1.0)
-  "reasoning": "Clear explanation of why you chose these tools based on document characteristics"
+  "primary_tools": ["도구이름1", "도구이름2", ...],  // 메인 도구 파이프라인 (단일 또는 여러 도구 순차 실행)
+  "fallback_tool": "폴백도구이름",  // 실패 시 사용할 도구 (선택이지만 권장)
+  "params": {{}},  // 도구 파라미터 (선택)
+  "estimated_confidence": 0.85,  // 이 계획에 대한 신뢰도 (0.0 ~ 1.0)
+  "reasoning": "문서 특성 기반으로 이 도구들을 선택한 명확한 이유"
 }}
 
-IMPORTANT:
-- primary_tools should be a list of tool names from the available tools
-- For simple cases, use a single tool: ["SimpleRangeParser"]
-- For complex cases, chain multiple tools: ["FormulaDetector", "VariableExtractor", "FormulaEvaluator"]
-- Always explain your reasoning clearly
+중요사항:
+- primary_tools는 사용 가능한 도구 목록에서 선택한 도구 이름 리스트여야 함
+- 단순한 경우: 단일 도구 사용 ["SimpleRangeParser"]
+- 복잡한 경우: 여러 도구 연쇄 ["FormulaDetector", "VariableExtractor", "FormulaEvaluator"]
+- 항상 선택 이유를 명확히 설명할 것
 
-Now, make your decision and output ONLY valid JSON:"""
+이제 결정을 내리고 유효한 JSON만 출력하세요:"""
 
     def _fallback_plan(self, stage: Stage, analysis: DocumentAnalysis) -> ToolPlan:
         """GPT 호출 실패 시 간단한 휴리스틱 사용"""
@@ -522,8 +765,8 @@ class ValidationAgent:
 class PipelineOrchestrator:
     """Manage and execute entire 4-stage pipeline"""
 
-    def __init__(self, model: str = "gpt-4o"):
-        self.planner = PlannerAgent(model=model)
+    def __init__(self, model: str = "gpt-4o", analysis_mode: str = "llm_based"):
+        self.planner = PlannerAgent(model=model, analysis_mode=analysis_mode)
         self.executor = ExecutorAgent()
         self.validator = ValidationAgent()
         self.stages = [
@@ -587,7 +830,8 @@ def main():
         "신한종신보험 패밀리케어(무배당, 해약환급금 일부지급형)_parsed.json"
     ]
 
-    orchestrator = PipelineOrchestrator(model="gpt-4o")
+    # LLM 기반 문서 분석 사용
+    orchestrator = PipelineOrchestrator(model="gpt-4o", analysis_mode="llm_based")
 
     all_results = []
 
