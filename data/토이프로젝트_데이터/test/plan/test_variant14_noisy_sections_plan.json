@@ -1,0 +1,210 @@
+{
+  "reasoning": {
+    "checklist": {
+      "언어": {
+        "check": "문서에 비한국어(중국어/영어/한자) 포함 여부 분석",
+        "detected": "순수 한국어",
+        "decision": "불필요",
+        "reason": "문서의 모든 요소가 한국어로 작성되어 있으며, 중국어나 영어가 포함되지 않았음."
+      },
+      "수식": {
+        "check": "문서에서 수식(min, max, 계산식 등) 포함 여부 확인",
+        "detected": "true",
+        "decision": "FormulaEvaluator 필요",
+        "reason": "조건 섹션에서 'min[세만기 - 년납, 90 - 년납, 80]'과 같은 수식이 발견됨."
+      },
+      "소제목": {
+        "check": "조건 섹션에 소제목 구조 존재 여부 확인",
+        "detected": "true",
+        "decision": "SubtitleMapper 계열 필요",
+        "reason": "조건 섹션에서 '가. 해약환급금 미지급형', '나. 일반형'과 같은 소제목이 존재하며, 각각의 소제목 아래에 표가 있음."
+      },
+      "복잡표": {
+        "check": "rowspan/colspan 복잡도, 병합 셀 분석",
+        "detected": "복잡함",
+        "decision": "RowspanHandler/ColspanHandler 필요",
+        "reason": "표에서 rowspan과 colspan이 사용되어 병합된 셀이 존재함."
+      }
+    },
+    "structure_analysis": {
+      "definition_complexity": "중간",
+      "definition_reasoning": "정의 섹션은 표 1개로 구성되어 있으나, rowspan이 사용되어 계층이 3단 이상으로 복잡함.",
+      "condition_complexity": "중간",
+      "condition_reasoning": "조건 섹션은 소제목과 다중 표로 구성되어 있으며, 수식이 포함되어 있음.",
+      "overall_strategy": "Hybrid 혼합"
+    },
+    "tool_selection_reasoning": [
+      {
+        "step": 1,
+        "tool": "RowspanHandler",
+        "why": "표에서 rowspan이 사용되어 병합된 셀을 처리하기 위해 필요",
+        "alternatives_considered": [
+          "ComplexTableParser: 복잡도에 비해 과도한 처리",
+          "ColspanHandler: rowspan만 처리하면 충분"
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 2,
+        "tool": "FormulaEvaluator",
+        "why": "조건 섹션의 수식을 평가하기 위해 필요",
+        "alternatives_considered": [
+          "FormulaExtractorLLM: 수식이 명확하여 불필요"
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 3,
+        "tool": "DefinitionDeepHierarchyHybrid",
+        "why": "정의 섹션의 표가 3단계 이상의 계층을 포함하고 있어 하이브리드 접근 필요",
+        "alternatives_considered": [
+          "DefinitionSimpleTableRule: 계층이 복잡하여 부적합",
+          "DefinitionLLM: LLM 사용은 과도함"
+        ],
+        "confidence": "medium"
+      },
+      {
+        "step": 4,
+        "tool": "ConditionSubtitleHybrid",
+        "why": "조건 섹션에 소제목과 다중 표가 존재하여 하이브리드 접근 필요",
+        "alternatives_considered": [
+          "ConditionSimpleTableRule: 소제목이 있어 부적합",
+          "ConditionLLM: LLM 사용은 과도함"
+        ],
+        "confidence": "medium"
+      }
+    ],
+    "cost_latency_consideration": "Rule 2개, Hybrid 2개, LLM 0개로 예상 비용은 중간 수준",
+    "potential_risks": [
+      "수식 평가 오류 가능성",
+      "소제목-표 매핑 오류 가능성"
+    ]
+  },
+  "plan": [
+    {
+      "step": 1,
+      "tool": "RowspanHandler",
+      "metadata": {
+        "section_index": 1,
+        "paragraph_index": 0,
+        "access_path": "elements[1].paragraphs[0].table.table_elements",
+        "target_columns": [
+          "명칭",
+          "보험종목",
+          "보험종목_1"
+        ],
+        "hierarchy_info": {
+          "depth": 3,
+          "columns": [
+            "명칭",
+            "보험종목",
+            "보험종목_1"
+          ]
+        }
+      },
+      "reason": "표에서 rowspan이 사용되어 병합된 셀을 처리하기 위해 필요",
+      "expected_output": "병합된 셀이 펼쳐진 표 데이터"
+    },
+    {
+      "step": 2,
+      "tool": "FormulaEvaluator",
+      "metadata": {
+        "section_index": 2,
+        "access_path": "elements[2].paragraphs",
+        "has_subtitles": true,
+        "formula_present": true
+      },
+      "reason": "조건 섹션의 수식을 평가하기 위해 필요",
+      "expected_output": "평가된 수식 결과"
+    },
+    {
+      "step": 3,
+      "tool": "DefinitionDeepHierarchyHybrid",
+      "metadata": {
+        "section_index": 1,
+        "paragraph_index": 0,
+        "access_path": "elements[1].paragraphs[0].table.table_elements",
+        "hierarchy_info": {
+          "depth": 3,
+          "columns": [
+            "명칭",
+            "보험종목",
+            "보험종목_1"
+          ]
+        },
+        "target_columns": [
+          "명칭",
+          "보험종목",
+          "보험종목_1"
+        ]
+      },
+      "reason": "정의 섹션의 표가 3단계 이상의 계층을 포함하고 있어 하이브리드 접근 필요",
+      "expected_output": "정의된 보종명 및 유형 계층 구조"
+    },
+    {
+      "step": 4,
+      "tool": "ConditionSubtitleHybrid",
+      "metadata": {
+        "section_index": 2,
+        "access_path": "elements[2].paragraphs",
+        "has_subtitles": true,
+        "formula_present": true
+      },
+      "reason": "조건 섹션에 소제목과 다중 표가 존재하여 하이브리드 접근 필요",
+      "expected_output": "추출된 가입 조건 정보"
+    },
+    {
+      "step": 5,
+      "tool": "Mapping",
+      "metadata": {},
+      "reason": "추출된 Definition과 Condition을 타겟 스키마에 맞게 필드명 매핑",
+      "expected_output": "타겟 스키마에 맞게 매핑된 데이터"
+    },
+    {
+      "step": 6,
+      "tool": "CartesianProduct",
+      "metadata": {},
+      "reason": "보종 × 기간 × 납입기간 × 연령 × 성별의 모든 조합 생성",
+      "expected_output": "모든 가능한 조합의 데이터"
+    },
+    {
+      "step": 7,
+      "tool": "Normalize",
+      "metadata": {},
+      "reason": "중복 제거 및 데이터 정규화",
+      "expected_output": "정규화된 데이터"
+    },
+    {
+      "step": 8,
+      "tool": "ValidationLight",
+      "metadata": {},
+      "reason": "필수 필드 존재 여부 및 기본 범위 검사",
+      "expected_output": "검증된 데이터"
+    },
+    {
+      "step": 9,
+      "tool": "FinalWriter",
+      "metadata": {},
+      "reason": "최종 가입가능조건 JSON 파일 출력",
+      "expected_output": "최종 JSON 파일"
+    }
+  ],
+  "_metadata": {
+    "model": "gpt-4o",
+    "latency_seconds": 22.09,
+    "token_usage": {
+      "input_tokens": 10983,
+      "output_tokens": 1707,
+      "total_tokens": 12690
+    },
+    "cost_usd": {
+      "input_cost": 0.027457,
+      "output_cost": 0.01707,
+      "total_cost": 0.044527
+    },
+    "pricing_per_1m_tokens": {
+      "input": 2.5,
+      "output": 10.0
+    }
+  }
+}

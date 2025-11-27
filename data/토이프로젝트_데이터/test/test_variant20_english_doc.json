@@ -1,0 +1,59 @@
+[
+  {
+    "doc_title": "Sample Accident Disability Rider (English Variant)",
+    "elements": [
+      {
+        "title": "1. Product Name and Type",
+        "paragraphs": [
+          {
+            "type": "table",
+            "content": "<table>...</table>",
+            "table": {
+              "table_title": "Product Definition",
+              "table_elements": [
+                {
+                  "Product Name": "Accident Disability Rider (Non-Refund)",
+                  "Plan Type": "Non-Refund",
+                  "Underwriting Type": "Simplified (315) / Simplified (335) / Standard"
+                },
+                {
+                  "Product Name": "Accident Disability Rider",
+                  "Plan Type": "Standard",
+                  "Underwriting Type": "Standard"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "title": "3. Coverage Period and Premium Payment",
+        "paragraphs": [
+          {
+            "type": "table",
+            "content": "<table>...</table>",
+            "table": {
+              "table_title": "Eligibility",
+              "table_elements": [
+                {
+                  "Plan Type": "Non-Refund",
+                  "Coverage Period": "20 / 30 years, Whole Life",
+                  "Payment Period": "10 / 20 years",
+                  "Male Age": "15 - 65",
+                  "Female Age": "15 - 65"
+                },
+                {
+                  "Plan Type": "Standard",
+                  "Coverage Period": "20 / 30 years",
+                  "Payment Period": "10 / 20 years",
+                  "Male Age": "15 - 60",
+                  "Female Age": "15 - 60"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+]

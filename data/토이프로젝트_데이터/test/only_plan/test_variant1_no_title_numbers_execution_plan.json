@@ -1,0 +1,344 @@
+{
+  "reasoning": {
+    "checklist": {
+      "언어": {
+        "check": "문서에 비한국어(중국어/영어/한자) 포함 여부 분석",
+        "detected": "순수 한국어",
+        "decision": "불필요",
+        "reason": "문서의 제목 및 섹션 제목, 컬럼명이 모두 한국어로 되어 있으며, 비한국어가 포함되지 않았음."
+      },
+      "수식": {
+        "check": "sample_conditions.has_formula 확인",
+        "detected": "true",
+        "decision": "FormulaEvaluator 필요",
+        "reason": "수식이 포함되어 있으며, 복잡한 min/max 계산식이 존재하여 파싱이 필요함."
+      },
+      "소제목": {
+        "check": "condition_hierarchy.has_subtitles 확인",
+        "detected": "true",
+        "decision": "SubtitleMapper 계열 필요",
+        "reason": "소제목이 존재하며, 소제목과 표가 떨어져 있어 매핑 실수 가능성이 있음."
+      },
+      "복잡표": {
+        "check": "rowspan/colspan 복잡도, 특이사항 분석",
+        "detected": "복잡함",
+        "decision": "RowspanHandler 필요",
+        "reason": "정의 섹션에서 rowspan을 통해 심사 유형이 여러 행에 걸쳐 나타남."
+      }
+    },
+    "structure_analysis": {
+      "definition_complexity": "중간",
+      "definition_reasoning": "표 1개, 계층 3단, 컬럼명이 명확하나 rowspan이 존재하여 중간 복잡도로 판단.",
+      "condition_complexity": "중간",
+      "condition_reasoning": "소제목이 존재하고, 다중 표가 있으며, 수식이 포함되어 있어 중간 복잡도로 판단.",
+      "overall_strategy": "Hybrid 혼합"
+    },
+    "tool_selection_reasoning": [
+      {
+        "step": 1,
+        "tool": "RowspanHandler",
+        "why": "정의 섹션에서 rowspan을 통해 심사 유형이 여러 행에 걸쳐 나타나므로 이를 처리하기 위해 필요.",
+        "alternatives_considered": [
+          "ComplexTableParser: 중복된 비용 발생 가능성",
+          "DefinitionMultiColumnRule: rowspan 처리 불가"
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 2,
+        "tool": "DefinitionDeepHierarchyHybrid",
+        "why": "계층 구조가 3단계로 깊고, rowspan이 존재하여 하이브리드 접근이 필요.",
+        "alternatives_considered": [
+          "DefinitionSimpleTableRule: 계층이 깊어 적합하지 않음",
+          "DefinitionLLM: 불필요한 LLM 비용 발생"
+        ],
+        "confidence": "medium"
+      },
+      {
+        "step": 3,
+        "tool": "SubtitleMapper",
+        "why": "소제목과 표가 떨어져 있어 매핑 실수를 방지하기 위해 필요.",
+        "alternatives_considered": [
+          "CloseProximityMapper: 소제목과 표가 물리적으로 떨어져 있어 부적합",
+          "DistantMappingHandler: 중복된 비용 발생 가능성"
+        ],
+        "confidence": "medium"
+      },
+      {
+        "step": 4,
+        "tool": "FormulaEvaluator",
+        "why": "조건 섹션에 복잡한 수식이 포함되어 있어 이를 평가하기 위해 필요.",
+        "alternatives_considered": [
+          "FormulaExtractorLLM: LLM 사용 불필요",
+          "ConditionRule: 수식 처리 불가"
+        ],
+        "confidence": "high"
+      }
+    ],
+    "cost_latency_consideration": "Rule 2개 × 저비용, Hybrid 2개 × 중비용, 전체 예상 비용: 중간",
+    "potential_risks": [
+      "수식 파싱 실패 가능",
+      "소제목-표 매핑 오류 가능성",
+      "rowspan 처리 오류 가능성"
+    ]
+  },
+  "plan": [
+    {
+      "step": 1,
+      "tool": "RowspanHandler",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements",
+        "target_columns": [
+          "명칭",
+          "보험종목",
+          "보험종목_1"
+        ],
+        "hierarchy_info": {
+          "depth": 3,
+          "columns": [
+            "명칭",
+            "보험종목",
+            "보험종목_1"
+          ]
+        }
+      },
+      "reason": "정의 섹션에서 rowspan을 통해 심사 유형이 여러 행에 걸쳐 나타나므로 이를 처리하기 위해 필요.",
+      "expected_output": "rowspan이 처리된 표 데이터"
+    },
+    {
+      "step": 2,
+      "tool": "DefinitionDeepHierarchyHybrid",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements",
+        "target_columns": [
+          "명칭",
+          "보험종목",
+          "보험종목_1"
+        ],
+        "hierarchy_info": {
+          "depth": 3,
+          "columns": [
+            "명칭",
+            "보험종목",
+            "보험종목_1"
+          ]
+        }
+      },
+      "reason": "계층 구조가 3단계로 깊고, rowspan이 존재하여 하이브리드 접근이 필요.",
+      "expected_output": "계층 구조가 추출된 정의 데이터"
+    },
+    {
+      "step": 3,
+      "tool": "SubtitleMapper",
+      "metadata": {
+        "section_index": 1,
+        "access_path": "elements[1].paragraphs",
+        "subtitle_mappings": [
+          {
+            "subtitle": "가. 해약환급금 미지급형",
+            "paragraph_index": 0,
+            "estimated_type": "심사 유형",
+            "table_index": 1,
+            "table_types": {
+              "유형1": [
+                "간편심사형",
+                "일반심사형"
+              ],
+              "유형2": [
+                "-"
+              ],
+              "보험기간": [
+                "80/90/100세\n만기, 종신"
+              ],
+              "보험료 납입기간": [
+                "10/15/20/25/30년납"
+              ]
+            }
+          },
+          {
+            "subtitle": "나. 일반형",
+            "paragraph_index": 2,
+            "estimated_type": "심사 유형",
+            "table_index": 3,
+            "table_types": {
+              "유형1": [
+                "간편심사형",
+                "일반심사형"
+              ],
+              "유형2": [
+                "-"
+              ],
+              "보험기간": [
+                "25/30년 만기,\n80/90/100세\n만기, 종신"
+              ],
+              "보험료 납입기간": [
+                "5/7/10/15/20/25/30년납"
+              ]
+            }
+          }
+        ],
+        "paragraph_map": [
+          {
+            "index": 0,
+            "type": "title",
+            "content": "가. 해약환급금 미지급형"
+          },
+          {
+            "index": 1,
+            "type": "table",
+            "content": "가입가능 조건"
+          },
+          {
+            "index": 2,
+            "type": "title",
+            "content": "나. 일반형"
+          },
+          {
+            "index": 3,
+            "type": "table",
+            "content": "가입가능 조건"
+          }
+        ],
+        "has_subtitles": true,
+        "formula_present": true
+      },
+      "reason": "소제목과 표가 떨어져 있어 매핑 실수를 방지하기 위해 필요.",
+      "expected_output": "소제목과 매핑된 조건 데이터"
+    },
+    {
+      "step": 4,
+      "tool": "FormulaEvaluator",
+      "metadata": {
+        "section_index": 1,
+        "access_path": "elements[1].paragraphs",
+        "subtitle_mappings": [
+          {
+            "subtitle": "가. 해약환급금 미지급형",
+            "paragraph_index": 0,
+            "estimated_type": "심사 유형",
+            "table_index": 1,
+            "table_types": {
+              "유형1": [
+                "간편심사형",
+                "일반심사형"
+              ],
+              "유형2": [
+                "-"
+              ],
+              "보험기간": [
+                "80/90/100세\n만기, 종신"
+              ],
+              "보험료 납입기간": [
+                "10/15/20/25/30년납"
+              ]
+            }
+          },
+          {
+            "subtitle": "나. 일반형",
+            "paragraph_index": 2,
+            "estimated_type": "심사 유형",
+            "table_index": 3,
+            "table_types": {
+              "유형1": [
+                "간편심사형",
+                "일반심사형"
+              ],
+              "유형2": [
+                "-"
+              ],
+              "보험기간": [
+                "25/30년 만기,\n80/90/100세\n만기, 종신"
+              ],
+              "보험료 납입기간": [
+                "5/7/10/15/20/25/30년납"
+              ]
+            }
+          }
+        ],
+        "paragraph_map": [
+          {
+            "index": 0,
+            "type": "title",
+            "content": "가. 해약환급금 미지급형"
+          },
+          {
+            "index": 1,
+            "type": "table",
+            "content": "가입가능 조건"
+          },
+          {
+            "index": 2,
+            "type": "title",
+            "content": "나. 일반형"
+          },
+          {
+            "index": 3,
+            "type": "table",
+            "content": "가입가능 조건"
+          }
+        ],
+        "has_subtitles": true,
+        "formula_present": true
+      },
+      "reason": "조건 섹션에 복잡한 수식이 포함되어 있어 이를 평가하기 위해 필요.",
+      "expected_output": "평가된 수식이 포함된 조건 데이터"
+    },
+    {
+      "step": 5,
+      "tool": "Mapping",
+      "metadata": {},
+      "reason": "추출된 Definition과 Condition을 타겟 스키마에 맞게 필드명 매핑",
+      "expected_output": "타겟 스키마에 맞게 매핑된 데이터"
+    },
+    {
+      "step": 6,
+      "tool": "CartesianProduct",
+      "metadata": {},
+      "reason": "보종 × 기간 × 납입기간 × 연령 × 성별의 모든 조합 생성",
+      "expected_output": "모든 가능한 조합이 생성된 데이터"
+    },
+    {
+      "step": 7,
+      "tool": "Normalize",
+      "metadata": {},
+      "reason": "중복 제거 및 데이터 정규화",
+      "expected_output": "정규화된 데이터"
+    },
+    {
+      "step": 8,
+      "tool": "ValidationLight",
+      "metadata": {},
+      "reason": "필수 필드 존재 여부 및 기본 범위 검사",
+      "expected_output": "검증된 데이터"
+    },
+    {
+      "step": 9,
+      "tool": "FinalWriter",
+      "metadata": {},
+      "reason": "최종 가입가능조건 JSON 파일 출력",
+      "expected_output": "최종 JSON 파일"
+    }
+  ],
+  "_metadata": {
+    "model": "gpt-4o",
+    "latency_seconds": 33.13,
+    "token_usage": {
+      "input_tokens": 6116,
+      "output_tokens": 2582,
+      "total_tokens": 8698
+    },
+    "cost_usd": {
+      "input_cost": 0.01529,
+      "output_cost": 0.02582,
+      "total_cost": 0.04111
+    },
+    "pricing_per_1m_tokens": {
+      "input": 2.5,
+      "output": 10.0
+    }
+  }
+}

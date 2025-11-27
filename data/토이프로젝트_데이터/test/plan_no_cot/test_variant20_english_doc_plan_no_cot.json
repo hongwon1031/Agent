@@ -1,0 +1,116 @@
+{
+  "plan": [
+    {
+      "step": 1,
+      "tool": "EnglishToKorean",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements",
+        "target_columns": [
+          "Product Name",
+          "Plan Type",
+          "Underwriting Type"
+        ],
+        "hierarchy_info": {
+          "depth": 2,
+          "columns": [
+            "Product Name",
+            "Plan Type"
+          ]
+        }
+      },
+      "reason": "영어로 작성된 정의 섹션의 컬럼명을 한국어로 번역하기 위해",
+      "expected_output": "한국어로 번역된 컬럼명"
+    },
+    {
+      "step": 2,
+      "tool": "DefinitionSimpleTableRule",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements",
+        "target_columns": [
+          "Product Name",
+          "Plan Type",
+          "Underwriting Type"
+        ],
+        "hierarchy_info": {
+          "depth": 2,
+          "columns": [
+            "Product Name",
+            "Plan Type"
+          ]
+        }
+      },
+      "reason": "단순한 표 구조의 정의 섹션에서 보종명과 유형을 추출하기 위해",
+      "expected_output": "보종명, 유형1, 유형2"
+    },
+    {
+      "step": 3,
+      "tool": "ConditionSimpleTableRule",
+      "metadata": {
+        "section_index": 1,
+        "access_path": "elements[1].paragraphs",
+        "has_subtitles": false,
+        "formula_present": false
+      },
+      "reason": "단일 표 구조의 조건 섹션에서 보험기간, 납입기간, 가입연령, 성별을 추출하기 위해",
+      "expected_output": "보험기간, 납입기간, 주피보험자최소가입연령, 주피보험자최대가입연령, 주피보험자가입성별"
+    },
+    {
+      "step": 4,
+      "tool": "Mapping",
+      "metadata": {},
+      "reason": "추출된 데이터를 내부 스키마에 맞게 매핑하기 위해",
+      "expected_output": "내부 스키마에 맞게 매핑된 데이터"
+    },
+    {
+      "step": 5,
+      "tool": "CartesianProduct",
+      "metadata": {},
+      "reason": "모든 가능한 조합을 생성하기 위해",
+      "expected_output": "보종 × 기간 × 납입기간 × 연령 × 성별의 모든 조합"
+    },
+    {
+      "step": 6,
+      "tool": "Normalize",
+      "metadata": {},
+      "reason": "중복 조합 제거 및 정규화를 통해 최종 JSON 구조를 정리하기 위해",
+      "expected_output": "정규화된 최종 JSON 구조"
+    },
+    {
+      "step": 7,
+      "tool": "ValidationLight",
+      "metadata": {},
+      "reason": "필수 필드 존재 여부 및 조합 개수 검증을 위해",
+      "expected_output": "검증된 JSON 데이터"
+    },
+    {
+      "step": 8,
+      "tool": "FinalWriter",
+      "metadata": {},
+      "reason": "최종 스키마에 맞춰 JSON을 파일로 저장하기 위해",
+      "expected_output": "최종 JSON 파일"
+    }
+  ],
+  "_metadata": {
+    "model": "gpt-4o",
+    "method": "direct_plan_no_cot",
+    "latency_seconds": 10.08,
+    "token_usage": {
+      "input_tokens": 3308,
+      "output_tokens": 761,
+      "total_tokens": 4069
+    },
+    "cost_usd": {
+      "input_cost": 0.00827,
+      "output_cost": 0.00761,
+      "total_cost": 0.01588
+    },
+    "pricing_per_1m_tokens": {
+      "input": 2.5,
+      "output": 10.0
+    }
+  }
+}

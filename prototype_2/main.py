@@ -1,6 +1,21 @@
 """
 Main entry point for prototype_2 agent.
 Processes insurance documents and extracts all definition combinations.
+
+이 프로그램의 진입점입니다. 명령줄 인자로 문서 경로를 받아 처리합니다.
+
+사용법:
+    python main.py <document_path> [output_path]
+
+예시:
+    python main.py "data/문서.json"
+    python main.py "data/문서.json" "결과.json"
+
+동작 흐름:
+    1. 문서 로드 (JSON 파일)
+    2. MultiStepAgent 생성
+    3. Agent 실행 (Plan → Execute → Validate → Replan → Result)
+    4. 결과 출력 및 저장
 """
 
 import json
@@ -11,7 +26,15 @@ from agent import MultiStepAgent
 
 
 def load_document(doc_path: str):
-    """Load parsed insurance document JSON."""
+    """
+    파싱된 보험 문서 JSON 로드
+
+    Args:
+        doc_path (str): 문서 파일 경로
+
+    Returns:
+        List[Dict] or None: 로드된 문서 또는 None (실패 시)
+    """
     try:
         with open(doc_path, 'r', encoding='utf-8') as f:
             doc = json.load(f)

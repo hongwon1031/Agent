@@ -1,0 +1,199 @@
+{
+  "reasoning": {
+    "checklist": {
+      "언어": {
+        "check": "문서에 비한국어(중국어/영어/한자) 포함 여부 분석",
+        "detected": "순수 한국어",
+        "decision": "불필요",
+        "reason": "문서의 모든 요소가 한국어로 작성되어 있으며, 영어 또는 중국어가 포함되어 있지 않음."
+      },
+      "수식": {
+        "check": "문서에서 수식(min, max, 계산식 등) 포함 여부 확인",
+        "detected": "false",
+        "decision": "불필요",
+        "reason": "문서 내 표나 텍스트에서 수식이 발견되지 않음."
+      },
+      "소제목": {
+        "check": "조건 섹션에 소제목 구조 존재 여부 확인",
+        "detected": "false",
+        "decision": "불필요",
+        "reason": "문서에 소제목과 관련된 구조가 발견되지 않음."
+      },
+      "복잡표": {
+        "check": "rowspan/colspan 복잡도, 병합 셀 분석",
+        "detected": "복잡함",
+        "decision": "RowspanHandler/ColspanHandler 필요",
+        "reason": "표에 colspan과 rowspan이 사용되어 병합된 셀이 존재함."
+      }
+    },
+    "structure_analysis": {
+      "definition_complexity": "중간",
+      "definition_reasoning": "표 1개, 계층 2단, colspan과 rowspan 사용으로 인해 다소 복잡한 구조.",
+      "condition_complexity": "단순",
+      "condition_reasoning": "조건 섹션이 존재하지 않음.",
+      "overall_strategy": "Rule 기반 우선"
+    },
+    "tool_selection_reasoning": [
+      {
+        "step": 1,
+        "tool": "RowspanHandler",
+        "why": "표에 rowspan이 사용되어 있어 이를 처리하기 위해 필요함.",
+        "alternatives_considered": [
+          "ComplexTableParser: 복잡한 구조가 아니므로 불필요"
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 2,
+        "tool": "ColspanHandler",
+        "why": "표에 colspan이 사용되어 있어 이를 처리하기 위해 필요함.",
+        "alternatives_considered": [
+          "ComplexTableParser: 복잡한 구조가 아니므로 불필요"
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 3,
+        "tool": "DefinitionMultiColumnRule",
+        "why": "멀티 컬럼 구조이지만 rowspan/colspan이 단순한 정의 표를 규칙 기반으로 파싱하기에 적합함.",
+        "alternatives_considered": [
+          "DefinitionHybrid: 불필요한 LLM 비용 발생",
+          "DefinitionLLM: 단순 구조에 과도한 Tool"
+        ],
+        "confidence": "high"
+      }
+    ],
+    "cost_latency_consideration": "Rule 기반 Tool 3개 × 저비용, 전체 예상 비용: 낮음",
+    "potential_risks": [
+      "rowspan/colspan 처리 오류 가능성",
+      "정의 섹션에서 계층 구조 추출 실패 가능성"
+    ]
+  },
+  "plan": [
+    {
+      "step": 1,
+      "tool": "RowspanHandler",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements",
+        "target_columns": [
+          "명칭",
+          "보험종목",
+          "보험종목_1"
+        ],
+        "hierarchy_info": {
+          "depth": 2,
+          "columns": [
+            "명칭",
+            "보험종목",
+            "보험종목_1"
+          ]
+        }
+      },
+      "reason": "표에 rowspan이 사용되어 있어 이를 처리하기 위해 필요함.",
+      "expected_output": "rowspan이 적용된 셀의 값이 각 행으로 펼쳐짐"
+    },
+    {
+      "step": 2,
+      "tool": "ColspanHandler",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements",
+        "target_columns": [
+          "명칭",
+          "보험종목",
+          "보험종목_1"
+        ],
+        "hierarchy_info": {
+          "depth": 2,
+          "columns": [
+            "명칭",
+            "보험종목",
+            "보험종목_1"
+          ]
+        }
+      },
+      "reason": "표에 colspan이 사용되어 있어 이를 처리하기 위해 필요함.",
+      "expected_output": "colspan이 적용된 셀이 개별 컬럼으로 분해됨"
+    },
+    {
+      "step": 3,
+      "tool": "DefinitionMultiColumnRule",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements",
+        "target_columns": [
+          "명칭",
+          "보험종목",
+          "보험종목_1"
+        ],
+        "hierarchy_info": {
+          "depth": 2,
+          "columns": [
+            "명칭",
+            "보험종목",
+            "보험종목_1"
+          ]
+        }
+      },
+      "reason": "멀티 컬럼 구조이지만 rowspan/colspan이 단순한 정의 표를 규칙 기반으로 파싱하기에 적합함.",
+      "expected_output": "보종명, 유형1/2/3 등의 계층 구조 추출"
+    },
+    {
+      "step": 4,
+      "tool": "Mapping",
+      "metadata": {},
+      "reason": "추출된 Definition과 Condition을 타겟 스키마에 맞게 필드명 매핑",
+      "expected_output": "타겟 스키마에 맞게 매핑된 데이터"
+    },
+    {
+      "step": 5,
+      "tool": "CartesianProduct",
+      "metadata": {},
+      "reason": "보종 × 기간 × 납입기간 × 연령 × 성별의 모든 조합 생성",
+      "expected_output": "모든 가능한 조합 생성"
+    },
+    {
+      "step": 6,
+      "tool": "Normalize",
+      "metadata": {},
+      "reason": "중복 제거 및 데이터 정규화",
+      "expected_output": "정규화된 데이터"
+    },
+    {
+      "step": 7,
+      "tool": "ValidationLight",
+      "metadata": {},
+      "reason": "필수 필드 존재 여부 및 기본 범위 검사",
+      "expected_output": "검증된 데이터"
+    },
+    {
+      "step": 8,
+      "tool": "FinalWriter",
+      "metadata": {},
+      "reason": "최종 가입가능조건 JSON 파일 출력",
+      "expected_output": "최종 JSON 파일"
+    }
+  ],
+  "_metadata": {
+    "model": "gpt-4o",
+    "latency_seconds": 16.21,
+    "token_usage": {
+      "input_tokens": 5459,
+      "output_tokens": 1514,
+      "total_tokens": 6973
+    },
+    "cost_usd": {
+      "input_cost": 0.013647,
+      "output_cost": 0.01514,
+      "total_cost": 0.028788
+    },
+    "pricing_per_1m_tokens": {
+      "input": 2.5,
+      "output": 10.0
+    }
+  }
+}

@@ -1,0 +1,346 @@
+{
+  "source_file": null,
+  "doc_title": null,
+  "document_analysis": {
+    "total_sections": 22,
+    "definition_section": {
+      "section_index": 0,
+      "title": "1. 보험종목의 명칭",
+      "structure": "혼합",
+      "table_count": 1,
+      "columns": [
+        "명칭",
+        "보험종목",
+        "보험종목_1",
+        "보험종목_2"
+      ],
+      "location": {
+        "paragraph_indices": {
+          "tables": [
+            0
+          ],
+          "texts": [
+            1
+          ]
+        },
+        "primary_table_index": 0
+      },
+      "sample_data": {
+        "계층구조": [
+          {
+            "level": 1,
+            "column_name": "명칭",
+            "values": [
+              "신한종신보험 패밀리케어\n(무배당, 해약환급금 일부지급형)",
+              "신한종신보험 패밀리케어(무배당)",
+              "신한종신보험 패밀리케어(무배당, 적립형 계약)",
+              "신한종신보험 패밀리케어(무배당, 치매간병전환형 계약)"
+            ],
+            "description": "보험 상품의 명칭"
+          },
+          {
+            "level": 2,
+            "column_name": "보험종목",
+            "values": [
+              "보장형 계약",
+              "적립형 계약",
+              "치매간병전환형 계약"
+            ],
+            "description": "보험의 종류"
+          },
+          {
+            "level": 3,
+            "column_name": "보험종목_1",
+            "values": [
+              "해약환급금 일부지급형",
+              "일반형",
+              "적립형 계약",
+              "치매간병전환형 계약"
+            ],
+            "description": "세부 보험종목"
+          },
+          {
+            "level": 4,
+            "column_name": "보험종목_2",
+            "values": [
+              "1종",
+              "2종",
+              "일반형",
+              "적립형 계약",
+              "치매간병전환형 계약"
+            ],
+            "description": "보험종목의 세부 유형"
+          }
+        ],
+        "hierarchy_depth": 4,
+        "hierarchy_tree_example": "명칭 → 보험종목 → 보험종목_1 → 보험종목_2"
+      },
+      "특이사항": "표와 텍스트가 혼합되어 있으며, 표의 rowspan/colspan을 통해 계층 구조가 형성되어 있음.",
+      "누락_위험": "계층 레벨이 rowspan으로 여러 행에 걸쳐 있어 누락 위험이 있음."
+    },
+    "condition_section": {
+      "section_index": 1,
+      "title": "2. 보험기간, 보험료 납입기간, 피보험자 가입나이 및 보험료 납입주기",
+      "structure": "혼합",
+      "table_count": 3,
+      "location": {
+        "paragraph_map": [
+          {
+            "index": 0,
+            "type": "title",
+            "content": "가. 보장형 계약"
+          },
+          {
+            "index": 1,
+            "type": "table",
+            "content": "가입가능 조건"
+          },
+          {
+            "index": 2,
+            "type": "text",
+            "content": "㈜ 보험료 납입기간은 보험기간을 초과할 수 없음"
+          },
+          {
+            "index": 3,
+            "type": "title",
+            "content": "나. 적립형 계약(전환형)"
+          },
+          {
+            "index": 4,
+            "type": "table",
+            "content": "가입가능 조건"
+          },
+          {
+            "index": 5,
+            "type": "text",
+            "content": "㈜ 1. 적립형 계약의 보험기간은 “적립형 계약 전환일”부터 종신까지로 한다.\n2. 적립형 계약의 가입나이는 “적립형 계약 전환일” 당시 피보험자의 나이로 한다."
+          },
+          {
+            "index": 6,
+            "type": "title",
+            "content": "다. 치매간병전환형 계약(전환형)"
+          },
+          {
+            "index": 7,
+            "type": "table",
+            "content": "가입가능 조건"
+          },
+          {
+            "index": 8,
+            "type": "text",
+            "content": "㈜ 1. 치매간병전환형 계약의 보험기간은 “치매간병전환형 계약 전환일”부터 계약자가 선택한 보험기간까지로 한다.\n2. 치매간병전환형 계약의 보험기간 중 중증치매 평생간병비 지급사유가 발생한 경우, 치매간병전환형 계약의 보험기간은 “치매간병전환형 계약 전환일”부터 최종 중증치매 평생간병비 지급사유 해당일까지로 한다.\n3. 치매간병전환형 계약의 가입나이는 “치매간병전환형 계약 전환일” 당시 피보험자의 나이로 한다."
+          }
+        ]
+      },
+      "condition_hierarchy": {
+        "has_subtitles": true,
+        "subtitle_mapping": [
+          {
+            "subtitle": "가. 보장형 계약",
+            "paragraph_index": 0,
+            "estimated_type": "보장형 계약 조건",
+            "table_index": 1,
+            "table_types": {
+              "유형1": [
+                "해약환급금 일부지급형"
+              ],
+              "유형2": [
+                "1종",
+                "2종"
+              ]
+            }
+          },
+          {
+            "subtitle": "나. 적립형 계약(전환형)",
+            "paragraph_index": 3,
+            "estimated_type": "적립형 계약 조건",
+            "table_index": 4,
+            "table_types": {
+              "유형1": [
+                "-"
+              ],
+              "유형2": [
+                "-"
+              ]
+            }
+          },
+          {
+            "subtitle": "다. 치매간병전환형 계약(전환형)",
+            "paragraph_index": 6,
+            "estimated_type": "치매간병전환형 계약 조건",
+            "table_index": 7,
+            "table_types": {
+              "유형1": [
+                "-"
+              ],
+              "유형2": [
+                "-"
+              ]
+            }
+          }
+        ],
+        "all_unique_types": {
+          "from_subtitles": [
+            "보장형 계약 조건",
+            "적립형 계약 조건",
+            "치매간병전환형 계약 조건"
+          ],
+          "from_table_column_유형1": [
+            "해약환급금 일부지급형",
+            "-"
+          ],
+          "from_table_column_유형2": [
+            "1종",
+            "2종",
+            "-"
+          ]
+        },
+        "hierarchy_tree_example": "소제목 → 유형1 → 유형2"
+      },
+      "sample_conditions": {
+        "보험기간": [
+          "종신",
+          "85세, 90세, 95세, 100세만기"
+        ],
+        "납입기간": [
+          "10년납",
+          "15년/20년납",
+          "일시납"
+        ],
+        "나이_표현": [
+          "만15세 ~Min[(80-년납),70]세",
+          "22세 〜 80세",
+          "30세 〜 70세"
+        ],
+        "has_formula": true,
+        "formula_examples": [
+          "Min[(80-년납),70]세"
+        ]
+      },
+      "특이사항": "소제목과 표가 명확히 구분되어 있으며, 각 소제목에 따라 다른 유형의 표가 존재함.",
+      "누락_위험": "소제목과 표가 떨어져 있어 매핑 실수 가능성이 있으며, 수식이 포함되어 있어 파싱 실수 가능성이 있음."
+    },
+    "other_sections": [
+      {
+        "index": 2,
+        "title": "3. 의무가입에 관한 사항",
+        "relevance": "관련성 낮음"
+      },
+      {
+        "index": 3,
+        "title": "4. 배당에 관한 사항",
+        "relevance": "관련성 낮음"
+      },
+      {
+        "index": 4,
+        "title": "5. 보험료에 관한 사항",
+        "relevance": "관련성 중간"
+      },
+      {
+        "index": 5,
+        "title": "6. 유지보너스에 관한 사항 (보장형 계약에 한함)",
+        "relevance": "관련성 낮음"
+      },
+      {
+        "index": 6,
+        "title": "7. 보험료 선납에 관한 사항 (보장형 계약에 한함)",
+        "relevance": "관련성 낮음"
+      },
+      {
+        "index": 7,
+        "title": "8. 해지계약의 부활(효력회복)에 관한 사항",
+        "relevance": "관련성 낮음"
+      },
+      {
+        "index": 8,
+        "title": "9. 연체이율에 관한 사항",
+        "relevance": "관련성 낮음"
+      },
+      {
+        "index": 9,
+        "title": "10. 계약자적립액의 인출에 관한 사항 (적립형 계약에 한함)",
+        "relevance": "관련성 낮음"
+      },
+      {
+        "index": 10,
+        "title": "11. 공시이율에 관한 사항 (적립형 계약에 한함)",
+        "relevance": "관련성 낮음"
+      },
+      {
+        "index": 11,
+        "title": "12. 보험계약대출에 관한 사항",
+        "relevance": "관련성 낮음"
+      },
+      {
+        "index": 12,
+        "title": "13. “해약환급금 일부지급형”에 관한 사항",
+        "relevance": "관련성 중간"
+      },
+      {
+        "index": 13,
+        "title": "14. 「이미 납입한 보험료」의 계산에 관한 사항 (적립형 계약에 한함)",
+        "relevance": "관련성 낮음"
+      },
+      {
+        "index": 14,
+        "title": "15. 보험료 납입에 관한 사항 (적립형 계약에 한함)",
+        "relevance": "관련성 낮음"
+      },
+      {
+        "index": 15,
+        "title": "16. 월대체보험료에 관한 사항 (적립형 계약에 한함)",
+        "relevance": "관련성 낮음"
+      },
+      {
+        "index": 16,
+        "title": "17. 연금전환에 관한 사항",
+        "relevance": "관련성 낮음"
+      },
+      {
+        "index": 17,
+        "title": "18. 적립형 계약으로의 전환에 관한 사항",
+        "relevance": "관련성 중간"
+      },
+      {
+        "index": 18,
+        "title": "19. 치매간병전환형 계약에 관한 사항",
+        "relevance": "관련성 중간"
+      },
+      {
+        "index": 19,
+        "title": "20. 종신전환형 계약에 관한 사항",
+        "relevance": "관련성 중간"
+      },
+      {
+        "index": 20,
+        "title": "21. 제휴서비스 부가에 관한 사항",
+        "relevance": "관련성 낮음"
+      },
+      {
+        "index": 21,
+        "title": "22. 기타",
+        "relevance": "관련성 낮음"
+      }
+    ],
+    "complexity": "중간",
+    "complexity_reason": "문서의 구조가 혼합되어 있으며, 표와 텍스트가 혼재되어 있어 정보 추출 시 주의가 필요함. 또한, 수식이 포함되어 있어 파싱 시 복잡도가 증가함."
+  },
+  "_metadata": {
+    "model": "gpt-4o",
+    "latency_seconds": 34.96,
+    "token_usage": {
+      "input_tokens": 20529,
+      "output_tokens": 2429,
+      "total_tokens": 22958
+    },
+    "cost_usd": {
+      "input_cost": 0.051322,
+      "output_cost": 0.02429,
+      "total_cost": 0.075612
+    },
+    "pricing_per_1m_tokens": {
+      "input": 2.5,
+      "output": 10.0
+    }
+  }
+}

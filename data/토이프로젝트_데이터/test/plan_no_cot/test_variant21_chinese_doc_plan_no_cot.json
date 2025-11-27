@@ -1,0 +1,127 @@
+{
+  "plan": [
+    {
+      "step": 1,
+      "tool": "ChineseToKorean",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements",
+        "target_columns": [
+          "名稱",
+          "保險種類",
+          "審核型態"
+        ]
+      },
+      "reason": "중국어 컬럼명을 한국어로 변환하기 위해",
+      "expected_output": "컬럼명이 한국어로 변환된 표"
+    },
+    {
+      "step": 2,
+      "tool": "DefinitionSimpleTableRule",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements",
+        "hierarchy_info": {
+          "depth": 2,
+          "columns": [
+            "보종명",
+            "유형1",
+            "유형2"
+          ]
+        },
+        "target_columns": [
+          "名稱",
+          "保險種類",
+          "審核型態"
+        ]
+      },
+      "reason": "단순한 정의 표 구조를 규칙 기반으로 파싱하기 위해",
+      "expected_output": "보종명, 유형1, 유형2 정보"
+    },
+    {
+      "step": 3,
+      "tool": "ChineseToKorean",
+      "metadata": {
+        "section_index": 1,
+        "paragraph_index": 0,
+        "access_path": "elements[1].paragraphs[0].table.table_elements",
+        "target_columns": [
+          "保險種類",
+          "保險期間",
+          "繳納期間",
+          "投保年齡"
+        ]
+      },
+      "reason": "중국어 컬럼명을 한국어로 변환하기 위해",
+      "expected_output": "컬럼명이 한국어로 변환된 표"
+    },
+    {
+      "step": 4,
+      "tool": "ConditionSimpleTableRule",
+      "metadata": {
+        "section_index": 1,
+        "access_path": "elements[1].paragraphs",
+        "has_subtitles": false,
+        "formula_present": false
+      },
+      "reason": "단순한 조건 표 구조를 규칙 기반으로 파싱하기 위해",
+      "expected_output": "보험기간, 납입기간, 가입연령 정보"
+    },
+    {
+      "step": 5,
+      "tool": "Mapping",
+      "metadata": {},
+      "reason": "내부 스키마에 맞게 필드명을 매핑하기 위해",
+      "expected_output": "타겟 스키마에 맞게 매핑된 데이터"
+    },
+    {
+      "step": 6,
+      "tool": "CartesianProduct",
+      "metadata": {},
+      "reason": "모든 가능한 조합을 생성하기 위해",
+      "expected_output": "보종 × 기간 × 납입기간 × 연령 × 성별 조합"
+    },
+    {
+      "step": 7,
+      "tool": "Normalize",
+      "metadata": {},
+      "reason": "중복 조합 제거 및 정규화를 위해",
+      "expected_output": "정규화된 최종 JSON 구조"
+    },
+    {
+      "step": 8,
+      "tool": "ValidationLight",
+      "metadata": {},
+      "reason": "필수 필드 존재 여부 및 기본 범위 검증을 위해",
+      "expected_output": "검증된 JSON 데이터"
+    },
+    {
+      "step": 9,
+      "tool": "FinalWriter",
+      "metadata": {},
+      "reason": "최종 스키마에 맞춰 JSON을 파일로 저장하기 위해",
+      "expected_output": "최종 가입가능조건 JSON 파일"
+    }
+  ],
+  "_metadata": {
+    "model": "gpt-4o",
+    "method": "direct_plan_no_cot",
+    "latency_seconds": 10.44,
+    "token_usage": {
+      "input_tokens": 3378,
+      "output_tokens": 819,
+      "total_tokens": 4197
+    },
+    "cost_usd": {
+      "input_cost": 0.008445,
+      "output_cost": 0.00819,
+      "total_cost": 0.016635
+    },
+    "pricing_per_1m_tokens": {
+      "input": 2.5,
+      "output": 10.0
+    }
+  }
+}

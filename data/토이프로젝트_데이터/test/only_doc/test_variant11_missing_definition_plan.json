@@ -1,0 +1,214 @@
+{
+  "document_analysis": {
+    "total_sections": 8,
+    "definition_section": {
+      "section_index": 0,
+      "title": "2. 특약의 부가대상",
+      "structure": "텍스트",
+      "table_count": 0,
+      "columns": [],
+      "location": {
+        "paragraph_indices": {
+          "tables": [],
+          "texts": [
+            0
+          ]
+        },
+        "primary_table_index": null
+      },
+      "sample_data": {
+        "계층구조": [],
+        "hierarchy_depth": 0,
+        "hierarchy_tree_example": ""
+      },
+      "특이사항": "정의 섹션이 텍스트로만 구성되어 있으며, 표가 없음",
+      "누락_위험": "정의 섹션에 표가 없어 계층적 정보가 누락될 위험"
+    },
+    "condition_section": {
+      "section_index": 1,
+      "title": "3. 보험기간, 보험료 납입기간, 피보험자 가입나이 및 보험료 납입주기",
+      "structure": "혼합",
+      "table_count": 3,
+      "location": {
+        "paragraph_map": [
+          {
+            "index": 0,
+            "type": "title",
+            "content": "가. 해약환급금 미지급형"
+          },
+          {
+            "index": 1,
+            "type": "table",
+            "content": "가입가능 조건"
+          },
+          {
+            "index": 2,
+            "type": "table",
+            "content": "가입불가 조건"
+          },
+          {
+            "index": 3,
+            "type": "title",
+            "content": "나. 일반형"
+          },
+          {
+            "index": 4,
+            "type": "table",
+            "content": "가입가능 조건"
+          },
+          {
+            "index": 5,
+            "type": "text",
+            "content": "※ 보험료 납입기간은 보험기간을 초과할 수 없음(이하 모든 보험종목별 동일 적용됨)"
+          }
+        ]
+      },
+      "condition_hierarchy": {
+        "has_subtitles": true,
+        "subtitle_mapping": [
+          {
+            "subtitle": "가. 해약환급금 미지급형",
+            "paragraph_index": 0,
+            "estimated_type": "가입가능 조건",
+            "table_index": 1,
+            "table_types": {
+              "유형1": [
+                "간편심사형",
+                "일반심사형"
+              ],
+              "유형2": [
+                "-"
+              ],
+              "보험기간": [
+                "80/90/100세 만기, 종신"
+              ],
+              "보험료 납입기간": [
+                "10/15/20/25/30년납"
+              ],
+              "남자나이": [
+                "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세"
+              ],
+              "여자나이": [
+                "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세"
+              ],
+              "보험료 납입주기": [
+                "월납"
+              ]
+            }
+          },
+          {
+            "subtitle": "나. 일반형",
+            "paragraph_index": 3,
+            "estimated_type": "가입가능 조건",
+            "table_index": 4,
+            "table_types": {
+              "유형1": [
+                "간편심사형",
+                "일반심사형"
+              ],
+              "유형2": [
+                "-"
+              ],
+              "보험기간": [
+                "25/30년 만기, 80/90/100세 만기, 종신"
+              ],
+              "보험료 납입기간": [
+                "5/7/10/15/20/25/30년납"
+              ],
+              "남자나이": [
+                "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세"
+              ],
+              "여자나이": [
+                "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세"
+              ],
+              "보험료 납입주기": [
+                "월납"
+              ]
+            }
+          }
+        ],
+        "all_unique_types": {
+          "from_subtitles": [
+            "가입가능 조건",
+            "가입불가 조건"
+          ],
+          "from_table_column_유형1": [
+            "간편심사형",
+            "일반심사형"
+          ],
+          "from_table_column_유형2": [
+            "-"
+          ]
+        },
+        "hierarchy_tree_example": "소제목 → 유형1 → 유형2"
+      },
+      "sample_conditions": {
+        "보험기간": [
+          "80/90/100세 만기, 종신",
+          "25/30년 만기, 80/90/100세 만기, 종신"
+        ],
+        "납입기간": [
+          "10/15/20/25/30년납",
+          "5/7/10/15/20/25/30년납"
+        ],
+        "나이_표현": [
+          "남자나이",
+          "여자나이"
+        ],
+        "has_formula": true,
+        "formula_examples": [
+          "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세"
+        ]
+      },
+      "특이사항": "표와 텍스트가 혼합되어 있으며, 소제목과 표가 명확히 구분됨",
+      "누락_위험": "소제목과 표가 떨어져 있어 매핑 실수 가능"
+    },
+    "other_sections": [
+      {
+        "index": 2,
+        "title": "4. 의무가입에 관한 사항",
+        "relevance": "관련 없음"
+      },
+      {
+        "index": 3,
+        "title": "5. 배당에 관한 사항",
+        "relevance": "관련 없음"
+      },
+      {
+        "index": 4,
+        "title": "6. 보험료에 관한 사항",
+        "relevance": "관련 있음"
+      },
+      {
+        "index": 5,
+        "title": "7. 보험료 할인에 관한 사항",
+        "relevance": "관련 없음"
+      },
+      {
+        "index": 6,
+        "title": "8. 보험료 선납에 관한 사항",
+        "relevance": "관련 없음"
+      }
+    ],
+    "complexity": "중간",
+    "complexity_reason": "조건 섹션에 여러 표와 소제목이 혼합되어 있어 구조적 복잡성이 중간 수준"
+  },
+  "_metadata": {
+    "model": "gpt-4o",
+    "latency_seconds": 12.01,
+    "token_usage": {
+      "input_tokens": 7532,
+      "output_tokens": 1334,
+      "total_tokens": 8866
+    },
+    "cost_usd": {
+      "input_cost": 0.01883,
+      "output_cost": 0.01334,
+      "total_cost": 0.03217
+    },
+    "pricing_per_1m_tokens": {
+      "input": 2.5,
+      "output": 10.0
+    }
+  }
+}

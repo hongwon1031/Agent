@@ -1,0 +1,193 @@
+{
+  "source_file": null,
+  "doc_title": null,
+  "document_analysis": {
+    "total_sections": 2,
+    "definition_section": {
+      "section_index": 0,
+      "title": "보험상품의 정의",
+      "structure": "표",
+      "table_count": 1,
+      "columns": [
+        "명칭",
+        "보험종목",
+        "보험종목_1"
+      ],
+      "location": {
+        "paragraph_indices": {
+          "tables": [
+            0
+          ],
+          "texts": []
+        },
+        "primary_table_index": 0
+      },
+      "sample_data": {
+        "계층구조": [
+          {
+            "level": 1,
+            "column_name": "명칭",
+            "values": [
+              "[3-100%장해형]재해장해특약\n(무배당, 해약환급금 미지급형)",
+              "[3-100%장해형]재해장해특약(무배당)"
+            ],
+            "description": "보험 상품의 명칭"
+          },
+          {
+            "level": 2,
+            "column_name": "보험종목",
+            "values": [
+              "해약환급금 미지급형",
+              "일반형"
+            ],
+            "description": "보험의 종류"
+          },
+          {
+            "level": 3,
+            "column_name": "보험종목_1",
+            "values": [
+              "간편심사(315)형\n/간편심사(335)형\n/간편심사(355)형\n/일반심사형"
+            ],
+            "description": "심사 유형"
+          }
+        ],
+        "hierarchy_depth": 3,
+        "hierarchy_tree_example": "명칭 → 보험종목 → 보험종목_1"
+      },
+      "특이사항": "표의 rowspan을 통해 심사 유형이 여러 행에 걸쳐 나타남",
+      "누락_위험": "컬럼명이 '보험종목_1' 등으로 중복되어 유형 구분 어려움"
+    },
+    "condition_section": {
+      "section_index": 1,
+      "title": "가입조건 및 피보험자 나이",
+      "structure": "혼합",
+      "table_count": 2,
+      "location": {
+        "paragraph_map": [
+          {
+            "index": 0,
+            "type": "title",
+            "content": "가. 해약환급금 미지급형"
+          },
+          {
+            "index": 1,
+            "type": "table",
+            "content": "가입가능 조건"
+          },
+          {
+            "index": 2,
+            "type": "title",
+            "content": "나. 일반형"
+          },
+          {
+            "index": 3,
+            "type": "table",
+            "content": "가입가능 조건"
+          }
+        ]
+      },
+      "condition_hierarchy": {
+        "has_subtitles": true,
+        "subtitle_mapping": [
+          {
+            "subtitle": "가. 해약환급금 미지급형",
+            "paragraph_index": 0,
+            "estimated_type": "심사 유형",
+            "table_index": 1,
+            "table_types": {
+              "유형1": [
+                "간편심사형",
+                "일반심사형"
+              ],
+              "유형2": [
+                "-"
+              ],
+              "보험기간": [
+                "80/90/100세\n만기, 종신"
+              ],
+              "보험료 납입기간": [
+                "10/15/20/25/30년납"
+              ]
+            }
+          },
+          {
+            "subtitle": "나. 일반형",
+            "paragraph_index": 2,
+            "estimated_type": "심사 유형",
+            "table_index": 3,
+            "table_types": {
+              "유형1": [
+                "간편심사형",
+                "일반심사형"
+              ],
+              "유형2": [
+                "-"
+              ],
+              "보험기간": [
+                "25/30년 만기,\n80/90/100세\n만기, 종신"
+              ],
+              "보험료 납입기간": [
+                "5/7/10/15/20/25/30년납"
+              ]
+            }
+          }
+        ],
+        "all_unique_types": {
+          "from_subtitles": [
+            "심사 유형"
+          ],
+          "from_table_column_유형1": [
+            "간편심사형",
+            "일반심사형"
+          ],
+          "from_table_column_유형2": [
+            "-"
+          ]
+        },
+        "hierarchy_tree_example": "소제목 → 유형1 → 유형2"
+      },
+      "sample_conditions": {
+        "보험기간": [
+          "80/90/100세 만기, 종신",
+          "25/30년 만기, 80/90/100세 만기, 종신"
+        ],
+        "납입기간": [
+          "10/15/20/25/30년납",
+          "5/7/10/15/20/25/30년납"
+        ],
+        "나이_표현": [
+          "남자나이",
+          "여자나이"
+        ],
+        "has_formula": true,
+        "formula_examples": [
+          "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세",
+          "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세"
+        ]
+      },
+      "특이사항": "소제목과 표가 떨어져 있어 매핑 실수 가능",
+      "누락_위험": "수식(min, max 등)이 복잡하여 파싱 실수 가능"
+    },
+    "other_sections": [],
+    "complexity": "중간",
+    "complexity_reason": "표와 텍스트가 혼합되어 있으며, 수식이 포함되어 있어 파싱 복잡도가 중간 수준"
+  },
+  "_metadata": {
+    "model": "gpt-4o",
+    "latency_seconds": 8.54,
+    "token_usage": {
+      "input_tokens": 4368,
+      "output_tokens": 1213,
+      "total_tokens": 5581
+    },
+    "cost_usd": {
+      "input_cost": 0.01092,
+      "output_cost": 0.01213,
+      "total_cost": 0.02305
+    },
+    "pricing_per_1m_tokens": {
+      "input": 2.5,
+      "output": 10.0
+    }
+  }
+}

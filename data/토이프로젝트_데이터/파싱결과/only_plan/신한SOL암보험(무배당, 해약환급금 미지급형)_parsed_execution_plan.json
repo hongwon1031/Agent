@@ -1,0 +1,586 @@
+{
+  "reasoning": {
+    "checklist": {
+      "언어": {
+        "check": "문서에 비한국어(중국어/영어/한자) 포함 여부 분석",
+        "detected": "순수 한국어",
+        "decision": "불필요",
+        "reason": "문서의 제목, 정의 섹션 및 조건 섹션의 제목과 컬럼명이 모두 한국어로 작성되어 있어 비한국어 처리가 필요하지 않음."
+      },
+      "수식": {
+        "check": "sample_conditions.has_formula 확인",
+        "detected": "true",
+        "decision": "FormulaEvaluator 필요",
+        "reason": "조건 섹션에 복잡한 수식(min{(80 – 년만기), 70}세 등)이 포함되어 있어 수식 평가가 필요함."
+      },
+      "소제목": {
+        "check": "condition_hierarchy.has_subtitles 확인",
+        "detected": "true",
+        "decision": "SubtitleMapper 계열 필요",
+        "reason": "조건 섹션에 여러 소제목이 존재하며, 소제목과 표의 매핑이 필요함."
+      },
+      "복잡표": {
+        "check": "rowspan/colspan 복잡도, 특이사항 분석",
+        "detected": "복잡함",
+        "decision": "ComplexTableParser 필요",
+        "reason": "조건 섹션의 표에 rowspan/colspan이 복합적으로 사용되어 있어 복잡한 표 구조 처리가 필요함."
+      }
+    },
+    "structure_analysis": {
+      "definition_complexity": "중간",
+      "definition_reasoning": "정의 섹션은 표 1개와 3단계 계층 구조로 구성되어 있으며, 텍스트와 표가 혼합되어 있음.",
+      "condition_complexity": "복잡",
+      "condition_reasoning": "조건 섹션은 소제목과 다중 표가 혼합되어 있으며, 텍스트와 표의 매핑이 어려움.",
+      "overall_strategy": "Hybrid 혼합"
+    },
+    "tool_selection_reasoning": [
+      {
+        "step": 1,
+        "tool": "FormulaEvaluator",
+        "why": "조건 섹션에 복잡한 수식이 포함되어 있어 수식 평가가 필요함.",
+        "alternatives_considered": [
+          "FormulaExtractorLLM: 수식이 명확히 표기되어 있어 불필요함."
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 2,
+        "tool": "ComplexTableParser",
+        "why": "조건 섹션의 표에 rowspan/colspan이 복합적으로 사용되어 있어 복잡한 표 구조 처리가 필요함.",
+        "alternatives_considered": [
+          "RowspanHandler/ColspanHandler: 개별적으로 처리하기에는 복잡도가 높음."
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 3,
+        "tool": "SubtitleMapper",
+        "why": "조건 섹션에 여러 소제목이 존재하며, 소제목과 표의 매핑이 필요함.",
+        "alternatives_considered": [
+          "DistantMappingHandler: 소제목과 표의 물리적 거리가 가까워 필요하지 않음."
+        ],
+        "confidence": "medium"
+      },
+      {
+        "step": 4,
+        "tool": "DefinitionDeepHierarchyHybrid",
+        "why": "정의 섹션이 3단계 계층 구조로 구성되어 있으며, 텍스트와 표가 혼합되어 있어 하이브리드 처리가 필요함.",
+        "alternatives_considered": [
+          "DefinitionSimpleTableRule: 계층 구조가 단순하지 않음.",
+          "DefinitionTextOnlyLLM: 표가 존재하므로 불필요함."
+        ],
+        "confidence": "medium"
+      },
+      {
+        "step": 5,
+        "tool": "ConditionSubtitleHybrid",
+        "why": "조건 섹션에 소제목과 다중 표가 혼합되어 있어 하이브리드 처리가 필요함.",
+        "alternatives_considered": [
+          "ConditionSimpleTableRule: 소제목이 존재하여 단순 규칙으로는 부족함."
+        ],
+        "confidence": "medium"
+      }
+    ],
+    "cost_latency_consideration": "Rule 0개, Hybrid 3개, LLM 0개로 예상 비용은 중간 수준.",
+    "potential_risks": [
+      "복잡한 수식 파싱 실패 가능",
+      "소제목-표 매핑 오류",
+      "복잡한 표 구조 처리 실패 가능"
+    ]
+  },
+  "plan": [
+    {
+      "step": 1,
+      "tool": "FormulaEvaluator",
+      "metadata": {
+        "section_index": 1,
+        "access_path": "elements[1].paragraphs",
+        "subtitle_mappings": [
+          {
+            "subtitle": "가. 주계약",
+            "paragraph_index": 0,
+            "estimated_type": "주계약 유형",
+            "table_index": 2
+          },
+          {
+            "subtitle": "① 해약환급금 미지급형",
+            "paragraph_index": 1,
+            "estimated_type": "해약환급금 미지급형 조건",
+            "table_index": 2
+          },
+          {
+            "subtitle": "② 일반형",
+            "paragraph_index": 5,
+            "estimated_type": "일반형 조건",
+            "table_index": 6
+          }
+        ],
+        "paragraph_map": [
+          {
+            "index": 0,
+            "type": "title",
+            "content": "가. 주계약"
+          },
+          {
+            "index": 1,
+            "type": "title",
+            "content": "① 해약환급금 미지급형"
+          },
+          {
+            "index": 2,
+            "type": "table",
+            "content": "가입가능 조건"
+          },
+          {
+            "index": 3,
+            "type": "text",
+            "content": "※ 보험료 납입기간은 보험기간을 초과할 수 없음(이하 모든 보험종목별 동일 적용됨)"
+          },
+          {
+            "index": 4,
+            "type": "table",
+            "content": "가입불가 조건"
+          },
+          {
+            "index": 5,
+            "type": "title",
+            "content": "② 일반형"
+          },
+          {
+            "index": 6,
+            "type": "table",
+            "content": "가입가능 조건"
+          },
+          {
+            "index": 7,
+            "type": "title",
+            "content": "나. 특약"
+          },
+          {
+            "index": 8,
+            "type": "title",
+            "content": "① 해약환급금 미지급형"
+          },
+          {
+            "index": 9,
+            "type": "table",
+            "content": "가입가능 조건"
+          },
+          {
+            "index": 10,
+            "type": "text",
+            "content": "※ 보험료 납입기간은 보험기간을 초과할 수 없음(이하 모든 보험종목별 동일 적용됨)"
+          },
+          {
+            "index": 11,
+            "type": "table",
+            "content": "가입불가 조건"
+          },
+          {
+            "index": 12,
+            "type": "title",
+            "content": "② 일반형"
+          },
+          {
+            "index": 13,
+            "type": "table",
+            "content": "가입가능 조건"
+          }
+        ],
+        "has_subtitles": true,
+        "formula_present": true
+      },
+      "reason": "조건 섹션에 복잡한 수식이 포함되어 있어 수식 평가가 필요함.",
+      "expected_output": "정규화된 수식 표현"
+    },
+    {
+      "step": 2,
+      "tool": "ComplexTableParser",
+      "metadata": {
+        "section_index": 1,
+        "access_path": "elements[1].paragraphs",
+        "subtitle_mappings": [
+          {
+            "subtitle": "가. 주계약",
+            "paragraph_index": 0,
+            "estimated_type": "주계약 유형",
+            "table_index": 2
+          },
+          {
+            "subtitle": "① 해약환급금 미지급형",
+            "paragraph_index": 1,
+            "estimated_type": "해약환급금 미지급형 조건",
+            "table_index": 2
+          },
+          {
+            "subtitle": "② 일반형",
+            "paragraph_index": 5,
+            "estimated_type": "일반형 조건",
+            "table_index": 6
+          }
+        ],
+        "paragraph_map": [
+          {
+            "index": 0,
+            "type": "title",
+            "content": "가. 주계약"
+          },
+          {
+            "index": 1,
+            "type": "title",
+            "content": "① 해약환급금 미지급형"
+          },
+          {
+            "index": 2,
+            "type": "table",
+            "content": "가입가능 조건"
+          },
+          {
+            "index": 3,
+            "type": "text",
+            "content": "※ 보험료 납입기간은 보험기간을 초과할 수 없음(이하 모든 보험종목별 동일 적용됨)"
+          },
+          {
+            "index": 4,
+            "type": "table",
+            "content": "가입불가 조건"
+          },
+          {
+            "index": 5,
+            "type": "title",
+            "content": "② 일반형"
+          },
+          {
+            "index": 6,
+            "type": "table",
+            "content": "가입가능 조건"
+          },
+          {
+            "index": 7,
+            "type": "title",
+            "content": "나. 특약"
+          },
+          {
+            "index": 8,
+            "type": "title",
+            "content": "① 해약환급금 미지급형"
+          },
+          {
+            "index": 9,
+            "type": "table",
+            "content": "가입가능 조건"
+          },
+          {
+            "index": 10,
+            "type": "text",
+            "content": "※ 보험료 납입기간은 보험기간을 초과할 수 없음(이하 모든 보험종목별 동일 적용됨)"
+          },
+          {
+            "index": 11,
+            "type": "table",
+            "content": "가입불가 조건"
+          },
+          {
+            "index": 12,
+            "type": "title",
+            "content": "② 일반형"
+          },
+          {
+            "index": 13,
+            "type": "table",
+            "content": "가입가능 조건"
+          }
+        ],
+        "has_subtitles": true,
+        "formula_present": true
+      },
+      "reason": "조건 섹션의 표에 rowspan/colspan이 복합적으로 사용되어 있어 복잡한 표 구조 처리가 필요함.",
+      "expected_output": "정규화된 표 데이터"
+    },
+    {
+      "step": 3,
+      "tool": "SubtitleMapper",
+      "metadata": {
+        "section_index": 1,
+        "access_path": "elements[1].paragraphs",
+        "subtitle_mappings": [
+          {
+            "subtitle": "가. 주계약",
+            "paragraph_index": 0,
+            "estimated_type": "주계약 유형",
+            "table_index": 2
+          },
+          {
+            "subtitle": "① 해약환급금 미지급형",
+            "paragraph_index": 1,
+            "estimated_type": "해약환급금 미지급형 조건",
+            "table_index": 2
+          },
+          {
+            "subtitle": "② 일반형",
+            "paragraph_index": 5,
+            "estimated_type": "일반형 조건",
+            "table_index": 6
+          }
+        ],
+        "paragraph_map": [
+          {
+            "index": 0,
+            "type": "title",
+            "content": "가. 주계약"
+          },
+          {
+            "index": 1,
+            "type": "title",
+            "content": "① 해약환급금 미지급형"
+          },
+          {
+            "index": 2,
+            "type": "table",
+            "content": "가입가능 조건"
+          },
+          {
+            "index": 3,
+            "type": "text",
+            "content": "※ 보험료 납입기간은 보험기간을 초과할 수 없음(이하 모든 보험종목별 동일 적용됨)"
+          },
+          {
+            "index": 4,
+            "type": "table",
+            "content": "가입불가 조건"
+          },
+          {
+            "index": 5,
+            "type": "title",
+            "content": "② 일반형"
+          },
+          {
+            "index": 6,
+            "type": "table",
+            "content": "가입가능 조건"
+          },
+          {
+            "index": 7,
+            "type": "title",
+            "content": "나. 특약"
+          },
+          {
+            "index": 8,
+            "type": "title",
+            "content": "① 해약환급금 미지급형"
+          },
+          {
+            "index": 9,
+            "type": "table",
+            "content": "가입가능 조건"
+          },
+          {
+            "index": 10,
+            "type": "text",
+            "content": "※ 보험료 납입기간은 보험기간을 초과할 수 없음(이하 모든 보험종목별 동일 적용됨)"
+          },
+          {
+            "index": 11,
+            "type": "table",
+            "content": "가입불가 조건"
+          },
+          {
+            "index": 12,
+            "type": "title",
+            "content": "② 일반형"
+          },
+          {
+            "index": 13,
+            "type": "table",
+            "content": "가입가능 조건"
+          }
+        ],
+        "has_subtitles": true,
+        "formula_present": true
+      },
+      "reason": "조건 섹션에 여러 소제목이 존재하며, 소제목과 표의 매핑이 필요함.",
+      "expected_output": "소제목과 표의 매핑 정보"
+    },
+    {
+      "step": 4,
+      "tool": "DefinitionDeepHierarchyHybrid",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements",
+        "hierarchy_info": {
+          "depth": 3,
+          "columns": [
+            "구 분",
+            "명칭",
+            "보험종목"
+          ]
+        },
+        "target_columns": [
+          "구 분",
+          "명칭",
+          "보험종목"
+        ]
+      },
+      "reason": "정의 섹션이 3단계 계층 구조로 구성되어 있으며, 텍스트와 표가 혼합되어 있어 하이브리드 처리가 필요함.",
+      "expected_output": "정의 섹션의 계층 구조 정보"
+    },
+    {
+      "step": 5,
+      "tool": "ConditionSubtitleHybrid",
+      "metadata": {
+        "section_index": 1,
+        "access_path": "elements[1].paragraphs",
+        "subtitle_mappings": [
+          {
+            "subtitle": "가. 주계약",
+            "paragraph_index": 0,
+            "estimated_type": "주계약 유형",
+            "table_index": 2
+          },
+          {
+            "subtitle": "① 해약환급금 미지급형",
+            "paragraph_index": 1,
+            "estimated_type": "해약환급금 미지급형 조건",
+            "table_index": 2
+          },
+          {
+            "subtitle": "② 일반형",
+            "paragraph_index": 5,
+            "estimated_type": "일반형 조건",
+            "table_index": 6
+          }
+        ],
+        "paragraph_map": [
+          {
+            "index": 0,
+            "type": "title",
+            "content": "가. 주계약"
+          },
+          {
+            "index": 1,
+            "type": "title",
+            "content": "① 해약환급금 미지급형"
+          },
+          {
+            "index": 2,
+            "type": "table",
+            "content": "가입가능 조건"
+          },
+          {
+            "index": 3,
+            "type": "text",
+            "content": "※ 보험료 납입기간은 보험기간을 초과할 수 없음(이하 모든 보험종목별 동일 적용됨)"
+          },
+          {
+            "index": 4,
+            "type": "table",
+            "content": "가입불가 조건"
+          },
+          {
+            "index": 5,
+            "type": "title",
+            "content": "② 일반형"
+          },
+          {
+            "index": 6,
+            "type": "table",
+            "content": "가입가능 조건"
+          },
+          {
+            "index": 7,
+            "type": "title",
+            "content": "나. 특약"
+          },
+          {
+            "index": 8,
+            "type": "title",
+            "content": "① 해약환급금 미지급형"
+          },
+          {
+            "index": 9,
+            "type": "table",
+            "content": "가입가능 조건"
+          },
+          {
+            "index": 10,
+            "type": "text",
+            "content": "※ 보험료 납입기간은 보험기간을 초과할 수 없음(이하 모든 보험종목별 동일 적용됨)"
+          },
+          {
+            "index": 11,
+            "type": "table",
+            "content": "가입불가 조건"
+          },
+          {
+            "index": 12,
+            "type": "title",
+            "content": "② 일반형"
+          },
+          {
+            "index": 13,
+            "type": "table",
+            "content": "가입가능 조건"
+          }
+        ],
+        "has_subtitles": true,
+        "formula_present": true
+      },
+      "reason": "조건 섹션에 소제목과 다중 표가 혼합되어 있어 하이브리드 처리가 필요함.",
+      "expected_output": "조건 섹션의 가입 조건 정보"
+    },
+    {
+      "step": 6,
+      "tool": "Mapping",
+      "metadata": {},
+      "reason": "추출된 Definition과 Condition을 타겟 스키마에 맞게 필드명 매핑",
+      "expected_output": "타겟 스키마에 맞춘 필드명"
+    },
+    {
+      "step": 7,
+      "tool": "CartesianProduct",
+      "metadata": {},
+      "reason": "보종 × 기간 × 납입기간 × 연령 × 성별의 모든 조합 생성",
+      "expected_output": "모든 가능한 조합"
+    },
+    {
+      "step": 8,
+      "tool": "Normalize",
+      "metadata": {},
+      "reason": "중복 제거 및 데이터 정규화",
+      "expected_output": "정규화된 데이터"
+    },
+    {
+      "step": 9,
+      "tool": "ValidationLight",
+      "metadata": {},
+      "reason": "필수 필드 존재 여부 및 기본 범위 검사",
+      "expected_output": "검증된 데이터"
+    },
+    {
+      "step": 10,
+      "tool": "FinalWriter",
+      "metadata": {},
+      "reason": "최종 가입가능조건 JSON 파일 출력",
+      "expected_output": "가입가능조건 JSON 파일"
+    }
+  ],
+  "_metadata": {
+    "model": "gpt-4o",
+    "latency_seconds": 33.55,
+    "token_usage": {
+      "input_tokens": 7553,
+      "output_tokens": 4314,
+      "total_tokens": 11867
+    },
+    "cost_usd": {
+      "input_cost": 0.018882,
+      "output_cost": 0.04314,
+      "total_cost": 0.062022
+    },
+    "pricing_per_1m_tokens": {
+      "input": 2.5,
+      "output": 10.0
+    }
+  }
+}

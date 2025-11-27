@@ -1,0 +1,221 @@
+{
+  "reasoning": {
+    "checklist": {
+      "언어": {
+        "check": "문서에 비한국어(중국어/영어/한자) 포함 여부 분석",
+        "detected": "순수 한국어",
+        "decision": "불필요",
+        "reason": "문서의 모든 내용이 한국어로 작성되어 있으며, 중국어나 영어가 포함되어 있지 않음."
+      },
+      "수식": {
+        "check": "문서에서 수식(min, max, 계산식 등) 포함 여부 확인",
+        "detected": "true",
+        "decision": "FormulaEvaluator 필요",
+        "reason": "조건 섹션의 표에서 'min[세만기 - 년납, 90 - 년납, 80]'과 같은 복잡한 수식이 발견됨."
+      },
+      "소제목": {
+        "check": "조건 섹션에 소제목 구조 존재 여부 확인",
+        "detected": "false",
+        "decision": "불필요",
+        "reason": "조건 섹션에 소제목이 존재하지 않으며, 표가 직접적으로 조건을 설명하고 있음."
+      },
+      "복잡표": {
+        "check": "rowspan/colspan 복잡도, 병합 셀 분석",
+        "detected": "복잡함",
+        "decision": "RowspanHandler/ColspanHandler 필요",
+        "reason": "표에서 rowspan과 colspan이 사용되어 병합된 셀이 존재하여 복잡한 구조를 가짐."
+      }
+    },
+    "structure_analysis": {
+      "definition_complexity": "단순",
+      "definition_reasoning": "정의 섹션은 표 1개로 구성되어 있으며, 계층 깊이가 2단계로 명확한 컬럼을 가지고 있음.",
+      "condition_complexity": "중간",
+      "condition_reasoning": "조건 섹션은 표 1개로 구성되어 있으나, 수식이 포함되어 있어 복잡도가 중간 수준임.",
+      "overall_strategy": "Rule 기반 우선"
+    },
+    "tool_selection_reasoning": [
+      {
+        "step": 1,
+        "tool": "RowspanHandler",
+        "why": "표에서 rowspan을 사용하여 병합된 셀이 존재하므로 이를 처리하기 위해 선택.",
+        "alternatives_considered": [
+          "ComplexTableParser: 복잡한 colspan까지 처리할 필요는 없음."
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 2,
+        "tool": "FormulaEvaluator",
+        "why": "조건 섹션의 표에 복잡한 수식이 포함되어 있어 이를 평가하기 위해 필요.",
+        "alternatives_considered": [
+          "FormulaExtractorLLM: 수식이 명확히 표에 포함되어 있어 LLM 사용 불필요."
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 3,
+        "tool": "DefinitionSimpleTableRule",
+        "why": "정의 섹션의 표가 단순하고 명확한 구조를 가지고 있어 규칙 기반으로 충분히 처리 가능.",
+        "alternatives_considered": [
+          "DefinitionHybrid: 단순한 구조에 과도한 Tool 사용 불필요."
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 4,
+        "tool": "ConditionSimpleTableRule",
+        "why": "조건 섹션의 표가 단일 구조로 명확하게 조건을 설명하고 있어 규칙 기반으로 처리 가능.",
+        "alternatives_considered": [
+          "ConditionHybrid: 수식 외에 복잡한 텍스트가 없어 필요하지 않음."
+        ],
+        "confidence": "high"
+      }
+    ],
+    "cost_latency_consideration": "Rule 3개 × 저비용, Hybrid 0개 × 중비용, LLM 0개 × 고비용. 전체 예상 비용: 낮음",
+    "potential_risks": [
+      "복잡한 수식 파싱 실패 가능",
+      "rowspan 처리 오류 가능성"
+    ]
+  },
+  "plan": [
+    {
+      "step": 1,
+      "tool": "RowspanHandler",
+      "metadata": {
+        "section_index": 1,
+        "paragraph_index": 0,
+        "access_path": "elements[1].paragraphs[0].table.table_elements",
+        "target_columns": [
+          "유형0",
+          "유형1",
+          "유형2",
+          "보험기간",
+          "보험료 납입기간",
+          "남자나이",
+          "여자나이",
+          "보험료 납입주기"
+        ],
+        "hierarchy_info": {
+          "depth": 2,
+          "columns": [
+            "유형0",
+            "유형1",
+            "유형2"
+          ]
+        }
+      },
+      "reason": "표에서 rowspan을 사용하여 병합된 셀이 존재하므로 이를 처리하기 위해 선택.",
+      "expected_output": "병합된 셀이 펼쳐진 표 데이터"
+    },
+    {
+      "step": 2,
+      "tool": "FormulaEvaluator",
+      "metadata": {
+        "section_index": 1,
+        "paragraph_index": 0,
+        "access_path": "elements[1].paragraphs[0].table.table_elements",
+        "target_columns": [
+          "남자나이",
+          "여자나이"
+        ],
+        "additional_context": {
+          "formulas": [
+            "min[세만기 - 년납, 90 - 년납, 80]",
+            "min[세만기 - 년납, 90 - 년납, 70]"
+          ]
+        }
+      },
+      "reason": "조건 섹션의 표에 복잡한 수식이 포함되어 있어 이를 평가하기 위해 필요.",
+      "expected_output": "평가된 나이 조건 데이터"
+    },
+    {
+      "step": 3,
+      "tool": "DefinitionSimpleTableRule",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements",
+        "hierarchy_info": {
+          "depth": 2,
+          "columns": [
+            "명칭",
+            "보험종목",
+            "보험종목_1"
+          ]
+        },
+        "target_columns": [
+          "명칭",
+          "보험종목",
+          "보험종목_1"
+        ]
+      },
+      "reason": "정의 섹션의 표가 단순하고 명확한 구조를 가지고 있어 규칙 기반으로 충분히 처리 가능.",
+      "expected_output": "보종명, 유형1/2/3 등의 계층 구조 데이터"
+    },
+    {
+      "step": 4,
+      "tool": "ConditionSimpleTableRule",
+      "metadata": {
+        "section_index": 1,
+        "access_path": "elements[1].paragraphs",
+        "has_subtitles": false,
+        "formula_present": true
+      },
+      "reason": "조건 섹션의 표가 단일 구조로 명확하게 조건을 설명하고 있어 규칙 기반으로 처리 가능.",
+      "expected_output": "보험기간, 납입기간, 가입연령, 성별 등의 조건 데이터"
+    },
+    {
+      "step": 5,
+      "tool": "Mapping",
+      "metadata": {},
+      "reason": "추출된 Definition과 Condition을 타겟 스키마에 맞게 필드명 매핑",
+      "expected_output": "타겟 스키마에 맞게 매핑된 데이터"
+    },
+    {
+      "step": 6,
+      "tool": "CartesianProduct",
+      "metadata": {},
+      "reason": "보종 × 기간 × 납입기간 × 연령 × 성별의 모든 조합 생성",
+      "expected_output": "모든 가능한 조합의 데이터"
+    },
+    {
+      "step": 7,
+      "tool": "Normalize",
+      "metadata": {},
+      "reason": "중복 제거 및 데이터 정규화",
+      "expected_output": "정규화된 데이터"
+    },
+    {
+      "step": 8,
+      "tool": "ValidationLight",
+      "metadata": {},
+      "reason": "필수 필드 존재 여부 및 기본 범위 검사",
+      "expected_output": "검증된 데이터"
+    },
+    {
+      "step": 9,
+      "tool": "FinalWriter",
+      "metadata": {},
+      "reason": "최종 가입가능조건 JSON 파일 출력",
+      "expected_output": "최종 JSON 파일"
+    }
+  ],
+  "_metadata": {
+    "model": "gpt-4o",
+    "latency_seconds": 21.89,
+    "token_usage": {
+      "input_tokens": 6808,
+      "output_tokens": 1842,
+      "total_tokens": 8650
+    },
+    "cost_usd": {
+      "input_cost": 0.01702,
+      "output_cost": 0.01842,
+      "total_cost": 0.03544
+    },
+    "pricing_per_1m_tokens": {
+      "input": 2.5,
+      "output": 10.0
+    }
+  }
+}

@@ -1,0 +1,199 @@
+{
+  "reasoning": {
+    "checklist": {
+      "언어": {
+        "check": "문서에 비한국어(중국어/영어/한자) 포함 여부 분석",
+        "detected": "순수 한국어",
+        "decision": "불필요",
+        "reason": "문서의 모든 내용이 한국어로 작성되어 있으며, 영어 또는 중국어가 포함되어 있지 않음"
+      },
+      "수식": {
+        "check": "조건 섹션에 수식 또는 min/max 형태의 표현 존재 여부",
+        "detected": "true",
+        "decision": "FormulaEvaluator 필요",
+        "reason": "조건 섹션에 'min[세만기 - 년납, 90 - 년납, 80]' 형태의 수식이 존재"
+      },
+      "소제목": {
+        "check": "condition_hierarchy.has_subtitles 또는 실제 raw JSON에서 소제목 패턴 존재 여부",
+        "detected": "false",
+        "decision": "SubtitleMapper 계열 불필요",
+        "reason": "조건 섹션에 소제목이 존재하지 않으며, 표와 텍스트가 혼합되어 있음"
+      },
+      "복잡표": {
+        "check": "rowspan/colspan, 병합 셀, 깊은 계층 구조 여부",
+        "detected": "중간",
+        "decision": "RowspanHandler 필요",
+        "reason": "rowspan이 사용된 표가 존재하며, 계층 구조가 숨겨져 있음"
+      }
+    },
+    "structure_analysis": {
+      "definition_complexity": "중간",
+      "definition_reasoning": "정의 섹션은 표와 텍스트가 혼합되어 있으며, rowspan으로 인해 계층 구조가 숨겨져 있음",
+      "condition_complexity": "중간",
+      "condition_reasoning": "조건 섹션은 여러 표로 분산되어 있으며, 수식이 포함되어 있음",
+      "overall_strategy": "Hybrid 혼합"
+    },
+    "tool_selection_reasoning": [
+      {
+        "step": 1,
+        "tool": "RowspanHandler",
+        "why": "rowspan으로 인해 숨겨진 계층 구조를 명확히 하기 위해 필요",
+        "alternatives_considered": [
+          "ComplexTableParser"
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 2,
+        "tool": "DefinitionMultiColumnRule",
+        "why": "정의 섹션의 표가 멀티 컬럼 구조이지만 비교적 단순하여 규칙 기반 파싱이 가능",
+        "alternatives_considered": [
+          "DefinitionDeepHierarchyHybrid"
+        ],
+        "confidence": "medium"
+      },
+      {
+        "step": 3,
+        "tool": "ConditionSimpleTableRule",
+        "why": "조건 섹션의 표가 단순한 구조로 되어 있어 규칙 기반 파싱이 가능",
+        "alternatives_considered": [
+          "ConditionHybrid"
+        ],
+        "confidence": "medium"
+      },
+      {
+        "step": 4,
+        "tool": "FormulaEvaluator",
+        "why": "조건 섹션에 포함된 수식을 평가하여 정규화된 표현으로 변환하기 위해 필요",
+        "alternatives_considered": [
+          "FormulaExtractorLLM"
+        ],
+        "confidence": "high"
+      }
+    ],
+    "cost_latency_consideration": "선택한 Tool 조합은 대부분 규칙 기반으로 비용과 지연이 낮음. 일부 하이브리드 툴 사용으로 중간 수준의 비용과 지연 예상",
+    "potential_risks": [
+      "계층 구조 누락 위험",
+      "수식 평가 오류 가능성"
+    ]
+  },
+  "plan": [
+    {
+      "step": 1,
+      "tool": "RowspanHandler",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements"
+      },
+      "reason": "rowspan으로 인해 숨겨진 계층 구조를 명확히 하기 위해 필요",
+      "expected_output": "각 행에 명확한 계층 구조가 반영된 테이블"
+    },
+    {
+      "step": 2,
+      "tool": "DefinitionMultiColumnRule",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements"
+      },
+      "reason": "정의 섹션의 표가 멀티 컬럼 구조이지만 비교적 단순하여 규칙 기반 파싱이 가능",
+      "expected_output": "보종명, 유형1, 유형2, 유형3 등의 계층 구조 추출"
+    },
+    {
+      "step": 3,
+      "tool": "ConditionSimpleTableRule",
+      "metadata": {
+        "section_index": 2,
+        "paragraph_index": 0,
+        "access_path": "elements[2].paragraphs[0].table.table_elements"
+      },
+      "reason": "조건 섹션의 표가 단순한 구조로 되어 있어 규칙 기반 파싱이 가능",
+      "expected_output": "보험기간, 납입기간, 남자나이, 여자나이 등의 조건 추출"
+    },
+    {
+      "step": 4,
+      "tool": "FormulaEvaluator",
+      "metadata": {
+        "section_index": 2,
+        "paragraph_index": 0,
+        "access_path": "elements[2].paragraphs[0].table.table_elements"
+      },
+      "reason": "조건 섹션에 포함된 수식을 평가하여 정규화된 표현으로 변환하기 위해 필요",
+      "expected_output": "정규화된 연령 및 기간 수식"
+    },
+    {
+      "step": 5,
+      "tool": "Mapping",
+      "metadata": {
+        "section_index": null,
+        "paragraph_index": null,
+        "access_path": null
+      },
+      "reason": "추출된 데이터를 내부 스키마에 맞게 필드명을 매핑",
+      "expected_output": "내부 스키마에 맞게 매핑된 데이터"
+    },
+    {
+      "step": 6,
+      "tool": "CartesianProduct",
+      "metadata": {
+        "section_index": null,
+        "paragraph_index": null,
+        "access_path": null
+      },
+      "reason": "보종 × 기간 × 납입기간 × 연령 × 성별 등 가능한 모든 조합을 생성",
+      "expected_output": "모든 가능한 조합의 데이터"
+    },
+    {
+      "step": 7,
+      "tool": "Normalize",
+      "metadata": {
+        "section_index": null,
+        "paragraph_index": null,
+        "access_path": null
+      },
+      "reason": "중복 조합 제거, 정렬, 필드 이름/값 정규화 등 최종 JSON 구조를 정리",
+      "expected_output": "정규화된 최종 JSON 구조"
+    },
+    {
+      "step": 8,
+      "tool": "ValidationLight",
+      "metadata": {
+        "section_index": null,
+        "paragraph_index": null,
+        "access_path": null
+      },
+      "reason": "필수 필드 존재 여부, 조합 개수, 기본 범위(연령/기간) 검사 등 경량 검증",
+      "expected_output": "검증된 JSON 데이터"
+    },
+    {
+      "step": 9,
+      "tool": "FinalWriter",
+      "metadata": {
+        "section_index": null,
+        "paragraph_index": null,
+        "access_path": null
+      },
+      "reason": "최종 스키마에 맞춰 JSON을 파일로 저장하는 단계",
+      "expected_output": "최종 JSON 파일"
+    }
+  ],
+  "_metadata": {
+    "model": "gpt-4o",
+    "latency_seconds": 19.26,
+    "token_usage": {
+      "input_tokens": 9992,
+      "output_tokens": 1699,
+      "total_tokens": 11691
+    },
+    "cost_usd": {
+      "input_cost": 0.02498,
+      "output_cost": 0.01699,
+      "total_cost": 0.04197
+    },
+    "pricing_per_1m_tokens": {
+      "input": 2.5,
+      "output": 10.0
+    }
+  }
+}

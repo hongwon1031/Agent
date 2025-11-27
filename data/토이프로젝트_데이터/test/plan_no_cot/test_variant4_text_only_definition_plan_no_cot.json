@@ -1,0 +1,166 @@
+{
+  "plan": [
+    {
+      "step": 1,
+      "tool": "DefinitionTextOnlyLLM",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0]",
+        "hierarchy_info": {
+          "depth": 2,
+          "columns": [
+            "보종명",
+            "유형1"
+          ]
+        },
+        "target_columns": [
+          "보종명",
+          "유형1"
+        ]
+      },
+      "reason": "정의가 텍스트 문단에만 존재하여 LLM을 통해 보종명과 유형 계층을 추출",
+      "expected_output": "보종명과 유형1의 계층 구조"
+    },
+    {
+      "step": 2,
+      "tool": "ConditionSimpleTableRule",
+      "metadata": {
+        "section_index": 1,
+        "access_path": "elements[1].paragraphs",
+        "has_subtitles": true,
+        "formula_present": true
+      },
+      "reason": "조건 섹션이 단일 표 구조로 되어 있어 규칙 기반으로 조건을 추출",
+      "expected_output": "보험기간, 납입기간, 가입연령, 성별 등의 조건"
+    },
+    {
+      "step": 3,
+      "tool": "FormulaEvaluator",
+      "metadata": {
+        "section_index": 1,
+        "access_path": "elements[1].paragraphs[1].table.table_elements",
+        "target_columns": [
+          "남자나이",
+          "여자나이"
+        ]
+      },
+      "reason": "연령 조건에 수식이 포함되어 있어 이를 평가하여 정규화된 표현으로 변환",
+      "expected_output": "정규화된 연령 조건"
+    },
+    {
+      "step": 4,
+      "tool": "Mapping",
+      "metadata": {
+        "section_index": 1,
+        "access_path": "elements[1].paragraphs[1].table.table_elements",
+        "target_columns": [
+          "보종명",
+          "유형1",
+          "보험기간",
+          "보험료 납입기간",
+          "남자나이",
+          "여자나이",
+          "보험료 납입주기"
+        ]
+      },
+      "reason": "내부 스키마에 맞게 필드명을 매핑",
+      "expected_output": "타겟 스키마에 맞는 필드명 매핑"
+    },
+    {
+      "step": 5,
+      "tool": "CartesianProduct",
+      "metadata": {
+        "section_index": 1,
+        "access_path": "elements[1].paragraphs[1].table.table_elements",
+        "target_columns": [
+          "보종명",
+          "유형1",
+          "보험기간",
+          "보험료 납입기간",
+          "남자나이",
+          "여자나이",
+          "보험료 납입주기"
+        ]
+      },
+      "reason": "가능한 모든 조합을 생성",
+      "expected_output": "모든 가능한 조합 생성"
+    },
+    {
+      "step": 6,
+      "tool": "Normalize",
+      "metadata": {
+        "section_index": 1,
+        "access_path": "elements[1].paragraphs[1].table.table_elements",
+        "target_columns": [
+          "보종명",
+          "유형1",
+          "보험기간",
+          "보험료 납입기간",
+          "남자나이",
+          "여자나이",
+          "보험료 납입주기"
+        ]
+      },
+      "reason": "중복 조합 제거 및 최종 JSON 구조 정리",
+      "expected_output": "정규화된 최종 JSON 구조"
+    },
+    {
+      "step": 7,
+      "tool": "ValidationLight",
+      "metadata": {
+        "section_index": 1,
+        "access_path": "elements[1].paragraphs[1].table.table_elements",
+        "target_columns": [
+          "보종명",
+          "유형1",
+          "보험기간",
+          "보험료 납입기간",
+          "남자나이",
+          "여자나이",
+          "보험료 납입주기"
+        ]
+      },
+      "reason": "필수 필드 존재 여부 및 조합 개수 검사",
+      "expected_output": "검증된 JSON 구조"
+    },
+    {
+      "step": 8,
+      "tool": "FinalWriter",
+      "metadata": {
+        "section_index": 1,
+        "access_path": "elements[1].paragraphs[1].table.table_elements",
+        "target_columns": [
+          "보종명",
+          "유형1",
+          "보험기간",
+          "보험료 납입기간",
+          "남자나이",
+          "여자나이",
+          "보험료 납입주기"
+        ]
+      },
+      "reason": "최종 스키마에 맞춰 JSON을 파일로 저장",
+      "expected_output": "최종 JSON 파일"
+    }
+  ],
+  "_metadata": {
+    "model": "gpt-4o",
+    "method": "direct_plan_no_cot",
+    "latency_seconds": 12.85,
+    "token_usage": {
+      "input_tokens": 4066,
+      "output_tokens": 1053,
+      "total_tokens": 5119
+    },
+    "cost_usd": {
+      "input_cost": 0.010165,
+      "output_cost": 0.01053,
+      "total_cost": 0.020695
+    },
+    "pricing_per_1m_tokens": {
+      "input": 2.5,
+      "output": 10.0
+    }
+  }
+}

@@ -1,0 +1,124 @@
+{
+  "plan": [
+    {
+      "step": 1,
+      "tool": "DefinitionSimpleTableRule",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements",
+        "target_columns": [
+          "명칭",
+          "명칭_1",
+          "보험종목"
+        ],
+        "hierarchy_info": {
+          "depth": 2,
+          "columns": [
+            "명칭",
+            "명칭_1",
+            "보험종목"
+          ]
+        }
+      },
+      "reason": "단순한 표 구조로 명칭과 보험종목을 규칙 기반으로 추출하기 적합함",
+      "expected_output": "보종명, 유형1, 유형2, 유형3"
+    },
+    {
+      "step": 2,
+      "tool": "ConditionSubtitleHybrid",
+      "metadata": {
+        "section_index": 2,
+        "access_path": "elements[2].paragraphs",
+        "has_subtitles": true,
+        "formula_present": true
+      },
+      "reason": "소제목별로 조건이 나뉘어 있으며, 수식이 포함되어 있어 하이브리드 접근이 필요함",
+      "expected_output": "보험기간, 납입기간, 주피보험자최소가입연령, 주피보험자최대가입연령, 주피보험자가입성별"
+    },
+    {
+      "step": 3,
+      "tool": "FormulaEvaluator",
+      "metadata": {
+        "section_index": 2,
+        "paragraph_index": 1,
+        "access_path": "elements[2].paragraphs[1].table.table_elements",
+        "target_columns": [
+          "남자나이",
+          "여자나이"
+        ]
+      },
+      "reason": "연령 조건에 수식이 포함되어 있어 이를 평가하여 정규화된 표현으로 변환 필요",
+      "expected_output": "주피보험자최소가입연령, 주피보험자최대가입연령"
+    },
+    {
+      "step": 4,
+      "tool": "Mapping",
+      "metadata": {
+        "section_index": null,
+        "access_path": null
+      },
+      "reason": "추출된 데이터를 내부 스키마에 맞게 필드명을 매핑",
+      "expected_output": "내부 스키마에 맞는 필드명 매핑 완료"
+    },
+    {
+      "step": 5,
+      "tool": "CartesianProduct",
+      "metadata": {
+        "section_index": null,
+        "access_path": null
+      },
+      "reason": "보종 × 기간 × 납입기간 × 연령 × 성별 등 가능한 모든 조합을 생성",
+      "expected_output": "모든 가능한 조합 생성 완료"
+    },
+    {
+      "step": 6,
+      "tool": "Normalize",
+      "metadata": {
+        "section_index": null,
+        "access_path": null
+      },
+      "reason": "중복 조합 제거, 정렬, 필드 이름/값 정규화 등 최종 JSON 구조를 정리",
+      "expected_output": "정규화된 최종 JSON 구조"
+    },
+    {
+      "step": 7,
+      "tool": "ValidationLight",
+      "metadata": {
+        "section_index": null,
+        "access_path": null
+      },
+      "reason": "필수 필드 존재 여부, 조합 개수, 기본 범위(연령/기간) 검사 등 경량 검증",
+      "expected_output": "검증 완료된 JSON"
+    },
+    {
+      "step": 8,
+      "tool": "FinalWriter",
+      "metadata": {
+        "section_index": null,
+        "access_path": null
+      },
+      "reason": "최종 스키마에 맞춰 JSON을 파일로 저장",
+      "expected_output": "최종 JSON 파일 저장 완료"
+    }
+  ],
+  "_metadata": {
+    "model": "gpt-4o",
+    "method": "direct_plan_no_cot",
+    "latency_seconds": 10.55,
+    "token_usage": {
+      "input_tokens": 8795,
+      "output_tokens": 857,
+      "total_tokens": 9652
+    },
+    "cost_usd": {
+      "input_cost": 0.021988,
+      "output_cost": 0.00857,
+      "total_cost": 0.030558
+    },
+    "pricing_per_1m_tokens": {
+      "input": 2.5,
+      "output": 10.0
+    }
+  }
+}

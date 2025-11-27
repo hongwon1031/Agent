@@ -1,0 +1,171 @@
+{
+  "plan": [
+    {
+      "step": 1,
+      "tool": "DefinitionSimpleTableRule",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements",
+        "hierarchy_info": {
+          "depth": 2,
+          "columns": [
+            "명칭",
+            "보험종목",
+            "보험종목_1"
+          ]
+        },
+        "target_columns": [
+          "명칭",
+          "보험종목",
+          "보험종목_1"
+        ]
+      },
+      "reason": "단순한 표 구조로 명칭과 보험종목을 규칙 기반으로 추출하기 적합함",
+      "expected_output": "보종명, 유형1, 유형2"
+    },
+    {
+      "step": 2,
+      "tool": "ConditionSimpleTableRule",
+      "metadata": {
+        "section_index": 2,
+        "access_path": "elements[2].paragraphs",
+        "has_subtitles": false,
+        "formula_present": true
+      },
+      "reason": "조건 섹션이 단일 표 구조로 명확하게 되어 있어 규칙 기반으로 추출하기 적합함",
+      "expected_output": "보험기간, 납입기간, 가입연령, 성별"
+    },
+    {
+      "step": 3,
+      "tool": "FormulaEvaluator",
+      "metadata": {
+        "section_index": 2,
+        "paragraph_index": 0,
+        "access_path": "elements[2].paragraphs[0].table.table_elements",
+        "target_columns": [
+          "남자나이",
+          "여자나이"
+        ]
+      },
+      "reason": "연령 조건에 수식이 포함되어 있어 이를 평가하여 정규화된 표현으로 변환하기 위함",
+      "expected_output": "정규화된 연령 조건"
+    },
+    {
+      "step": 4,
+      "tool": "Mapping",
+      "metadata": {
+        "section_index": null,
+        "access_path": null,
+        "additional_context": {
+          "mapping_fields": [
+            "보종명",
+            "유형1",
+            "유형2",
+            "보험기간",
+            "납입기간",
+            "가입연령",
+            "성별"
+          ]
+        }
+      },
+      "reason": "내부 스키마에 맞게 필드명을 매핑하여 최종 JSON 구조를 준비하기 위함",
+      "expected_output": "매핑된 JSON 구조"
+    },
+    {
+      "step": 5,
+      "tool": "CartesianProduct",
+      "metadata": {
+        "section_index": null,
+        "access_path": null,
+        "additional_context": {
+          "fields": [
+            "보종명",
+            "유형1",
+            "유형2",
+            "보험기간",
+            "납입기간",
+            "가입연령",
+            "성별"
+          ]
+        }
+      },
+      "reason": "가능한 모든 조합을 생성하여 완전한 가입가능조건을 구성하기 위함",
+      "expected_output": "모든 조합의 가입가능조건"
+    },
+    {
+      "step": 6,
+      "tool": "Normalize",
+      "metadata": {
+        "section_index": null,
+        "access_path": null,
+        "additional_context": {
+          "fields": [
+            "보종명",
+            "유형1",
+            "유형2",
+            "보험기간",
+            "납입기간",
+            "가입연령",
+            "성별"
+          ]
+        }
+      },
+      "reason": "중복 조합 제거 및 정렬을 통해 최종 JSON 구조를 정리하기 위함",
+      "expected_output": "정규화된 최종 JSON"
+    },
+    {
+      "step": 7,
+      "tool": "ValidationLight",
+      "metadata": {
+        "section_index": null,
+        "access_path": null,
+        "additional_context": {
+          "fields": [
+            "보종명",
+            "유형1",
+            "유형2",
+            "보험기간",
+            "납입기간",
+            "가입연령",
+            "성별"
+          ]
+        }
+      },
+      "reason": "필수 필드 존재 여부 및 조합 개수를 검사하여 데이터의 완전성을 확인하기 위함",
+      "expected_output": "검증된 JSON 데이터"
+    },
+    {
+      "step": 8,
+      "tool": "FinalWriter",
+      "metadata": {
+        "section_index": null,
+        "access_path": null,
+        "additional_context": {
+          "output_format": "JSON"
+        }
+      },
+      "reason": "최종 스키마에 맞춰 JSON을 파일로 저장하기 위함",
+      "expected_output": "최종 가입가능조건 JSON 파일"
+    }
+  ],
+  "_metadata": {
+    "model": "gpt-4o",
+    "method": "direct_plan_no_cot",
+    "latency_seconds": 13.08,
+    "token_usage": {
+      "input_tokens": 17195,
+      "output_tokens": 1008,
+      "total_tokens": 18203
+    },
+    "cost_usd": {
+      "input_cost": 0.042987,
+      "output_cost": 0.01008,
+      "total_cost": 0.053067
+    },
+    "pricing_per_1m_tokens": {
+      "input": 2.5,
+      "output": 10.0
+    }
+  }
+}

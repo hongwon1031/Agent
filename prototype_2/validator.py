@@ -1,6 +1,18 @@
 """
 LLM-based validator for task outputs.
 Validates each task's output against task goals and original document.
+
+이 모듈은 각 Task의 출력 결과를 검증하여 품질을 보장합니다.
+
+주요 기능:
+    - validate_search: Search 도구 결과 검증 (올바른 위치인지)
+    - validate_extract: Extract 도구 결과 검증 (데이터 완전성)
+    - validate_cartesian: Cartesian 도구 결과 검증 (조합 완전성)
+
+검증 전략:
+    - 단순 규칙이 아닌 LLM의 판단으로 유연한 검증
+    - 실패 시 구체적인 에러 메시지와 개선 제안 제공
+    - Replanner가 이 피드백을 활용하여 재계획 수립
 """
 
 import os
@@ -12,10 +24,28 @@ from dotenv import load_dotenv
 
 class LLMValidator:
     """
-    LLM-based validator that can handle various validation scenarios.
+    LLM 기반 Task 출력 검증기
+
+    역할:
+        1. Task 출력의 정확성 검증
+        2. 에러 원인 분석 및 제안사항 생성
+        3. Replanner에게 피드백 제공
+
+    검증 방식:
+        - 규칙 기반이 아닌 LLM의 문맥 이해 능력 활용
+        - 원본 문서와 비교하여 데이터 손실 여부 확인
+        - 예상 조합 수와 실제 조합 수 비교
+
+    Attributes:
+        client (OpenAI): OpenAI API 클라이언트
     """
 
     def __init__(self):
+        """
+        Validator 초기화
+
+        OpenAI API 클라이언트 생성
+        """
         load_dotenv(dotenv_path=r"c:\Users\NT-165\Desktop\Project\Toy\.env")
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 

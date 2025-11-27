@@ -1,0 +1,99 @@
+{
+  "plan": [
+    {
+      "step": 1,
+      "tool": "DefinitionSimpleTableRule",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements",
+        "target_columns": [
+          "명칭",
+          "보험종목",
+          "보험종목_1"
+        ],
+        "hierarchy_info": {
+          "depth": 2,
+          "columns": [
+            "명칭",
+            "보험종목",
+            "보험종목_1"
+          ]
+        }
+      },
+      "reason": "단순한 표 구조로 명칭과 보험종목을 규칙 기반으로 파싱",
+      "expected_output": "보종명, 유형1, 유형2, 유형3"
+    },
+    {
+      "step": 2,
+      "tool": "Mapping",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements",
+        "target_columns": [
+          "명칭",
+          "보험종목",
+          "보험종목_1"
+        ]
+      },
+      "reason": "추출된 정의 데이터를 내부 스키마에 맞게 매핑",
+      "expected_output": "보종명, 유형1, 유형2, 유형3 매핑된 데이터"
+    },
+    {
+      "step": 3,
+      "tool": "CartesianProduct",
+      "metadata": {
+        "additional_context": {}
+      },
+      "reason": "보종명, 유형1, 유형2, 유형3의 가능한 모든 조합 생성",
+      "expected_output": "모든 조합의 보종명, 유형1, 유형2, 유형3"
+    },
+    {
+      "step": 4,
+      "tool": "Normalize",
+      "metadata": {
+        "additional_context": {}
+      },
+      "reason": "중복 조합 제거 및 정규화",
+      "expected_output": "정규화된 최종 JSON 구조"
+    },
+    {
+      "step": 5,
+      "tool": "ValidationLight",
+      "metadata": {
+        "additional_context": {}
+      },
+      "reason": "필수 필드 존재 여부 및 조합 개수 검증",
+      "expected_output": "검증된 JSON 데이터"
+    },
+    {
+      "step": 6,
+      "tool": "FinalWriter",
+      "metadata": {
+        "additional_context": {}
+      },
+      "reason": "최종 스키마에 맞춰 JSON을 파일로 저장",
+      "expected_output": "최종 가입가능조건 JSON 파일"
+    }
+  ],
+  "_metadata": {
+    "model": "gpt-4o",
+    "method": "direct_plan_no_cot",
+    "latency_seconds": 7.06,
+    "token_usage": {
+      "input_tokens": 4195,
+      "output_tokens": 570,
+      "total_tokens": 4765
+    },
+    "cost_usd": {
+      "input_cost": 0.010488,
+      "output_cost": 0.0057,
+      "total_cost": 0.016188
+    },
+    "pricing_per_1m_tokens": {
+      "input": 2.5,
+      "output": 10.0
+    }
+  }
+}

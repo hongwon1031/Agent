@@ -1,0 +1,79 @@
+        2. Tool 선택 가이드 (참고용, 강제 아님):
+
+           ⚠️ 아래는 가이드일 뿐이다. document_analysis를 분석하여 최적의 전략을 자유롭게 수립하라!
+
+           [언어(Language)]
+           - 문서 제목/섹션/컬럼이 한국어가 아닌 경우(영어/중국어/한자 등):
+             - 초반 step에 LanguageNormalize* 계열 Tool을 1단계 이상 포함하는 것을 우선 고려하라.
+             - 예: 중국어/한자 위주 문서 → LanguageNormalizeZhToKo 같은 도구로 주요 용어를 정규화한 뒤 Definition/Condition을 수행.
+           - 문서가 순수 한국어인 경우:
+             - 언어 정규화 Tool은 생략하고 바로 Definition/Condition 단계로 진행해도 된다.
+
+           [정의 섹션 구조(Definition)]
+           - 구조가 "표"이고, 표 개수 1개, 계층 깊이 ≤ 2, 컬럼명이 명확할 때:
+             → DefinitionSimpleTableRule / DefinitionRule 위주로 사용 (LLM/HYBRID는 사용 최소화)
+           - 구조가 "표"이고, 계층 깊이 ≥ 3 또는 멀티 컬럼(명칭+보험종목+심사유형 등)으로 복잡할 때:
+             → DefinitionMultiColumnRule, DefinitionDeepHierarchyHybrid 고려
+           - 구조가 "텍스트"이거나 표가 거의 없고 정의가 문단에 흩어져 있을 때:
+             → DefinitionTextOnlyLLM 우선 고려 (필요시 DefinitionColumnGuesser로 컬럼 역할 추론)
+           - 보종명 표기 형태가 제각각일 때:
+             → DefinitionNameNormalizer를 Definition 단계 전/후로 한 번 포함하여 보종명을 정규화
+
+           [조건 섹션 구조(Condition)]
+           - 조건 섹션에 "가./나." 등 소제목 + 표 구조가 뚜렷할 때:
+             → SubtitleMapper + ConditionSubtitleHybrid 조합을 우선 고려 (소제목-표 매핑 필수)
+           - 조건 섹션이 표 1~2개로 단순하고 소제목이 없을 때:
+             → ConditionSimpleTableRule / ConditionRule 위주로 사용
+           - 가입조건이 주로 텍스트 본문에 서술되어 있을 때:
+             → ConditionTextOnlyLLM 또는 ConditionSamplerLongDoc 후 ConditionLLM 조합을 고려
+
+           [수식/코드/단위]
+           - sample_conditions.has_formula == true 이고 formula_examples에 min[...] 등 복잡한 수식이 있을 때:
+             → FormulaEvaluator, FormulaExtractorLLM를 Condition 단계 이후에 별도 step으로 추가
+           - 심사형 코드/성별 코드/기간 단위가 문서마다 다를 때:
+             → CodeNormalizer, UnitConverter를 CartesianProduct 이전 또는 이후에 한 번씩 포함
+
+           [비용/지연(Cost/Latency)]
+           - 가능한 경우 Rule 기반 Tool로 최대한 처리하고,
+             정말 필요한 부분(텍스트 해석, 복잡 수식, 컬럼 추론 등)에만 LLM/Hybrid를 사용하라.
+           - 문서 길이가 매우 길 경우:
+             → Sampler 계열 Tool(예: ConditionSamplerLongDoc)을 활용하여 LLM 입력 구간을 줄이는 것을 고려.
+
+
+        3. Plan 수립 전략:
+
+           ⚠️ 중요: 아래는 일반적인 예시일 뿐이다.
+           문서 특성에 따라 순서 변경, Tool 생략/추가, 병렬 실행 등 자유롭게 계획하라!
+
+           [기본 플로우 예시]
+           1. (필요시) 언어 정규화
+              - LanguageNormalize* 계열 Tool로 비한국어/혼합 언어 문서를 정규화
+           2. Definition 추출
+              - 문서 구조에 따라 DefinitionSimpleTableRule / DefinitionMultiColumnRule /
+                DefinitionDeepHierarchyHybrid / DefinitionTextOnlyLLM 중 선택
+           3. Condition 추출
+              - 소제목/표 구조에 따라 ConditionSimpleTableRule / ConditionSubtitleHybrid /
+                ConditionTextOnlyLLM / ConditionHybrid 중 선택
+           4. 보조 처리
+              - RowspanHandler, ColspanHandler, ComplexTableParser, SubtitleMapper 등으로
+                표/소제목 구조를 정리
+              - FormulaEvaluator, FormulaExtractorLLM으로 수식 정규화
+              - CodeNormalizer, UnitConverter로 코드/단위를 표준화
+           5. 매핑 & 조합 생성
+              - HierarchyExtractor, DeepHierarchyHandler로 계층 구조를 정리
+              - Mapping으로 내부 스키마에 맞춰 필드 매핑
+              - CartesianProduct로 보종 × 기간 × 납입기간 × 연령 × 성별 조합 생성
+           6. 정규화 & 검증 & 출력
+              - Normalize, ValidationLight로 중복/필수필드/범위 검증
+              - FinalWriter로 최종 JSON을 생성
+
+           [문서 복잡도에 따른 변형 예시]
+           - 단순한 표만 있는 문서:
+             → (언어 정규화 생략 가능)
+                DefinitionSimpleTableRule + ConditionSimpleTableRule + CartesianProduct + FinalWriter 정도면 충분
+           - 복잡한 구조(멀티 컬럼, 소제목+다중 표, 복잡 수식)가 있는 문서:
+             → DefinitionDeepHierarchyHybrid / ConditionSubtitleHybrid / FormulaEvaluator /
+                RowspanHandler / ColspanHandler 등을 적절히 조합
+           - 병렬 처리 가능한 경우:
+             → Definition 관련 step과 Condition 관련 step을 분리하여 병렬 실행하고,
+                Mapping/CartesianProduct 단계에서 합류하도록 step을 설계

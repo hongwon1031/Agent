@@ -1,0 +1,260 @@
+{
+  "reasoning": {
+    "checklist": {
+      "언어": {
+        "check": "문서에 비한국어(중국어/영어/한자) 포함 여부 분석",
+        "detected": "순수 한국어",
+        "decision": "불필요",
+        "reason": "문서의 모든 섹션이 한국어로 작성되어 있으며, 비한국어가 포함되지 않음."
+      },
+      "수식": {
+        "check": "sample_conditions.has_formula 확인",
+        "detected": "true",
+        "decision": "FormulaEvaluator 필요",
+        "reason": "조건 섹션에 수식이 포함되어 있으며, 복잡한 계산식이 존재하여 수식 평가가 필요함."
+      },
+      "소제목": {
+        "check": "condition_hierarchy.has_subtitles 확인",
+        "detected": "true",
+        "decision": "SubtitleMapper 계열 필요",
+        "reason": "소제목이 존재하며, 소제목과 표가 매핑되어 있어 관련 툴이 필요함."
+      },
+      "복잡표": {
+        "check": "rowspan/colspan 복잡도, 특이사항 분석",
+        "detected": "언급 없음",
+        "decision": "불필요",
+        "reason": "표가 없거나 단순한 구조로, rowspan/colspan 관련 처리가 필요하지 않음."
+      }
+    },
+    "structure_analysis": {
+      "definition_complexity": "복잡",
+      "definition_reasoning": "정의 섹션이 텍스트로만 구성되어 있어 표를 통한 구조적 정보가 없음.",
+      "condition_complexity": "중간",
+      "condition_reasoning": "조건 섹션에 소제목과 수식이 포함된 혼합 구조로, 표와 텍스트가 혼재되어 있음.",
+      "overall_strategy": "Hybrid 혼합"
+    },
+    "tool_selection_reasoning": [
+      {
+        "step": 1,
+        "tool": "DefinitionTextOnlyLLM",
+        "why": "정의 섹션이 표 없이 텍스트로만 구성되어 있어 LLM을 통해 보종명/유형 계층을 추출해야 함.",
+        "alternatives_considered": [
+          "DefinitionRule: 표가 없어 적용 불가",
+          "DefinitionHybrid: 텍스트만 존재하므로 불필요"
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 2,
+        "tool": "ConditionSubtitleHybrid",
+        "why": "조건 섹션에 소제목과 표가 혼합되어 있어 소제목-표 매핑을 통해 조건을 추출해야 함.",
+        "alternatives_considered": [
+          "ConditionRule: 소제목이 있어 적용 불가",
+          "ConditionLLM: 텍스트만으로 처리할 필요 없음"
+        ],
+        "confidence": "medium"
+      },
+      {
+        "step": 3,
+        "tool": "FormulaEvaluator",
+        "why": "조건 섹션에 복잡한 수식이 포함되어 있어 수식 평가가 필요함.",
+        "alternatives_considered": [
+          "FormulaExtractorLLM: 수식 평가가 주 목적이므로 불필요"
+        ],
+        "confidence": "high"
+      }
+    ],
+    "cost_latency_consideration": "Rule 0개, Hybrid 2개, LLM 1개로 예상 비용은 중간 수준.",
+    "potential_risks": [
+      "수식 파싱 실패 가능",
+      "소제목-표 매핑 오류 가능성"
+    ]
+  },
+  "plan": [
+    {
+      "step": 1,
+      "tool": "DefinitionTextOnlyLLM",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": null,
+        "access_path": "elements[0].paragraphs",
+        "hierarchy_info": {
+          "depth": 0,
+          "columns": []
+        },
+        "target_columns": []
+      },
+      "reason": "정의 섹션이 텍스트로만 구성되어 있어 LLM을 통해 보종명/유형 계층을 추출해야 함.",
+      "expected_output": "보종명 및 유형 계층 정보"
+    },
+    {
+      "step": 2,
+      "tool": "ConditionSubtitleHybrid",
+      "metadata": {
+        "section_index": 1,
+        "access_path": "elements[1].paragraphs",
+        "subtitle_mappings": [
+          {
+            "subtitle": "가. 해약환급금 미지급형",
+            "paragraph_index": 0,
+            "estimated_type": "가입조건 유형",
+            "table_index": 1,
+            "table_types": {
+              "유형1": [
+                "간편심사형",
+                "일반심사형"
+              ],
+              "유형2": [
+                "-"
+              ],
+              "보험기간": [
+                "80/90/100세\n만기, 종신"
+              ],
+              "보험료 납입기간": [
+                "10/15/20/25/30년납"
+              ],
+              "남자나이": [
+                "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세",
+                "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세"
+              ],
+              "여자나이": [
+                "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세",
+                "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세"
+              ],
+              "보험료 납입주기": [
+                "월납"
+              ]
+            }
+          }
+        ],
+        "paragraph_map": [
+          {
+            "index": 0,
+            "type": "title",
+            "content": "가. 해약환급금 미지급형"
+          },
+          {
+            "index": 1,
+            "type": "table",
+            "content": "가입가능 조건"
+          }
+        ],
+        "has_subtitles": true,
+        "formula_present": true
+      },
+      "reason": "조건 섹션에 소제목과 표가 혼합되어 있어 소제목-표 매핑을 통해 조건을 추출해야 함.",
+      "expected_output": "보험기간, 납입기간, 가입연령, 성별 등의 조건 정보"
+    },
+    {
+      "step": 3,
+      "tool": "FormulaEvaluator",
+      "metadata": {
+        "section_index": 1,
+        "access_path": "elements[1].paragraphs",
+        "subtitle_mappings": [
+          {
+            "subtitle": "가. 해약환급금 미지급형",
+            "paragraph_index": 0,
+            "estimated_type": "가입조건 유형",
+            "table_index": 1,
+            "table_types": {
+              "유형1": [
+                "간편심사형",
+                "일반심사형"
+              ],
+              "유형2": [
+                "-"
+              ],
+              "보험기간": [
+                "80/90/100세\n만기, 종신"
+              ],
+              "보험료 납입기간": [
+                "10/15/20/25/30년납"
+              ],
+              "남자나이": [
+                "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세",
+                "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세"
+              ],
+              "여자나이": [
+                "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세",
+                "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세"
+              ],
+              "보험료 납입주기": [
+                "월납"
+              ]
+            }
+          }
+        ],
+        "paragraph_map": [
+          {
+            "index": 0,
+            "type": "title",
+            "content": "가. 해약환급금 미지급형"
+          },
+          {
+            "index": 1,
+            "type": "table",
+            "content": "가입가능 조건"
+          }
+        ],
+        "has_subtitles": true,
+        "formula_present": true
+      },
+      "reason": "조건 섹션에 복잡한 수식이 포함되어 있어 수식 평가가 필요함.",
+      "expected_output": "정규화된 연령/기간 수식 정보"
+    },
+    {
+      "step": 4,
+      "tool": "Mapping",
+      "metadata": {},
+      "reason": "추출된 Definition과 Condition을 타겟 스키마에 맞게 필드명 매핑",
+      "expected_output": "타겟 스키마에 맞춘 필드명 매핑 정보"
+    },
+    {
+      "step": 5,
+      "tool": "CartesianProduct",
+      "metadata": {},
+      "reason": "보종 × 기간 × 납입기간 × 연령 × 성별의 모든 조합 생성",
+      "expected_output": "모든 조합 생성 정보"
+    },
+    {
+      "step": 6,
+      "tool": "Normalize",
+      "metadata": {},
+      "reason": "중복 제거 및 데이터 정규화",
+      "expected_output": "정규화된 데이터"
+    },
+    {
+      "step": 7,
+      "tool": "ValidationLight",
+      "metadata": {},
+      "reason": "필수 필드 존재 여부 및 기본 범위 검사",
+      "expected_output": "검증된 데이터"
+    },
+    {
+      "step": 8,
+      "tool": "FinalWriter",
+      "metadata": {},
+      "reason": "최종 가입가능조건 JSON 파일 출력",
+      "expected_output": "최종 JSON 파일"
+    }
+  ],
+  "_metadata": {
+    "model": "gpt-4o",
+    "latency_seconds": 21.9,
+    "token_usage": {
+      "input_tokens": 5776,
+      "output_tokens": 2166,
+      "total_tokens": 7942
+    },
+    "cost_usd": {
+      "input_cost": 0.01444,
+      "output_cost": 0.02166,
+      "total_cost": 0.0361
+    },
+    "pricing_per_1m_tokens": {
+      "input": 2.5,
+      "output": 10.0
+    }
+  }
+}

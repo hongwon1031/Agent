@@ -1,5 +1,20 @@
 """
 Main agent orchestration with multi-step planning, execution, validation, and replanning.
+
+이 모듈은 전체 워크플로우를 조율하는 최상위 Agent입니다.
+
+워크플로우:
+    1. Plan: Planner가 초기 3단계 계획 생성
+    2. Execute: 각 Task를 순차적으로 실행
+    3. Validate: Validator가 Task 결과 검증
+    4. Replan (필요시): 실패 시 Planner가 재계획 수립
+    5. Repeat: 최대 재시도 횟수까지 반복
+    6. Result: 모든 Task 성공 시 최종 결과 반환
+
+핵심 아이디어:
+    - Plan-Execute-Validate 루프
+    - LLM 기반 동적 재계획
+    - Validator 피드백을 통한 점진적 개선
 """
 
 import json
@@ -11,11 +26,32 @@ from validator import LLMValidator
 
 class MultiStepAgent:
     """
-    Orchestrates the entire workflow:
-    Plan → Execute Task → Validate → (Replan if failed) → Next Task → Final Result
+    다단계 Agent 오케스트레이터
+
+    전체 워크플로우를 관리하는 최상위 클래스입니다.
+
+    역할:
+        1. 초기 계획 수립 (Planner)
+        2. Task 순차 실행 (Executor)
+        3. 결과 검증 (Validator)
+        4. 실패 시 재계획 (Planner)
+        5. 최종 결과 반환
+
+    Attributes:
+        executor (ToolExecutor): 도구 실행 관리자
+        planner (MultiStepPlanner): 계획 수립 및 재계획 관리자
+        validator (LLMValidator): 결과 검증기
+        max_replan_per_task (int): Task당 최대 재시도 횟수
     """
 
     def __init__(self, max_replan_per_task: int = 3):
+        """
+        Agent 초기화
+
+        Args:
+            max_replan_per_task (int): Task당 최대 재계획 횟수 (기본값: 3)
+                예: 3이면 최대 4번 시도 (초기 1회 + 재계획 3회)
+        """
         self.executor = ToolExecutor()
         self.planner = MultiStepPlanner(tools=self.executor.tools)
         self.validator = LLMValidator()

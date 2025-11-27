@@ -1,0 +1,102 @@
+{
+  "plan": [
+    {
+      "step": 1,
+      "tool": "DefinitionSimpleTableRule",
+      "metadata": {
+        "section_index": 1,
+        "paragraph_index": 0,
+        "access_path": "elements[1].paragraphs[0].table.table_elements",
+        "hierarchy_info": {
+          "depth": 2,
+          "columns": [
+            "명칭",
+            "보험종목",
+            "보험종목_1"
+          ]
+        },
+        "target_columns": [
+          "명칭",
+          "보험종목",
+          "보험종목_1"
+        ]
+      },
+      "reason": "단순한 표 구조로 명칭과 보험종목을 규칙 기반으로 추출하기 적합함",
+      "expected_output": "보종명, 유형1, 유형2, 유형3"
+    },
+    {
+      "step": 2,
+      "tool": "ConditionSubtitleHybrid",
+      "metadata": {
+        "section_index": 3,
+        "access_path": "elements[3].paragraphs",
+        "has_subtitles": true,
+        "formula_present": true
+      },
+      "reason": "소제목별로 조건이 나뉘어 있으며, 수식이 포함되어 있어 하이브리드 접근이 필요함",
+      "expected_output": "보험기간, 납입기간, 주피보험자최소가입연령, 주피보험자최대가입연령, 주피보험자가입성별"
+    },
+    {
+      "step": 3,
+      "tool": "FormulaEvaluator",
+      "metadata": {
+        "section_index": 3,
+        "paragraph_index": 1,
+        "access_path": "elements[3].paragraphs[1].table.table_elements",
+        "target_columns": [
+          "남자나이",
+          "여자나이"
+        ]
+      },
+      "reason": "연령 조건에 수식이 포함되어 있어 이를 평가하여 정규화된 표현으로 변환",
+      "expected_output": "주피보험자최소가입연령, 주피보험자최대가입연령"
+    },
+    {
+      "step": 4,
+      "tool": "Mapping",
+      "metadata": {},
+      "reason": "내부 스키마에 맞게 필드명을 매핑하여 최종 JSON 구조를 준비",
+      "expected_output": "타겟 스키마에 맞춘 JSON 데이터"
+    },
+    {
+      "step": 5,
+      "tool": "Normalize",
+      "metadata": {},
+      "reason": "중복 조합 제거 및 필드 이름/값 정규화",
+      "expected_output": "정규화된 최종 JSON 데이터"
+    },
+    {
+      "step": 6,
+      "tool": "ValidationLight",
+      "metadata": {},
+      "reason": "필수 필드 존재 여부 및 기본 범위 검사",
+      "expected_output": "검증된 최종 JSON 데이터"
+    },
+    {
+      "step": 7,
+      "tool": "FinalWriter",
+      "metadata": {},
+      "reason": "최종 스키마에 맞춰 JSON을 파일로 저장",
+      "expected_output": "파일로 저장된 최종 JSON 데이터"
+    }
+  ],
+  "_metadata": {
+    "model": "gpt-4o",
+    "method": "direct_plan_no_cot",
+    "latency_seconds": 10.39,
+    "token_usage": {
+      "input_tokens": 9111,
+      "output_tokens": 690,
+      "total_tokens": 9801
+    },
+    "cost_usd": {
+      "input_cost": 0.022777,
+      "output_cost": 0.0069,
+      "total_cost": 0.029677
+    },
+    "pricing_per_1m_tokens": {
+      "input": 2.5,
+      "output": 10.0
+    }
+  }
+}

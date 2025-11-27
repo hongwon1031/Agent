@@ -1,0 +1,308 @@
+{
+  "document_analysis": {
+    "total_sections": 2,
+    "definition_section": {
+      "section_index": 0,
+      "title": "1. Product Name and Type",
+      "structure": "표",
+      "table_count": 1,
+      "columns": [
+        "Product Name",
+        "Plan Type",
+        "Underwriting Type"
+      ],
+      "location": {
+        "paragraph_indices": {
+          "tables": [
+            0
+          ],
+          "texts": []
+        },
+        "primary_table_index": 0
+      },
+      "sample_data": {
+        "계층구조": [
+          {
+            "level": 1,
+            "column_name": "Product Name",
+            "values": [
+              "Accident Disability Rider (Non-Refund)",
+              "Accident Disability Rider"
+            ],
+            "description": "보험 상품의 이름"
+          },
+          {
+            "level": 2,
+            "column_name": "Plan Type",
+            "values": [
+              "Non-Refund",
+              "Standard"
+            ],
+            "description": "플랜의 유형"
+          },
+          {
+            "level": 3,
+            "column_name": "Underwriting Type",
+            "values": [
+              "Simplified (315)",
+              "Simplified (335)",
+              "Standard"
+            ],
+            "description": "심사 유형"
+          }
+        ],
+        "hierarchy_depth": 3,
+        "hierarchy_tree_example": "Product Name → Plan Type → Underwriting Type"
+      },
+      "특이사항": "단일 표로 명확하게 정의된 계층 구조",
+      "누락_위험": "없음"
+    },
+    "condition_section": {
+      "section_index": 1,
+      "title": "3. Coverage Period and Premium Payment",
+      "structure": "표",
+      "table_count": 1,
+      "location": {
+        "paragraph_map": [
+          {
+            "index": 0,
+            "type": "table",
+            "content": "Eligibility"
+          }
+        ]
+      },
+      "condition_hierarchy": {
+        "has_subtitles": false,
+        "subtitle_mapping": [],
+        "all_unique_types": {
+          "from_subtitles": [],
+          "from_table_column_유형1": [
+            "Non-Refund",
+            "Standard"
+          ],
+          "from_table_column_유형2": [
+            "20 / 30 years, Whole Life",
+            "20 / 30 years"
+          ],
+          "from_table_column_유형3": [
+            "10 / 20 years"
+          ]
+        },
+        "hierarchy_tree_example": "Plan Type → Coverage Period → Payment Period"
+      },
+      "sample_conditions": {
+        "보험기간": [
+          "20 / 30 years, Whole Life",
+          "20 / 30 years"
+        ],
+        "납입기간": [
+          "10 / 20 years"
+        ],
+        "나이_표현": [
+          "Male Age",
+          "Female Age"
+        ],
+        "has_formula": false,
+        "formula_examples": []
+      },
+      "특이사항": "표로 명확하게 정의된 조건",
+      "누락_위험": "없음"
+    },
+    "other_sections": [],
+    "complexity": "단순",
+    "complexity_reason": "각 섹션이 단일 표로 명확하게 정의되어 있으며, 계층 구조가 명확함"
+  },
+  "reasoning": {
+    "checklist": {
+      "언어": {
+        "check": "문서에 비한국어(중국어/영어/한자) 포함 여부 분석",
+        "detected": "영어 혼재",
+        "decision": "EnglishToKorean 필요",
+        "reason": "문서의 모든 섹션이 영어로 작성되어 있음"
+      },
+      "수식": {
+        "check": "sample_conditions.has_formula 확인",
+        "detected": "false",
+        "decision": "FormulaEvaluator 불필요",
+        "reason": "수식이 포함되어 있지 않음"
+      },
+      "소제목": {
+        "check": "condition_hierarchy.has_subtitles 확인",
+        "detected": "false",
+        "decision": "SubtitleMapper 불필요",
+        "reason": "소제목이 존재하지 않음"
+      },
+      "복잡표": {
+        "check": "rowspan/colspan 복잡도, 특이사항 분석",
+        "detected": "단순함",
+        "decision": "RowspanHandler/ColspanHandler 불필요",
+        "reason": "단일 표로 명확하게 정의되어 있음"
+      }
+    },
+    "structure_analysis": {
+      "definition_complexity": "단순",
+      "definition_reasoning": "표 1개, 계층 3단계, 명확한 컬럼",
+      "condition_complexity": "단순",
+      "condition_reasoning": "표 1개, 소제목 없음",
+      "overall_strategy": "Rule 기반 우선"
+    },
+    "tool_selection_reasoning": [
+      {
+        "step": 1,
+        "tool": "EnglishToKorean",
+        "why": "문서가 영어로 작성되어 있어 한국어로 번역 필요",
+        "alternatives_considered": [
+          "ChineseToKorean: 중국어가 아님"
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 2,
+        "tool": "DefinitionSimpleTableRule",
+        "why": "단일 표로 명확하게 정의된 계층 구조를 규칙 기반으로 파싱",
+        "alternatives_considered": [
+          "DefinitionHybrid: 불필요한 LLM 비용 발생",
+          "DefinitionLLM: 단순 구조에 과도한 Tool"
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 3,
+        "tool": "ConditionSimpleTableRule",
+        "why": "단일 표로 명확하게 정의된 조건을 규칙 기반으로 파싱",
+        "alternatives_considered": [
+          "ConditionHybrid: 불필요한 LLM 비용 발생",
+          "ConditionLLM: 단순 구조에 과도한 Tool"
+        ],
+        "confidence": "high"
+      }
+    ],
+    "cost_latency_consideration": "Rule 기반 Tool 3개 × 저비용, 전체 예상 비용: 낮음",
+    "potential_risks": [
+      "영어 번역 품질 이슈"
+    ]
+  },
+  "plan": [
+    {
+      "step": 1,
+      "tool": "EnglishToKorean",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements",
+        "target_columns": [
+          "Product Name",
+          "Plan Type",
+          "Underwriting Type"
+        ],
+        "hierarchy_info": {
+          "depth": 3,
+          "columns": [
+            "Product Name",
+            "Plan Type",
+            "Underwriting Type"
+          ]
+        }
+      },
+      "reason": "문서가 영어로 작성되어 있어 한국어로 번역 필요",
+      "expected_output": "한국어로 번역된 정의 섹션"
+    },
+    {
+      "step": 2,
+      "tool": "DefinitionSimpleTableRule",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements",
+        "hierarchy_info": {
+          "depth": 3,
+          "columns": [
+            "Product Name",
+            "Plan Type",
+            "Underwriting Type"
+          ]
+        },
+        "target_columns": [
+          "Product Name",
+          "Plan Type",
+          "Underwriting Type"
+        ]
+      },
+      "reason": "단일 표로 명확하게 정의된 계층 구조를 규칙 기반으로 파싱",
+      "expected_output": "보종명, 유형1/2/3 등의 계층 구조"
+    },
+    {
+      "step": 3,
+      "tool": "ConditionSimpleTableRule",
+      "metadata": {
+        "section_index": 1,
+        "access_path": "elements[1].paragraphs",
+        "subtitle_mappings": [],
+        "paragraph_map": [
+          {
+            "index": 0,
+            "type": "table",
+            "content": "Eligibility"
+          }
+        ],
+        "has_subtitles": false,
+        "formula_present": false
+      },
+      "reason": "단일 표로 명확하게 정의된 조건을 규칙 기반으로 파싱",
+      "expected_output": "보험기간, 납입기간, 가입연령, 성별 등의 조건"
+    },
+    {
+      "step": 4,
+      "tool": "Mapping",
+      "metadata": {},
+      "reason": "추출된 Definition과 Condition을 타겟 스키마에 맞게 필드명 매핑",
+      "expected_output": "타겟 스키마에 맞게 매핑된 데이터"
+    },
+    {
+      "step": 5,
+      "tool": "CartesianProduct",
+      "metadata": {},
+      "reason": "보종 × 기간 × 납입기간 × 연령 × 성별의 모든 조합 생성",
+      "expected_output": "모든 가능한 조합"
+    },
+    {
+      "step": 6,
+      "tool": "Normalize",
+      "metadata": {},
+      "reason": "중복 제거 및 데이터 정규화",
+      "expected_output": "정규화된 데이터"
+    },
+    {
+      "step": 7,
+      "tool": "ValidationLight",
+      "metadata": {},
+      "reason": "필수 필드 존재 여부 및 기본 범위 검사",
+      "expected_output": "검증된 데이터"
+    },
+    {
+      "step": 8,
+      "tool": "FinalWriter",
+      "metadata": {},
+      "reason": "최종 스키마에 맞춰 JSON을 파일로 저장",
+      "expected_output": "최종 가입가능조건 JSON 파일"
+    }
+  ],
+  "_metadata": {
+    "model": "gpt-4o",
+    "latency_seconds": 27.3,
+    "token_usage": {
+      "input_tokens": 7102,
+      "output_tokens": 2083,
+      "total_tokens": 9185
+    },
+    "cost_usd": {
+      "input_cost": 0.017755,
+      "output_cost": 0.02083,
+      "total_cost": 0.038585
+    },
+    "pricing_per_1m_tokens": {
+      "input": 2.5,
+      "output": 10.0
+    }
+  }
+}

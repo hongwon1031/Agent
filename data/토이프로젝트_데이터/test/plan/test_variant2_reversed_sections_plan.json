@@ -1,0 +1,226 @@
+{
+  "reasoning": {
+    "checklist": {
+      "언어": {
+        "check": "문서에 비한국어(중국어/영어/한자) 포함 여부 분석",
+        "detected": "순수 한국어",
+        "decision": "불필요",
+        "reason": "문서의 모든 요소가 한국어로 작성되어 있으며, 중국어나 영어가 포함되어 있지 않음."
+      },
+      "수식": {
+        "check": "문서에서 수식(min, max, 계산식 등) 포함 여부 확인",
+        "detected": "true",
+        "decision": "FormulaEvaluator 필요",
+        "reason": "가입 가능 조건 표에서 'min[세만기 - 년납, 90 - 년납, 80]'과 같은 수식이 발견됨."
+      },
+      "소제목": {
+        "check": "조건 섹션에 소제목 구조 존재 여부 확인",
+        "detected": "true",
+        "decision": "SubtitleMapper 필요",
+        "reason": "조건 섹션에서 '가. 해약환급금 미지급형'과 같은 소제목이 존재하며, 소제목과 표가 연결됨."
+      },
+      "복잡표": {
+        "check": "rowspan/colspan 복잡도, 병합 셀 분석",
+        "detected": "복잡함",
+        "decision": "RowspanHandler/ColspanHandler 필요",
+        "reason": "표에서 rowspan과 colspan이 사용되어 병합된 셀이 존재함."
+      }
+    },
+    "structure_analysis": {
+      "definition_complexity": "중간",
+      "definition_reasoning": "표 1개, 계층 3단, 명확한 컬럼명 존재",
+      "condition_complexity": "중간",
+      "condition_reasoning": "소제목 존재, 표 1개, 수식 포함",
+      "overall_strategy": "Hybrid 혼합"
+    },
+    "tool_selection_reasoning": [
+      {
+        "step": 1,
+        "tool": "FormulaEvaluator",
+        "why": "수식이 포함된 조건을 정규화하기 위해 필요",
+        "alternatives_considered": [
+          "수식이 없을 경우 생략 가능"
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 2,
+        "tool": "RowspanHandler",
+        "why": "rowspan으로 병합된 셀을 개별 셀로 분해하기 위해 필요",
+        "alternatives_considered": [
+          "복잡한 표가 아닐 경우 생략 가능"
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 3,
+        "tool": "ColspanHandler",
+        "why": "colspan으로 병합된 셀을 개별 셀로 분해하기 위해 필요",
+        "alternatives_considered": [
+          "복잡한 표가 아닐 경우 생략 가능"
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 4,
+        "tool": "DefinitionMultiColumnRule",
+        "why": "멀티 컬럼 구조의 정의 표를 규칙 기반으로 파싱",
+        "alternatives_considered": [
+          "DefinitionHybrid: 불필요한 LLM 비용 발생"
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 5,
+        "tool": "ConditionSubtitleHybrid",
+        "why": "소제목과 표가 연결된 구조에서 조건을 추출하기 위해 필요",
+        "alternatives_considered": [
+          "ConditionRule: 소제목이 없을 경우"
+        ],
+        "confidence": "high"
+      }
+    ],
+    "cost_latency_consideration": "Rule 3개, Hybrid 2개, 전체 예상 비용: 중간",
+    "potential_risks": [
+      "수식 파싱 실패 가능성",
+      "소제목-표 매핑 오류 가능성",
+      "복잡한 표 구조로 인한 데이터 누락 가능성"
+    ]
+  },
+  "plan": [
+    {
+      "step": 1,
+      "tool": "FormulaEvaluator",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 1,
+        "access_path": "elements[0].paragraphs[1].table.table_elements",
+        "target_columns": [
+          "남자나이",
+          "여자나이"
+        ]
+      },
+      "reason": "수식을 포함한 나이 조건을 정규화하기 위해 필요",
+      "expected_output": "정규화된 나이 조건"
+    },
+    {
+      "step": 2,
+      "tool": "RowspanHandler",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 1,
+        "access_path": "elements[0].paragraphs[1].table.table_elements",
+        "target_columns": [
+          "보험기간",
+          "보험료 납입기간"
+        ]
+      },
+      "reason": "rowspan으로 병합된 셀을 개별 셀로 분해하기 위해 필요",
+      "expected_output": "분해된 보험기간 및 납입기간 정보"
+    },
+    {
+      "step": 3,
+      "tool": "ColspanHandler",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 1,
+        "access_path": "elements[0].paragraphs[1].table.table_elements",
+        "target_columns": [
+          "남자나이",
+          "여자나이"
+        ]
+      },
+      "reason": "colspan으로 병합된 셀을 개별 셀로 분해하기 위해 필요",
+      "expected_output": "분해된 나이 정보"
+    },
+    {
+      "step": 4,
+      "tool": "DefinitionMultiColumnRule",
+      "metadata": {
+        "section_index": 1,
+        "paragraph_index": 0,
+        "access_path": "elements[1].paragraphs[0].table.table_elements",
+        "hierarchy_info": {
+          "depth": 3,
+          "columns": [
+            "명칭",
+            "보험종목",
+            "보험종목_1"
+          ]
+        },
+        "target_columns": [
+          "명칭",
+          "보험종목",
+          "보험종목_1"
+        ]
+      },
+      "reason": "멀티 컬럼 구조의 정의 표를 규칙 기반으로 파싱",
+      "expected_output": "정의된 보험 상품 계층 정보"
+    },
+    {
+      "step": 5,
+      "tool": "ConditionSubtitleHybrid",
+      "metadata": {
+        "section_index": 0,
+        "access_path": "elements[0].paragraphs",
+        "has_subtitles": true,
+        "formula_present": true
+      },
+      "reason": "소제목과 표가 연결된 구조에서 조건을 추출하기 위해 필요",
+      "expected_output": "추출된 가입 조건 정보"
+    },
+    {
+      "step": 6,
+      "tool": "Mapping",
+      "metadata": {},
+      "reason": "추출된 Definition과 Condition을 타겟 스키마에 맞게 필드명 매핑",
+      "expected_output": "필드명이 매핑된 데이터"
+    },
+    {
+      "step": 7,
+      "tool": "CartesianProduct",
+      "metadata": {},
+      "reason": "보종 × 기간 × 납입기간 × 연령 × 성별의 모든 조합 생성",
+      "expected_output": "모든 조합이 생성된 데이터"
+    },
+    {
+      "step": 8,
+      "tool": "Normalize",
+      "metadata": {},
+      "reason": "중복 제거 및 데이터 정규화",
+      "expected_output": "정규화된 데이터"
+    },
+    {
+      "step": 9,
+      "tool": "ValidationLight",
+      "metadata": {},
+      "reason": "필수 필드 존재 여부 및 기본 범위 검사",
+      "expected_output": "검증된 데이터"
+    },
+    {
+      "step": 10,
+      "tool": "FinalWriter",
+      "metadata": {},
+      "reason": "최종 가입가능조건 JSON 파일 출력",
+      "expected_output": "최종 JSON 파일"
+    }
+  ],
+  "_metadata": {
+    "model": "gpt-4o",
+    "latency_seconds": 19.79,
+    "token_usage": {
+      "input_tokens": 6151,
+      "output_tokens": 1755,
+      "total_tokens": 7906
+    },
+    "cost_usd": {
+      "input_cost": 0.015378,
+      "output_cost": 0.01755,
+      "total_cost": 0.032927
+    },
+    "pricing_per_1m_tokens": {
+      "input": 2.5,
+      "output": 10.0
+    }
+  }
+}

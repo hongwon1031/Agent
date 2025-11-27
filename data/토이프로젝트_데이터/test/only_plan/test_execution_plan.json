@@ -1,0 +1,303 @@
+{
+  "reasoning": {
+    "checklist": {
+      "언어": {
+        "check": "문서에 비한국어(중국어/영어/한자) 포함 여부 분석",
+        "detected": "순수 한국어",
+        "decision": "불필요",
+        "reason": "문서의 제목, 정의 섹션 및 조건 섹션의 컬럼명과 내용이 모두 한국어로 작성되어 있음."
+      },
+      "수식": {
+        "check": "sample_conditions.has_formula 확인",
+        "detected": "true",
+        "decision": "FormulaEvaluator 필요",
+        "reason": "조건 섹션에 복잡한 수식이 포함되어 있어 수식 평가가 필요함."
+      },
+      "소제목": {
+        "check": "condition_hierarchy.has_subtitles 확인",
+        "detected": "true",
+        "decision": "SubtitleMapper 계열 필요",
+        "reason": "조건 섹션에 소제목이 존재하며, 소제목과 표가 명확히 매핑되어 있음."
+      },
+      "복잡표": {
+        "check": "rowspan/colspan 복잡도, 특이사항 분석",
+        "detected": "복잡함",
+        "decision": "RowspanHandler 필요",
+        "reason": "정의 섹션의 표에 rowspan이 존재하여 계층 구조가 형성됨."
+      }
+    },
+    "structure_analysis": {
+      "definition_complexity": "중간",
+      "definition_reasoning": "표 1개, 계층 깊이 3단, rowspan으로 인한 계층 구조",
+      "condition_complexity": "중간",
+      "condition_reasoning": "소제목 존재, 다중 표, 복잡한 수식 포함",
+      "overall_strategy": "Hybrid 혼합"
+    },
+    "tool_selection_reasoning": [
+      {
+        "step": 1,
+        "tool": "RowspanHandler",
+        "why": "정의 섹션의 표에 rowspan이 존재하여 계층 구조를 펼쳐야 함.",
+        "alternatives_considered": [
+          "ComplexTableParser: 필요 이상의 복잡한 처리",
+          "ColspanHandler: colspan이 아닌 rowspan 문제"
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 2,
+        "tool": "DefinitionDeepHierarchyHybrid",
+        "why": "정의 섹션의 계층 깊이가 3단계 이상이며, 표와 텍스트가 혼합되어 있음.",
+        "alternatives_considered": [
+          "DefinitionSimpleTableRule: 계층이 단순하지 않음",
+          "DefinitionHybrid: 계층 깊이가 3단 이상으로 더 복잡함"
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 3,
+        "tool": "SubtitleMapper",
+        "why": "조건 섹션의 소제목과 표가 명확히 매핑되어 있어 소제목 기반 매핑이 필요함.",
+        "alternatives_considered": [
+          "DistantMappingHandler: 소제목과 표가 가까이 있어 불필요",
+          "CloseProximityMapper: 소제목과 표의 물리적 거리가 명확함"
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 4,
+        "tool": "FormulaEvaluator",
+        "why": "조건 섹션에 복잡한 수식이 포함되어 있어 수식 평가가 필요함.",
+        "alternatives_considered": [
+          "FormulaExtractorLLM: 수식이 명확히 표기되어 있어 불필요"
+        ],
+        "confidence": "high"
+      }
+    ],
+    "cost_latency_consideration": "Rule 2개, Hybrid 2개, 전체 예상 비용: 중간",
+    "potential_risks": [
+      "rowspan 처리 오류 가능성",
+      "수식 평가 오류 가능성",
+      "소제목-표 매핑 오류 가능성"
+    ]
+  },
+  "plan": [
+    {
+      "step": 1,
+      "tool": "RowspanHandler",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements",
+        "target_columns": [
+          "명칭",
+          "보험종목",
+          "보험종목_1"
+        ],
+        "hierarchy_info": {
+          "depth": 3,
+          "columns": [
+            "명칭",
+            "보험종목",
+            "보험종목_1"
+          ]
+        }
+      },
+      "reason": "정의 섹션의 표에 rowspan이 존재하여 계층 구조를 펼쳐야 함.",
+      "expected_output": "rowspan을 펼쳐 각 행에 명확한 계층 구조 생성"
+    },
+    {
+      "step": 2,
+      "tool": "DefinitionDeepHierarchyHybrid",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements",
+        "target_columns": [
+          "명칭",
+          "보험종목",
+          "보험종목_1"
+        ],
+        "hierarchy_info": {
+          "depth": 3,
+          "columns": [
+            "명칭",
+            "보험종목",
+            "보험종목_1"
+          ]
+        }
+      },
+      "reason": "정의 섹션의 계층 깊이가 3단계 이상이며, 표와 텍스트가 혼합되어 있음.",
+      "expected_output": "보종명, 유형1/2/3 등의 계층 구조 추출"
+    },
+    {
+      "step": 3,
+      "tool": "SubtitleMapper",
+      "metadata": {
+        "section_index": 2,
+        "access_path": "elements[2].paragraphs",
+        "subtitle_mappings": [
+          {
+            "subtitle": "가. 해약환급금 미지급형",
+            "paragraph_index": 0,
+            "estimated_type": "가입가능 조건",
+            "table_index": 1
+          },
+          {
+            "subtitle": "나. 일반형",
+            "paragraph_index": 3,
+            "estimated_type": "가입가능 조건",
+            "table_index": 4
+          }
+        ],
+        "paragraph_map": [
+          {
+            "index": 0,
+            "type": "title",
+            "content": "가. 해약환급금 미지급형"
+          },
+          {
+            "index": 1,
+            "type": "table",
+            "content": "가입가능 조건"
+          },
+          {
+            "index": 2,
+            "type": "table",
+            "content": "가입불가 조건"
+          },
+          {
+            "index": 3,
+            "type": "title",
+            "content": "나. 일반형"
+          },
+          {
+            "index": 4,
+            "type": "table",
+            "content": "가입가능 조건"
+          },
+          {
+            "index": 5,
+            "type": "text",
+            "content": "※ 보험료 납입기간은 보험기간을 초과할 수 없음(이하 모든 보험종목별 동일 적용됨)"
+          }
+        ],
+        "has_subtitles": true,
+        "formula_present": true
+      },
+      "reason": "조건 섹션의 소제목과 표가 명확히 매핑되어 있어 소제목 기반 매핑이 필요함.",
+      "expected_output": "소제목별로 조건 표를 매핑하여 조건 정보 추출"
+    },
+    {
+      "step": 4,
+      "tool": "FormulaEvaluator",
+      "metadata": {
+        "section_index": 2,
+        "access_path": "elements[2].paragraphs",
+        "subtitle_mappings": [
+          {
+            "subtitle": "가. 해약환급금 미지급형",
+            "paragraph_index": 0,
+            "estimated_type": "가입가능 조건",
+            "table_index": 1
+          },
+          {
+            "subtitle": "나. 일반형",
+            "paragraph_index": 3,
+            "estimated_type": "가입가능 조건",
+            "table_index": 4
+          }
+        ],
+        "paragraph_map": [
+          {
+            "index": 0,
+            "type": "title",
+            "content": "가. 해약환급금 미지급형"
+          },
+          {
+            "index": 1,
+            "type": "table",
+            "content": "가입가능 조건"
+          },
+          {
+            "index": 2,
+            "type": "table",
+            "content": "가입불가 조건"
+          },
+          {
+            "index": 3,
+            "type": "title",
+            "content": "나. 일반형"
+          },
+          {
+            "index": 4,
+            "type": "table",
+            "content": "가입가능 조건"
+          },
+          {
+            "index": 5,
+            "type": "text",
+            "content": "※ 보험료 납입기간은 보험기간을 초과할 수 없음(이하 모든 보험종목별 동일 적용됨)"
+          }
+        ],
+        "has_subtitles": true,
+        "formula_present": true
+      },
+      "reason": "조건 섹션에 복잡한 수식이 포함되어 있어 수식 평가가 필요함.",
+      "expected_output": "수식을 평가하여 정규화된 조건 정보 생성"
+    },
+    {
+      "step": 5,
+      "tool": "Mapping",
+      "metadata": {},
+      "reason": "추출된 Definition과 Condition을 타겟 스키마에 맞게 필드명 매핑",
+      "expected_output": "타겟 스키마에 맞게 필드명 매핑된 데이터"
+    },
+    {
+      "step": 6,
+      "tool": "CartesianProduct",
+      "metadata": {},
+      "reason": "보종 × 기간 × 납입기간 × 연령 × 성별의 모든 조합 생성",
+      "expected_output": "모든 가능한 조합 생성"
+    },
+    {
+      "step": 7,
+      "tool": "Normalize",
+      "metadata": {},
+      "reason": "중복 제거 및 데이터 정규화",
+      "expected_output": "정규화된 데이터"
+    },
+    {
+      "step": 8,
+      "tool": "ValidationLight",
+      "metadata": {},
+      "reason": "필수 필드 존재 여부 및 기본 범위 검사",
+      "expected_output": "검증된 데이터"
+    },
+    {
+      "step": 9,
+      "tool": "FinalWriter",
+      "metadata": {},
+      "reason": "최종 가입가능조건 JSON 파일 출력",
+      "expected_output": "최종 JSON 파일"
+    }
+  ],
+  "_metadata": {
+    "model": "gpt-4o",
+    "latency_seconds": 26.98,
+    "token_usage": {
+      "input_tokens": 6499,
+      "output_tokens": 2330,
+      "total_tokens": 8829
+    },
+    "cost_usd": {
+      "input_cost": 0.016247,
+      "output_cost": 0.0233,
+      "total_cost": 0.039547
+    },
+    "pricing_per_1m_tokens": {
+      "input": 2.5,
+      "output": 10.0
+    }
+  }
+}

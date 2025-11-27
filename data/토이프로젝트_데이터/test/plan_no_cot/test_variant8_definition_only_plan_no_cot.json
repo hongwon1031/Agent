@@ -1,0 +1,121 @@
+{
+  "plan": [
+    {
+      "step": 1,
+      "tool": "DefinitionSimpleTableRule",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements",
+        "target_columns": [
+          "명칭",
+          "보험종목",
+          "보험종목_1"
+        ],
+        "hierarchy_info": {
+          "depth": 2,
+          "columns": [
+            "명칭",
+            "보험종목",
+            "보험종목_1"
+          ]
+        }
+      },
+      "reason": "단순한 표 구조로 명칭과 보험종목을 규칙 기반으로 추출하기 적합함",
+      "expected_output": "보종명, 유형1, 유형2, 유형3 정보"
+    },
+    {
+      "step": 2,
+      "tool": "DefinitionNameNormalizer",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements",
+        "target_columns": [
+          "명칭"
+        ]
+      },
+      "reason": "명칭의 줄바꿈 및 괄호를 정리하여 일관된 형태로 정규화",
+      "expected_output": "정규화된 보종명"
+    },
+    {
+      "step": 3,
+      "tool": "Mapping",
+      "metadata": {
+        "section_index": 0,
+        "access_path": "elements[0].paragraphs",
+        "has_subtitles": false,
+        "formula_present": false
+      },
+      "reason": "추출된 정의 정보를 내부 스키마에 맞게 매핑",
+      "expected_output": "타겟 스키마에 맞춘 매핑된 정보"
+    },
+    {
+      "step": 4,
+      "tool": "CartesianProduct",
+      "metadata": {
+        "section_index": 0,
+        "access_path": "elements[0].paragraphs",
+        "has_subtitles": false,
+        "formula_present": false
+      },
+      "reason": "보종명, 유형1, 유형2, 유형3의 가능한 모든 조합 생성",
+      "expected_output": "모든 가능한 조합의 정보"
+    },
+    {
+      "step": 5,
+      "tool": "Normalize",
+      "metadata": {
+        "section_index": 0,
+        "access_path": "elements[0].paragraphs",
+        "has_subtitles": false,
+        "formula_present": false
+      },
+      "reason": "중복 조합 제거 및 필드 이름/값 정규화",
+      "expected_output": "정규화된 최종 JSON 구조"
+    },
+    {
+      "step": 6,
+      "tool": "ValidationLight",
+      "metadata": {
+        "section_index": 0,
+        "access_path": "elements[0].paragraphs",
+        "has_subtitles": false,
+        "formula_present": false
+      },
+      "reason": "필수 필드 존재 여부 및 조합 개수 검사",
+      "expected_output": "검증된 JSON 데이터"
+    },
+    {
+      "step": 7,
+      "tool": "FinalWriter",
+      "metadata": {
+        "section_index": 0,
+        "access_path": "elements[0].paragraphs",
+        "has_subtitles": false,
+        "formula_present": false
+      },
+      "reason": "최종 스키마에 맞춰 JSON을 파일로 저장",
+      "expected_output": "최종 가입가능조건 JSON 파일"
+    }
+  ],
+  "_metadata": {
+    "model": "gpt-4o",
+    "method": "direct_plan_no_cot",
+    "latency_seconds": 10.2,
+    "token_usage": {
+      "input_tokens": 3587,
+      "output_tokens": 779,
+      "total_tokens": 4366
+    },
+    "cost_usd": {
+      "input_cost": 0.008967,
+      "output_cost": 0.00779,
+      "total_cost": 0.016758
+    },
+    "pricing_per_1m_tokens": {
+      "input": 2.5,
+      "output": 10.0
+    }
+  }
+}

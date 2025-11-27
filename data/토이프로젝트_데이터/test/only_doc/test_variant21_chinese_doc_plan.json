@@ -1,0 +1,134 @@
+{
+  "source_file": null,
+  "doc_title": null,
+  "document_analysis": {
+    "total_sections": 2,
+    "definition_section": {
+      "section_index": 0,
+      "title": "一、保險種類名稱",
+      "structure": "표",
+      "table_count": 1,
+      "columns": [
+        "名稱",
+        "保險種類",
+        "審核型態"
+      ],
+      "location": {
+        "paragraph_indices": {
+          "tables": [
+            0
+          ],
+          "texts": []
+        },
+        "primary_table_index": 0
+      },
+      "sample_data": {
+        "계층구조": [
+          {
+            "level": 1,
+            "column_name": "名稱",
+            "values": [
+              "簡易癌症診斷附約（非分紅，解約金不給付）",
+              "簡易癌症診斷附約（非分紅）"
+            ],
+            "description": "보험 상품의 이름"
+          },
+          {
+            "level": 2,
+            "column_name": "保險種類",
+            "values": [
+              "解約金不給付型",
+              "一般型"
+            ],
+            "description": "보험 종류"
+          },
+          {
+            "level": 3,
+            "column_name": "審核型態",
+            "values": [
+              "簡易核保型 / 一般核保型",
+              "一般核保型"
+            ],
+            "description": "심사 형태"
+          }
+        ],
+        "hierarchy_depth": 3,
+        "hierarchy_tree_example": "名稱 → 保險種類 → 審核型態"
+      },
+      "특이사항": "표의 구조가 단순하여 계층 파악이 용이함",
+      "누락_위험": "컬럼명이 명확하여 누락 위험이 낮음"
+    },
+    "condition_section": {
+      "section_index": 1,
+      "title": "三、保險期間及保費繳納期間",
+      "structure": "표",
+      "table_count": 1,
+      "location": {
+        "paragraph_map": [
+          {
+            "index": 0,
+            "type": "table",
+            "content": "投保資格"
+          }
+        ]
+      },
+      "condition_hierarchy": {
+        "has_subtitles": false,
+        "subtitle_mapping": [],
+        "all_unique_types": {
+          "from_subtitles": [],
+          "from_table_column_유형1": [
+            "解約金不給付型",
+            "一般型"
+          ],
+          "from_table_column_유형2": [
+            "20年 / 30年 / 終身",
+            "20年 / 30年"
+          ],
+          "from_table_column_유형3": [
+            "10年 / 20年"
+          ]
+        },
+        "hierarchy_tree_example": "保險種類 → 保險期間 → 繳納期間"
+      },
+      "sample_conditions": {
+        "보험기간": [
+          "20年 / 30年 / 終身",
+          "20年 / 30年"
+        ],
+        "납입기간": [
+          "10年 / 20年"
+        ],
+        "나이_표현": [
+          "15歲至65歲",
+          "15歲至60歲"
+        ],
+        "has_formula": false,
+        "formula_examples": []
+      },
+      "특이사항": "표의 구조가 단순하여 조건 파악이 용이함",
+      "누락_위험": "표의 정보가 명확하여 누락 위험이 낮음"
+    },
+    "other_sections": [],
+    "complexity": "단순",
+    "complexity_reason": "문서의 구조가 명확하고 표의 정보가 일관되게 제공됨"
+  },
+  "_metadata": {
+    "model": "gpt-4o",
+    "latency_seconds": 6.01,
+    "token_usage": {
+      "input_tokens": 2556,
+      "output_tokens": 777,
+      "total_tokens": 3333
+    },
+    "cost_usd": {
+      "input_cost": 0.00639,
+      "output_cost": 0.00777,
+      "total_cost": 0.01416
+    },
+    "pricing_per_1m_tokens": {
+      "input": 2.5,
+      "output": 10.0
+    }
+  }
+}

@@ -1,5 +1,17 @@
 """
 Multi-step planner and replanner with LLM-based task generation.
+
+이 모듈은 LLM 기반으로 초기 계획을 수립하고, 실패 시 재계획하는 기능을 제공합니다.
+
+주요 기능:
+    - create_initial_plan: 3단계 계획 생성 (Search → Extract → Cartesian)
+    - replan_task: 실패한 Task에 대한 새로운 계획 생성
+
+계획 전략:
+    1. 먼저 빠른 rule-based 도구 시도
+    2. 실패 시 LLM이 에러 분석하여 llm-based 도구로 전환
+    3. Validator 피드백을 반영하여 instruction 추가
+    4. 최대 재시도 횟수까지 반복
 """
 
 import os
@@ -11,31 +23,69 @@ from dotenv import load_dotenv
 
 class MultiStepPlanner:
     """
-    Creates initial multi-step plan and handles replanning on failures.
+    다단계 계획 수립 및 재계획 관리자
+
+    역할:
+        1. 초기 3단계 계획 생성 (Search → Extract → Cartesian)
+        2. 실패한 Task에 대한 재계획 수립
+        3. 에러 분석 및 대안 전략 제시
+        4. Validator 피드백 반영
+
+    Attributes:
+        client (OpenAI): OpenAI API 클라이언트
+        tools (Dict[str, SimpleTool]): 사용 가능한 도구 목록
     """
 
     def __init__(self, tools: Dict[str, Any] = None):
+        """
+        Planner 초기화
+
+        Args:
+            tools (Dict[str, SimpleTool], optional): 사용 가능한 도구 인스턴스
+                Planner가 도구의 description과 schema를 참고하여 계획 수립
+        """
         load_dotenv(dotenv_path=r"c:\Users\NT-165\Desktop\Project\Toy\.env")
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.tools = tools or {}
 
     def create_initial_plan(self, doc: List[Dict]) -> Dict[str, Any]:
         """
-        Create initial 3-step plan: Search → Extract → Cartesian
+        초기 3단계 계획 생성
+
+        보험 문서에서 정의를 추출하는 표준 3단계 계획을 LLM이 생성합니다:
+            Task 1: 정의 섹션 찾기 (Search)
+            Task 2: 데이터 추출하기 (Extract) - Task 1 결과 사용
+            Task 3: Cartesian Product 생성 (Cartesian) - Task 2 결과 사용
+
+        Args:
+            doc (List[Dict]): 파싱된 보험 문서
+                LLM에게 문서 구조를 간략히 제공하여 문맥 이해 돕기
 
         Returns:
-            {
-                "tasks": [
-                    {
-                        "task_id": 1,
-                        "description": "...",
-                        "tool_name": "...",
-                        "parameters": {...},
-                        "depends_on": None or task_id
-                    },
-                    ...
-                ]
-            }
+            Dict[str, Any]: 계획 또는 에러
+                성공 시: {
+                    "tasks": [
+                        {
+                            "task_id": int,               # Task 고유 번호
+                            "description": str,           # Task 설명
+                            "tool_name": str,             # 사용할 도구 이름
+                            "parameters": Dict,           # 도구 파라미터 (참조 포함)
+                            "depends_on": Optional[int]   # 의존하는 Task ID
+                        },
+                        ...
+                    ],
+                    "reasoning": str  # 계획 수립 이유
+                }
+                실패 시: {"error": str}
+
+        계획 전략:
+            - 첫 시도는 빠른 rule-based 도구 (rule_search, rule_extract)
+            - 파라미터에 이전 Task 결과 참조 포함 (예: {{task1.location.section_index}})
+            - LLM이 도구 스키마를 보고 올바른 참조 경로 생성
+
+        중요:
+            - LLM에게 정확한 참조 형식 교육 ({{task1.location.section_index}})
+            - 잘못된 참조({{task1.section_index}}) 방지
         """
         try:
             # Analyze document structure for context
@@ -162,20 +212,49 @@ class MultiStepPlanner:
         previous_attempts: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """
-        Create a new plan for a failed task based on error analysis.
+        실패한 Task에 대한 재계획 생성
+
+        LLM이 에러를 분석하고 새로운 전략을 수립합니다.
 
         Args:
-            failed_task: The task that failed
-            tool_error: Error message from tool execution
-            validation_result: Validation result (if tool succeeded but validation failed)
-            previous_attempts: List of previous attempts for this task
+            failed_task (Dict[str, Any]): 실패한 Task 정보
+                구조: {"task_id": int, "tool_name": str, "parameters": Dict, ...}
+            tool_error (str): 도구 실행 에러 메시지
+                예: "No definition sections found with keywords: ['정의']"
+            validation_result (Optional[Dict[str, Any]]): Validator 결과
+                도구는 성공했지만 검증 실패 시 제공됨
+                구조: {"is_valid": bool, "errors": List[str], "suggestions": List[str]}
+            previous_attempts (List[Dict[str, Any]]): 이전 시도 기록
+                각 시도의 tool_name, parameters, error 포함
 
         Returns:
-            {
-                "tool_name": "...",
-                "parameters": {...},
-                "reasoning": "..."
-            }
+            Dict[str, Any]: 새로운 계획 또는 에러
+                성공 시: {
+                    "tool_name": str,        # 새로 시도할 도구 이름
+                    "parameters": Dict,      # 새 파라미터 (instruction 포함 가능)
+                    "reasoning": str,        # 전략 변경 이유
+                    "changes": str           # 이전 대비 변경사항
+                }
+                실패 시: {"error": str}
+
+        재계획 전략:
+            1. 에러 분석:
+               - 키워드 미매칭 → llm_search로 전환
+               - 테이블 구조 복잡 → llm_extract로 전환
+               - 주석 필터링 실패 → instruction에 구체적 지시 추가
+
+            2. Validator 피드백 반영:
+               - suggestions를 instruction에 포함
+               - 예: "제목에 '명칭'이 포함된 섹션도 고려하세요"
+
+            3. 점진적 개선:
+               - 1차 시도: rule → llm 도구 전환
+               - 2차 시도: instruction 추가
+               - 3차 시도: 다른 파라미터 조합
+
+        중요:
+            - 동일한 실수 반복 방지 (previous_attempts 참고)
+            - Validator의 suggestions를 최대한 활용
         """
         try:
             # Determine failure reason

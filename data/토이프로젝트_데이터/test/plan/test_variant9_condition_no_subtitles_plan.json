@@ -1,0 +1,242 @@
+{
+  "reasoning": {
+    "checklist": {
+      "언어": {
+        "check": "문서에 비한국어(중국어/영어/한자) 포함 여부 분석",
+        "detected": "순수 한국어",
+        "decision": "불필요",
+        "reason": "문서의 모든 요소가 한국어로 작성되어 있으며, 중국어나 영어가 포함되어 있지 않음."
+      },
+      "수식": {
+        "check": "문서에서 수식(min, max, 계산식 등) 포함 여부 확인",
+        "detected": "true",
+        "decision": "FormulaEvaluator 필요",
+        "reason": "조건 섹션의 표에서 min[세만기 - 년납, 90 - 년납, 80]과 같은 수식이 발견됨."
+      },
+      "소제목": {
+        "check": "조건 섹션에 소제목 구조 존재 여부 확인",
+        "detected": "false",
+        "decision": "불필요",
+        "reason": "조건 섹션에 소제목이 존재하지 않으며, 표가 직접적으로 조건을 설명하고 있음."
+      },
+      "복잡표": {
+        "check": "rowspan/colspan 복잡도, 병합 셀 분석",
+        "detected": "복잡함",
+        "decision": "RowspanHandler/ColspanHandler 필요",
+        "reason": "표에서 rowspan과 colspan이 사용되어 병합된 셀이 존재함."
+      }
+    },
+    "structure_analysis": {
+      "definition_complexity": "단순",
+      "definition_reasoning": "표 1개, 계층 2단, 명확한 컬럼명으로 구성되어 있음.",
+      "condition_complexity": "중간",
+      "condition_reasoning": "표 2개, 수식 포함, 텍스트 비중이 낮음.",
+      "overall_strategy": "Rule 기반 우선"
+    },
+    "tool_selection_reasoning": [
+      {
+        "step": 1,
+        "tool": "RowspanHandler",
+        "why": "표에서 rowspan이 사용되어 있어 각 행으로 값을 펼쳐 넣기 위해 필요함.",
+        "alternatives_considered": [
+          "ComplexTableParser: 복잡한 rowspan/colspan 조합이 아니므로 불필요"
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 2,
+        "tool": "ColspanHandler",
+        "why": "표에서 colspan이 사용되어 있어 개별 컬럼으로 분해하기 위해 필요함.",
+        "alternatives_considered": [
+          "ComplexTableParser: 복잡한 rowspan/colspan 조합이 아니므로 불필요"
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 3,
+        "tool": "FormulaEvaluator",
+        "why": "조건 섹션의 표에서 수식을 평가하기 위해 필요함.",
+        "alternatives_considered": [
+          "FormulaExtractorLLM: 수식이 명확하여 LLM 사용 불필요"
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 4,
+        "tool": "DefinitionSimpleTableRule",
+        "why": "명칭/보험종목/보험종목_1 등 컬럼이 명확한 단일 정의 표를 규칙으로 파싱하기에 적합함.",
+        "alternatives_considered": [
+          "DefinitionHybrid: 단순 구조에 과도한 Tool"
+        ],
+        "confidence": "high"
+      },
+      {
+        "step": 5,
+        "tool": "ConditionSimpleTableRule",
+        "why": "조건 섹션이 단일 표 구조로 깔끔하게 구성되어 있어 규칙 기반으로 조건 추출 가능.",
+        "alternatives_considered": [
+          "ConditionHybrid: 복잡하지 않으므로 불필요"
+        ],
+        "confidence": "high"
+      }
+    ],
+    "cost_latency_consideration": "Rule 기반 Tool 5개 × 저비용",
+    "potential_risks": [
+      "수식 평가 오류 가능성",
+      "rowspan/colspan 처리 오류 가능성"
+    ]
+  },
+  "plan": [
+    {
+      "step": 1,
+      "tool": "RowspanHandler",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements",
+        "target_columns": [
+          "보험종목_1"
+        ],
+        "hierarchy_info": {
+          "depth": 2,
+          "columns": [
+            "명칭",
+            "보험종목",
+            "보험종목_1"
+          ]
+        }
+      },
+      "reason": "표에서 rowspan이 사용되어 있어 각 행으로 값을 펼쳐 넣기 위해 필요함.",
+      "expected_output": "rowspan이 해소된 표 데이터"
+    },
+    {
+      "step": 2,
+      "tool": "ColspanHandler",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements",
+        "target_columns": [
+          "보험종목"
+        ],
+        "hierarchy_info": {
+          "depth": 2,
+          "columns": [
+            "명칭",
+            "보험종목",
+            "보험종목_1"
+          ]
+        }
+      },
+      "reason": "표에서 colspan이 사용되어 있어 개별 컬럼으로 분해하기 위해 필요함.",
+      "expected_output": "colspan이 해소된 표 데이터"
+    },
+    {
+      "step": 3,
+      "tool": "FormulaEvaluator",
+      "metadata": {
+        "section_index": 2,
+        "paragraph_index": 0,
+        "access_path": "elements[2].paragraphs[0].table.table_elements",
+        "target_columns": [
+          "남자나이",
+          "여자나이"
+        ],
+        "additional_context": {
+          "formula_present": true
+        }
+      },
+      "reason": "조건 섹션의 표에서 수식을 평가하기 위해 필요함.",
+      "expected_output": "평가된 수식 결과"
+    },
+    {
+      "step": 4,
+      "tool": "DefinitionSimpleTableRule",
+      "metadata": {
+        "section_index": 0,
+        "paragraph_index": 0,
+        "access_path": "elements[0].paragraphs[0].table.table_elements",
+        "hierarchy_info": {
+          "depth": 2,
+          "columns": [
+            "명칭",
+            "보험종목",
+            "보험종목_1"
+          ]
+        },
+        "target_columns": [
+          "명칭",
+          "보험종목",
+          "보험종목_1"
+        ]
+      },
+      "reason": "명칭/보험종목/보험종목_1 등 컬럼이 명확한 단일 정의 표를 규칙으로 파싱하기에 적합함.",
+      "expected_output": "정의된 보험 상품 계층 정보"
+    },
+    {
+      "step": 5,
+      "tool": "ConditionSimpleTableRule",
+      "metadata": {
+        "section_index": 2,
+        "access_path": "elements[2].paragraphs",
+        "has_subtitles": false,
+        "formula_present": true
+      },
+      "reason": "조건 섹션이 단일 표 구조로 깔끔하게 구성되어 있어 규칙 기반으로 조건 추출 가능.",
+      "expected_output": "추출된 가입 조건 정보"
+    },
+    {
+      "step": 6,
+      "tool": "Mapping",
+      "metadata": {},
+      "reason": "추출된 Definition과 Condition을 타겟 스키마에 맞게 필드명 매핑",
+      "expected_output": "타겟 스키마에 맞게 매핑된 데이터"
+    },
+    {
+      "step": 7,
+      "tool": "CartesianProduct",
+      "metadata": {},
+      "reason": "보종 × 기간 × 납입기간 × 연령 × 성별의 모든 조합 생성",
+      "expected_output": "모든 조합이 생성된 데이터"
+    },
+    {
+      "step": 8,
+      "tool": "Normalize",
+      "metadata": {},
+      "reason": "중복 제거 및 데이터 정규화",
+      "expected_output": "정규화된 데이터"
+    },
+    {
+      "step": 9,
+      "tool": "ValidationLight",
+      "metadata": {},
+      "reason": "필수 필드 존재 여부 및 기본 범위 검사",
+      "expected_output": "검증된 데이터"
+    },
+    {
+      "step": 10,
+      "tool": "FinalWriter",
+      "metadata": {},
+      "reason": "최종 가입가능조건 JSON 파일 출력",
+      "expected_output": "최종 JSON 파일"
+    }
+  ],
+  "_metadata": {
+    "model": "gpt-4o",
+    "latency_seconds": 20.28,
+    "token_usage": {
+      "input_tokens": 10759,
+      "output_tokens": 1906,
+      "total_tokens": 12665
+    },
+    "cost_usd": {
+      "input_cost": 0.026897,
+      "output_cost": 0.01906,
+      "total_cost": 0.045957
+    },
+    "pricing_per_1m_tokens": {
+      "input": 2.5,
+      "output": 10.0
+    }
+  }
+}

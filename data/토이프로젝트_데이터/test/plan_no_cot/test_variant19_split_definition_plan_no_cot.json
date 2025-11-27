@@ -1,0 +1,150 @@
+{
+  "plan": [
+    {
+      "step": 1,
+      "tool": "DefinitionSimpleTableRule",
+      "metadata": {
+        "section_index": 1,
+        "paragraph_index": 0,
+        "access_path": "elements[1].paragraphs[0].table.table_elements",
+        "hierarchy_info": {
+          "depth": 2,
+          "columns": [
+            "명칭",
+            "보험종목",
+            "보험종목_1"
+          ]
+        },
+        "target_columns": [
+          "명칭",
+          "보험종목",
+          "보험종목_1"
+        ]
+      },
+      "reason": "단순한 표 구조로 명칭과 보험종목을 규칙 기반으로 추출하기 적합함",
+      "expected_output": "보종명, 유형1, 유형2, 유형3"
+    },
+    {
+      "step": 2,
+      "tool": "ConditionSimpleTableRule",
+      "metadata": {
+        "section_index": 3,
+        "access_path": "elements[3].paragraphs",
+        "has_subtitles": true,
+        "formula_present": true
+      },
+      "reason": "조건 섹션이 단일 표 구조로 깔끔하게 정리되어 있어 규칙 기반으로 추출하기 적합함",
+      "expected_output": "보험기간, 납입기간, 주피보험자최소가입연령, 주피보험자최대가입연령, 주피보험자가입성별"
+    },
+    {
+      "step": 3,
+      "tool": "FormulaEvaluator",
+      "metadata": {
+        "section_index": 3,
+        "access_path": "elements[3].paragraphs",
+        "additional_context": {
+          "formula_columns": [
+            "남자나이",
+            "여자나이"
+          ]
+        }
+      },
+      "reason": "조건 표에 포함된 연령 수식을 평가하여 정규화된 표현으로 변환하기 위함",
+      "expected_output": "정규화된 주피보험자최소가입연령, 주피보험자최대가입연령"
+    },
+    {
+      "step": 4,
+      "tool": "Mapping",
+      "metadata": {
+        "section_index": null,
+        "access_path": null,
+        "additional_context": {
+          "mapping_schema": "타겟 스키마"
+        }
+      },
+      "reason": "추출된 데이터를 내부 스키마에 맞게 필드명을 매핑하기 위함",
+      "expected_output": "타겟 스키마에 맞춘 데이터 매핑"
+    },
+    {
+      "step": 5,
+      "tool": "CartesianProduct",
+      "metadata": {
+        "section_index": null,
+        "access_path": null,
+        "additional_context": {
+          "fields": [
+            "보종명",
+            "유형1",
+            "유형2",
+            "유형3",
+            "보험기간",
+            "납입기간",
+            "주피보험자최소가입연령",
+            "주피보험자최대가입연령",
+            "주피보험자가입성별"
+          ]
+        }
+      },
+      "reason": "가능한 모든 조합을 생성하여 다양한 가입조건을 구성하기 위함",
+      "expected_output": "모든 가능한 가입조건 조합"
+    },
+    {
+      "step": 6,
+      "tool": "Normalize",
+      "metadata": {
+        "section_index": null,
+        "access_path": null,
+        "additional_context": {
+          "normalization_rules": "중복 제거, 정렬, 필드 이름/값 정규화"
+        }
+      },
+      "reason": "최종 JSON 구조를 정리하고 중복 조합을 제거하기 위함",
+      "expected_output": "정규화된 최종 JSON 구조"
+    },
+    {
+      "step": 7,
+      "tool": "ValidationLight",
+      "metadata": {
+        "section_index": null,
+        "access_path": null,
+        "additional_context": {
+          "validation_rules": "필수 필드 존재 여부, 조합 개수, 기본 범위 검사"
+        }
+      },
+      "reason": "최종 데이터의 유효성을 경량 검증하기 위함",
+      "expected_output": "검증된 최종 JSON 데이터"
+    },
+    {
+      "step": 8,
+      "tool": "FinalWriter",
+      "metadata": {
+        "section_index": null,
+        "access_path": null,
+        "additional_context": {
+          "output_format": "타겟 스키마"
+        }
+      },
+      "reason": "최종 스키마에 맞춰 JSON을 파일로 저장하기 위함",
+      "expected_output": "파일로 저장된 최종 JSON"
+    }
+  ],
+  "_metadata": {
+    "model": "gpt-4o",
+    "method": "direct_plan_no_cot",
+    "latency_seconds": 13.76,
+    "token_usage": {
+      "input_tokens": 8979,
+      "output_tokens": 1013,
+      "total_tokens": 9992
+    },
+    "cost_usd": {
+      "input_cost": 0.022447,
+      "output_cost": 0.01013,
+      "total_cost": 0.032577
+    },
+    "pricing_per_1m_tokens": {
+      "input": 2.5,
+      "output": 10.0
+    }
+  }
+}
