@@ -45,12 +45,14 @@ class Section:
         content_items: 콘텐츠 항목들 (paragraph, table 등)
         metadata: 추가 메타데이터
         access_path: 원본 문서에서의 접근 경로
+        content_summary: 콘텐츠 형식 요약 정보
     """
     index: int
     title: str
     content_items: List[Dict[str, Any]]
     metadata: Dict[str, Any]
     access_path: List[Union[str, int]]  # 예: ["document", "sections", 0, "content"]
+    content_summary: Dict[str, Any] = None  # 새로 추가
 
 
 @dataclass
@@ -175,14 +177,16 @@ class DocumentAccessor:
             return sections
 
         for idx, element in enumerate(elements):
+            content_items = element.get("paragraphs", [])
             section = Section(
                 index=idx,
                 title=element.get("title", ""),
-                content_items=element.get("paragraphs", []),
+                content_items=content_items,
                 metadata={
                     "original_element": element
                 },
-                access_path=[0, "elements", idx] if isinstance(self.raw_document, list) else ["elements", idx]
+                access_path=[0, "elements", idx] if isinstance(self.raw_document, list) else ["elements", idx],
+                content_summary=self._analyze_content_summary(content_items)
             )
             sections.append(section)
 
@@ -200,16 +204,19 @@ class DocumentAccessor:
         for idx, page in enumerate(pages):
             # Page를 하나의 섹션으로 취급
             content_items = page.get("content", []) if isinstance(page, dict) else []
+            if not isinstance(content_items, list):
+                content_items = [content_items]
 
             section = Section(
                 index=idx,
                 title=page.get("title", f"Page {idx + 1}") if isinstance(page, dict) else f"Page {idx + 1}",
-                content_items=content_items if isinstance(content_items, list) else [content_items],
+                content_items=content_items,
                 metadata={
                     "page_number": idx + 1,
                     "original_page": page
                 },
-                access_path=["pages", idx]
+                access_path=["pages", idx],
+                content_summary=self._analyze_content_summary(content_items)
             )
             sections.append(section)
 
@@ -225,14 +232,16 @@ class DocumentAccessor:
             sections_data = []
 
         for idx, sec in enumerate(sections_data):
+            content_items = sec.get("content", []) if isinstance(sec, dict) else []
             section = Section(
                 index=idx,
                 title=sec.get("title", "") if isinstance(sec, dict) else "",
-                content_items=sec.get("content", []) if isinstance(sec, dict) else [],
+                content_items=content_items,
                 metadata={
                     "original_section": sec
                 },
-                access_path=["sections", idx]
+                access_path=["sections", idx],
+                content_summary=self._analyze_content_summary(content_items)
             )
             sections.append(section)
 
@@ -246,14 +255,16 @@ class DocumentAccessor:
         sections_data = doc.get("sections", [])
 
         for idx, sec in enumerate(sections_data):
+            content_items = sec.get("content", []) if isinstance(sec, dict) else []
             section = Section(
                 index=idx,
                 title=sec.get("title", "") if isinstance(sec, dict) else "",
-                content_items=sec.get("content", []) if isinstance(sec, dict) else [],
+                content_items=content_items,
                 metadata={
                     "original_section": sec
                 },
-                access_path=["document", "sections", idx]
+                access_path=["document", "sections", idx],
+                content_summary=self._analyze_content_summary(content_items)
             )
             sections.append(section)
 
@@ -282,7 +293,8 @@ class DocumentAccessor:
                         title=str(title),
                         content_items=content_items,
                         metadata={"original_obj": obj},
-                        access_path=path.copy()
+                        access_path=path.copy(),
+                        content_summary=self._analyze_content_summary(content_items)
                     ))
 
                 # 재귀적으로 탐색
@@ -403,6 +415,74 @@ class DocumentAccessor:
 
         return contents
 
+    def _analyze_content_summary(self, content_items: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        콘텐츠 요약 정보 생성
+
+        Args:
+            content_items: 섹션의 콘텐츠 항목들
+
+        Returns:
+            Dict: 콘텐츠 요약 정보
+                - has_table: bool
+                - has_text: bool
+                - table_count: int
+                - text_count: int
+                - primary_type: ContentType
+                - content_preview: str (최대 200자)
+        """
+        has_table = False
+        has_text = False
+        table_count = 0
+        text_count = 0
+        text_preview = []
+
+        for item in content_items:
+            if not isinstance(item, dict):
+                continue
+
+            # 테이블 감지
+            if "table" in item or "table_elements" in item:
+                has_table = True
+                table_count += 1
+                # 테이블이 실제로 데이터가 있는지 확인
+                table = item.get("table", {})
+                if isinstance(table, dict):
+                    table_elements = table.get("table_elements", [])
+                    if not table_elements:  # 빈 테이블이면 카운트 안함
+                        table_count -= 1
+                        has_table = has_table and table_count > 0
+
+            # 텍스트 감지
+            text_content = item.get("content") or item.get("text", "")
+            if isinstance(text_content, str) and text_content.strip():
+                has_text = True
+                text_count += 1
+                # 텍스트 미리보기 수집 (최대 100자씩, 최대 3개)
+                if len(text_preview) < 3:
+                    preview = text_content.strip()[:100]
+                    if preview:
+                        text_preview.append(preview)
+
+        # Primary type 결정
+        if has_table and has_text:
+            primary_type = ContentType.MIXED
+        elif has_table:
+            primary_type = ContentType.TABLE
+        elif has_text:
+            primary_type = ContentType.TEXT
+        else:
+            primary_type = ContentType.UNKNOWN
+
+        return {
+            "has_table": has_table,
+            "has_text": has_text,
+            "table_count": table_count,
+            "text_count": text_count,
+            "primary_type": primary_type.value,
+            "content_preview": "\n".join(text_preview)  # 최대 3개 미리보기
+        }
+
     def _detect_content_type(self, item: Dict[str, Any]) -> ContentType:
         """콘텐츠 타입 자동 감지"""
         # 테이블 확인
@@ -450,16 +530,37 @@ class DocumentAccessor:
         """
         sections = self.get_all_sections()
 
+        # 형식별 섹션 분류
+        sections_by_format = {
+            "table_only": [],
+            "text_only": [],
+            "mixed": [],
+            "unknown": []
+        }
+
+        for s in sections:
+            if s.content_summary:
+                primary_type = s.content_summary.get("primary_type", "unknown")
+                if primary_type == "table":
+                    sections_by_format["table_only"].append(s.index)
+                elif primary_type == "text":
+                    sections_by_format["text_only"].append(s.index)
+                elif primary_type == "mixed":
+                    sections_by_format["mixed"].append(s.index)
+                else:
+                    sections_by_format["unknown"].append(s.index)
+
         return {
             "format": self.format.value,
             "total_sections": len(sections),
             "sections_with_tables": sum(
                 1 for s in sections
-                if any("table" in str(item.keys()).lower() for item in s.content_items if isinstance(item, dict))
+                if s.content_summary and s.content_summary.get("has_table", False)
             ),
             "sections_with_text": sum(
                 1 for s in sections
-                if any("text" in str(item.keys()).lower() for item in s.content_items if isinstance(item, dict))
+                if s.content_summary and s.content_summary.get("has_text", False)
             ),
             "section_titles": [s.title for s in sections],
+            "sections_by_format": sections_by_format  # 새로 추가
         }

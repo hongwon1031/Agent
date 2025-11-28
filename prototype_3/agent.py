@@ -7,7 +7,8 @@ LLM 기반 동적 계획 + Hybrid Tools + 완전 검증
 import json
 from typing import Dict, Any, List
 
-from core.llm_document_analyzer import LLMDocumentAnalyzer
+# [DEPRECATED] DocumentAnalyzer 사용 중단 - DocumentAccessor로 대체
+# from core.llm_document_analyzer import LLMDocumentAnalyzer
 from core.llm_planner import LLMPlanner
 from core.llm_validator import LLMValidator
 from tools.hybrid_tools import (
@@ -37,7 +38,8 @@ class Prototype3Agent:
         Args:
             max_replan_per_task: Task당 최대 재시도 횟수
         """
-        self.analyzer = LLMDocumentAnalyzer()
+        # [DEPRECATED] DocumentAnalyzer 사용 중단
+        # self.analyzer = LLMDocumentAnalyzer()
         self.planner = LLMPlanner()
         self.validator = LLMValidator()
         self.max_replan = max_replan_per_task
@@ -74,38 +76,57 @@ class Prototype3Agent:
         print("Prototype 3: Fully Generalized Multi-Agent System")
         print("="*80)
 
-        # Step 1: 문서 구조 분석 (LLM)
-        print("\n[STEP 1] Analyzing document structure with LLM...")
-        structure_analysis = self.analyzer.analyze(doc)
+        # [DEPRECATED] DocumentAnalyzer 사용 중단 - DocumentAccessor로 대체
+        # # Step 1: 문서 구조 분석 (LLM)
+        # print("\n[STEP 1] Analyzing document structure with LLM...")
+        # structure_analysis = self.analyzer.analyze(doc)
+        #
+        # if "error" in structure_analysis:
+        #     return {
+        #         "success": False,
+        #         "document_analysis": structure_analysis,
+        #         "error": f"Document analysis failed: {structure_analysis['error']}"
+        #     }
+        #
+        # print(f"[OK] Structure detected: {structure_analysis.get('structure_type')}")
+        # print(f"   Sections path: {structure_analysis.get('sections_path')}")
+        # print(f"   Estimated sections: {structure_analysis.get('total_sections_estimate')}")
+        #
+        # # 섹션 추출
+        # sections = self.analyzer.get_sections(doc, structure_analysis)
+        # print(f"   Actual sections found: {len(sections)}")
 
-        if "error" in structure_analysis:
-            return {
-                "success": False,
-                "document_analysis": structure_analysis,
-                "error": f"Document analysis failed: {structure_analysis['error']}"
-            }
+        # NEW: DocumentAccessor 사용
+        print("\n[STEP 1] Extracting sections with DocumentAccessor...")
+        from core.document_accessor import DocumentAccessor
+        accessor = DocumentAccessor(doc)
+        sections_raw = accessor.get_all_sections()
+        print(f"[OK] Found {len(sections_raw)} sections (Format: {accessor.format.value})")
 
-        print(f"✅ Structure detected: {structure_analysis.get('structure_type')}")
-        print(f"   Sections path: {structure_analysis.get('sections_path')}")
-        print(f"   Estimated sections: {structure_analysis.get('total_sections_estimate')}")
-
-        # 섹션 추출
-        sections = self.analyzer.get_sections(doc, structure_analysis)
-        print(f"   Actual sections found: {len(sections)}")
+        # Section 객체를 도구들이 기대하는 dict 형태로 변환
+        sections = []
+        for section in sections_raw:
+            sections.append({
+                "index": section.index,
+                "title": section.title,
+                "content": section.content_items,
+                "raw": section.metadata.get("original_element") or section.metadata.get("original_section") or section.metadata
+            })
+        print(f"   Converted {len(sections)} Section objects to dict format")
 
         # Step 2: 계획 수립 (LLM)
         print("\n[STEP 2] Creating dynamic plan with LLM...")
-        plan = self.planner.create_plan(doc, structure_analysis)
+        # OLD: plan = self.planner.create_plan(doc, structure_analysis)
+        plan = self.planner.create_plan(doc)  # NEW: structure_analysis 제거
 
         if "error" in plan:
             return {
                 "success": False,
-                "document_analysis": structure_analysis,
                 "error": f"Planning failed: {plan['error']}"
             }
 
         tasks = plan.get("tasks", [])
-        print(f"✅ Plan created with {len(tasks)} tasks")
+        print(f"[OK] Plan created with {len(tasks)} tasks")
         for task in tasks:
             print(f"   Task {task['task_id']}: {task['description']} [{task['tool_name']}]")
 
@@ -124,16 +145,15 @@ class Prototype3Agent:
             )
 
             if not task_result["success"]:
-                print(f"✗ Task {task_id} failed after {task_result['attempts']} attempts")
+                print(f"[FAIL] Task {task_id} failed after {task_result['attempts']} attempts")
                 return {
                     "success": False,
-                    "document_analysis": structure_analysis,
                     "execution_plan": plan,
                     "execution_log": execution_log,
                     "error": f"Task {task_id} failed: {task_result['error']}"
                 }
 
-            print(f"✅ Task {task_id} succeeded")
+            print(f"[OK] Task {task_id} succeeded")
             previous_results[task_id] = task_result["data"]
 
         # Step 4: 최종 결과
@@ -146,7 +166,6 @@ class Prototype3Agent:
 
         return {
             "success": True,
-            "document_analysis": structure_analysis,
             "execution_plan": plan,
             "final_data": final_data,
             "execution_log": execution_log,
@@ -201,13 +220,13 @@ class Prototype3Agent:
 
             if not result.success:
                 # 도구 실행 실패
-                print(f"  ✗ Tool execution failed: {result.error}")
+                print(f"  [FAIL] Tool execution failed: {result.error}")
                 attempt_log["validation"] = None
                 attempts.append(attempt_log)
 
                 # Fallback 시도
                 if current_task.get("fallback") and attempt_num < self.max_replan:
-                    print(f"  → Trying fallback: {current_task['fallback']}")
+                    print(f"  [->] Trying fallback: {current_task['fallback']}")
                     fallback_tool_name = f"{current_task['fallback']}_{current_task['type']}"
                     current_task["tool_name"] = fallback_tool_name
                     continue
@@ -227,7 +246,7 @@ class Prototype3Agent:
 
             else:
                 # 도구 실행 성공 → 검증
-                print(f"  ✓ Tool execution succeeded")
+                print(f"  [OK] Tool execution succeeded")
 
                 # Validation context 준비
                 validation_context = self._prepare_validation_context(
@@ -245,7 +264,7 @@ class Prototype3Agent:
 
                 if validation_result["is_valid"]:
                     # 검증 성공!
-                    print(f"  ✓ Validation passed (confidence: {validation_result.get('confidence', 'N/A')})")
+                    print(f"  [OK] Validation passed (confidence: {validation_result.get('confidence', 'N/A')})")
 
                     execution_log.append({
                         "task_id": task["task_id"],
@@ -262,7 +281,7 @@ class Prototype3Agent:
                     }
                 else:
                     # 검증 실패
-                    print(f"  ✗ Validation failed:")
+                    print(f"  [FAIL] Validation failed:")
                     for error in validation_result.get("errors", []):
                         print(f"    - {error}")
 
@@ -355,11 +374,14 @@ class Prototype3Agent:
         """
         context = {}
 
-        # Extract validation: 원본 데이터 필요
+        # Extract validation: 원본 컨텐츠 필요 (table 또는 text)
         if task["type"] == "extract":
             depends_on = task.get("depends_on")
             if depends_on:
-                context["original_table"] = previous_results.get(depends_on, {}).get("found_table")
+                prev_result = previous_results.get(depends_on, {})
+                # found_content (text) 또는 found_table 전달
+                original_content = prev_result.get("found_content") or prev_result.get("found_table")
+                context["original_content"] = original_content
 
         # Transform validation: 추출된 데이터 필요
         elif task["type"] == "transform":

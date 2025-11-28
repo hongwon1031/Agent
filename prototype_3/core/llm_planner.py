@@ -38,10 +38,12 @@ class LLMPlanner:
         load_dotenv(dotenv_path=r"c:\Users\NT-165\Desktop\Project\Toy\.env")
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+    # OLD signature (deprecated):
+    # def create_plan(self, doc: Any, structure_analysis: Dict[str, Any], goal: str = ...) -> Dict[str, Any]:
+
     def create_plan(
         self,
         doc: Any,
-        structure_analysis: Dict[str, Any],
         goal: str = """
         - 보험 상품 정의(보종명,유형계층)의 모든 조합 추출
         - 조건(보험기간/납입기간 등)에 대한 Task는 이번 계획에 포함하지 말 것
@@ -52,7 +54,7 @@ class LLMPlanner:
 
         Args:
             doc: 원본 문서
-            structure_analysis: LLMDocumentAnalyzer의 분석 결과
+            # structure_analysis: [DEPRECATED] LLMDocumentAnalyzer의 분석 결과
             goal: 최종 목표
 
         Returns:
@@ -81,10 +83,23 @@ class LLMPlanner:
         # Tool schemas 가져오기
         tool_schemas = get_schema_prompt()
 
+        # DocumentAccessor로 형식 정보 가져오기
+        from core.document_accessor import DocumentAccessor
+        accessor = DocumentAccessor(doc)
+        doc_summary = accessor.get_summary()
+
+        # [DEPRECATED] DocumentAnalyzer 결과 사용 중단
+        # OLD prompt included: **문서 구조 분석 결과**: {json.dumps(structure_analysis, ...)}
+
         prompt = f"""다음 문서에서 "{goal}"하는 계획을 수립하세요.
 
-**문서 구조 분석 결과**:
-{json.dumps(structure_analysis, ensure_ascii=False, indent=2)}
+**문서 형식 정보**:
+{json.dumps(doc_summary, ensure_ascii=False, indent=2)}
+
+**형식별 섹션 분포**:
+- Table 형식: {len(doc_summary['sections_by_format']['table_only'])}개
+- Text 형식: {len(doc_summary['sections_by_format']['text_only'])}개
+- Mixed 형식: {len(doc_summary['sections_by_format']['mixed'])}개
 
 **문서 샘플**:
 {doc_sample}
@@ -94,9 +109,13 @@ class LLMPlanner:
 {tool_schemas}
 
 **계획 수립 전략**:
-1. 문서가 표준적인가? → Rule 도구 우선, Fallback LLM
-2. 문서가 복잡한가? → LLM 도구 직접 사용
-3. 각 Task는 이전 Task 결과 참조 가능 ("depends_on")
+1. 섹션 형식 정보를 활용하여 적절한 도구 선택
+   - Text 형식 섹션 → text 지원 도구 선택 (rule_search, rule_extract 등)
+   - Table 형식 섹션 → table 우선, text fallback
+2. Rule 도구 우선, 실패 시 LLM fallback
+3. content_type 파라미터를 명시적으로 전달
+4. Search의 content_type을 Extract에 전달: "{{{{task1.content_type}}}}"
+5. 각 Task는 이전 Task 결과 참조 가능 ("depends_on")
 
 **Task 타입**:
 - "search": 정의 섹션/테이블 찾기
@@ -109,7 +128,7 @@ class LLMPlanner:
 - 파라미터에 이전 Task 결과 참조는 "{{{{taskN.field}}}}" 형식
 - Runtime injection 파라미터("$sections" 등)는 정확히 명시된 대로 사용할 것
 
-**예시 출력**:
+**예시 출력 (table 형식)**:
 {{
   "tasks": [
     {{
@@ -121,19 +140,21 @@ class LLMPlanner:
       "tool_name": "rule_search",
       "parameters": {{
         "keywords": ["정의", "명칭", "보험종목"],
-        "sections": "$sections"
+        "sections": "$sections",
+        "search_in_content": true
       }},
       "depends_on": null
     }},
     {{
       "task_id": 2,
       "type": "extract",
-      "description": "테이블 데이터 추출",
+      "description": "데이터 추출 (형식 자동 감지)",
       "strategy": "rule",
       "fallback": "llm",
       "tool_name": "rule_extract",
       "parameters": {{
-        "content": "{{{{task1.found_table}}}}"
+        "content": "{{{{task1.found_content}}}}",
+        "content_type": "{{{{task1.content_type}}}}"
       }},
       "depends_on": 1
     }},
@@ -151,7 +172,7 @@ class LLMPlanner:
       "depends_on": 2
     }}
   ],
-  "reasoning": "문서가 표준 구조이므로 Rule 도구 우선 시도",
+  "reasoning": "문서가 표준 구조이며 형식 정보를 활용하여 content_type을 자동 전달",
   "estimated_difficulty": "easy"
 }}
 

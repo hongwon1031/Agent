@@ -13,10 +13,11 @@ Special tokens:
 TOOL_SCHEMAS = {
     "rule_search": {
         "description": "Rule-based keyword matching search in sections",
+        "supported_formats": ["table", "text"],  # 새로 추가
         "parameters": {
             "keywords": {
                 "type": "list[string]",
-                "description": "Keywords to search for in section titles",
+                "description": "Keywords to search for in section titles and content",
                 "required": True,
                 "example": ["보험종목", "명칭"]
             },
@@ -25,21 +26,29 @@ TOOL_SCHEMAS = {
                 "description": "List of sections to search in",
                 "required": True,
                 "value": "$sections"  # Runtime injection
+            },
+            "search_in_content": {
+                "type": "boolean",
+                "description": "Whether to search in section content (not just titles)",
+                "required": False,
+                "default": True
             }
         },
         "returns": {
-            "found_table": "dict - The table/content found in the matching section",
+            "found_content": "dict or string - The content found (table or text)",
+            "content_type": "string - 'table' or 'text'",
             "section_title": "string - Title of the matched section"
         }
     },
 
     "llm_search": {
         "description": "LLM-based semantic search in sections",
+        "supported_formats": ["table", "text", "mixed"],  # 새로 추가
         "parameters": {
-            "goal": {
+            "instruction": {
                 "type": "string",
                 "description": "Description of what section to find",
-                "required": True,
+                "required": False,
                 "example": "보험 상품의 정의/명칭 정보를 담고 있는 섹션"
             },
             "sections": {
@@ -47,55 +56,68 @@ TOOL_SCHEMAS = {
                 "description": "List of sections to analyze",
                 "required": True,
                 "value": "$sections"  # Runtime injection
-            },
-            "context": {
-                "type": "string",
-                "description": "Additional context or hints",
-                "required": False,
-                "example": "테이블 형태로 되어 있을 가능성이 높음"
             }
         },
         "returns": {
-            "found_table": "dict - The table/content found",
-            "section_title": "string - Title of the matched section"
+            "found_content": "dict or string - The content found (table or text)",
+            "content_type": "string - 'table' or 'text'",
+            "section_title": "string - Title of the matched section",
+            "reasoning": "string - Why this section was selected"
         }
     },
 
     "rule_extract": {
-        "description": "Rule-based table data extraction",
+        "description": "Rule-based data extraction (table or text)",
+        "supported_formats": ["table", "text"],  # 새로 추가
         "parameters": {
             "content": {
-                "type": "dict",
-                "description": "Table content to extract from",
+                "type": "dict or string",
+                "description": "Content to extract from (table dict or text string)",
                 "required": True,
-                "example": "{{task1.found_table}}"
+                "example": "{{task1.found_content}}"
+            },
+            "content_type": {
+                "type": "string",
+                "description": "'table' or 'text' - type of content",
+                "required": False,
+                "example": "{{task1.content_type}}",
+                "default": "table"
             }
         },
         "returns": {
             "header": "list[string] - Column headers",
-            "data": "list[list[string]] - Table rows"
+            "data": "list[list[string]] - Data rows",
+            "extraction_method": "string - 'table_parsing' or 'text_parsing'"
         }
     },
 
     "llm_extract": {
         "description": "LLM-based intelligent data extraction",
+        "supported_formats": ["table", "text", "mixed"],  # 새로 추가
         "parameters": {
             "content": {
-                "type": "dict",
-                "description": "Content to extract from",
+                "type": "dict or string",
+                "description": "Content to extract from (table dict or text string)",
                 "required": True,
-                "example": "{{task1.found_table}}"
+                "example": "{{task1.found_content}}"
+            },
+            "content_type": {
+                "type": "string",
+                "description": "'table' or 'text' - type of content",
+                "required": False,
+                "example": "{{task1.content_type}}"
             },
             "instruction": {
                 "type": "string",
                 "description": "Specific extraction instructions",
-                "required": True,
+                "required": False,
                 "example": "테이블에서 보험명, 유형 정보를 추출하세요"
             }
         },
         "returns": {
             "header": "list[string] - Extracted field names",
-            "data": "list[list[string]] - Extracted data rows"
+            "data": "list[list[string]] - Extracted data rows",
+            "extraction_method": "string - 'table' or 'text'"
         }
     },
 
@@ -162,14 +184,21 @@ def get_schema_prompt() -> str:
 
     for tool_name, schema in TOOL_SCHEMAS.items():
         prompt += f"### {tool_name}\n"
-        prompt += f"**Description:** {schema['description']}\n\n"
-        prompt += "**Parameters:**\n"
+        prompt += f"**Description:** {schema['description']}\n"
+
+        # supported_formats 추가
+        if 'supported_formats' in schema:
+            prompt += f"**Supported Formats:** {', '.join(schema['supported_formats'])}\n"
+
+        prompt += "\n**Parameters:**\n"
 
         for param_name, param_info in schema['parameters'].items():
             required = "Required" if param_info['required'] else "Optional"
             prompt += f"- `{param_name}` ({param_info['type']}, {required})\n"
             prompt += f"  - {param_info['description']}\n"
 
+            if 'default' in param_info:
+                prompt += f"  - Default: `{param_info['default']}`\n"
             if 'value' in param_info:
                 prompt += f"  - **Use value:** `\"{param_info['value']}\"`\n"
             elif 'example' in param_info:

@@ -1,5 +1,5 @@
 {
-  "success": true,
+  "success": false,
   "document_analysis": {
     "structure_type": "list_of_dicts",
     "sections_path": [
@@ -37,7 +37,7 @@
       ]
     },
     "confidence": 0.95,
-    "reasoning": "문서는 리스트로 시작하며, 각 항목은 딕셔너리로 구성되어 있습니다. 각 딕셔너리는 'elements'라는 키를 통해 섹션들을 포함하고 있으며, 각 섹션은 'title'과 'paragraphs'라는 키를 가지고 있습니다. 'paragraphs' 안에는 'table'이라는 키가 있어 테이블 데이터를 포함하고 있습니다. 따라서, 문서의 구조는 'list_of_dicts'로 분류할 수 있으며, 섹션에 접근하기 위해서는 'elements' 경로를 따라가야 합니다."
+    "reasoning": "The JSON document is structured as a list of dictionaries, where each dictionary represents a document with a 'doc_title' and 'elements'. Each element in 'elements' has a 'title' and 'paragraphs', where paragraphs can contain tables. The path to access sections is through the 'elements' key, and the title of each section is stored in the 'title' field. The content of each section is stored in the 'paragraphs' field, and tables are identified by the 'table' and 'table_elements' keys. The sample section provided is the first element in the 'elements' list, demonstrating the structure and fields used."
   },
   "execution_plan": {
     "tasks": [
@@ -51,22 +51,23 @@
         "parameters": {
           "keywords": [
             "보험종목",
-            "명칭",
-            "保險種類名稱"
+            "명칭"
           ],
-          "sections": "$sections"
+          "sections": "$sections",
+          "search_in_content": true
         },
         "depends_on": null
       },
       {
         "task_id": 2,
         "type": "extract",
-        "description": "보험 상품 정의 테이블 데이터 추출",
+        "description": "보험 상품 정의 데이터 추출",
         "strategy": "rule",
         "fallback": "llm",
         "tool_name": "rule_extract",
         "parameters": {
-          "content": "{{task1.found_table}}"
+          "content": "{{task1.found_content}}",
+          "content_type": "{{task1.content_type}}"
         },
         "depends_on": 1
       },
@@ -84,28 +85,8 @@
         "depends_on": 2
       }
     ],
-    "reasoning": "문서 구조가 표준적이며, 명확한 키워드가 존재하므로 Rule 도구를 우선 사용하여 섹션을 찾고 데이터를 추출한 후, Cartesian Product를 생성합니다.",
+    "reasoning": "문서의 구조가 표준적이며, 섹션 내의 테이블에서 보험 상품 정의 정보를 추출하고, 이를 기반으로 모든 조합을 생성하는 것이 목표입니다. Rule 기반 도구를 우선 사용하고, 필요 시 LLM 도구를 보조적으로 활용합니다.",
     "estimated_difficulty": "easy"
-  },
-  "final_data": {
-    "definitions": [
-      {
-        "보종명": "簡易癌症診斷附約（非分紅，解約金不給付）",
-        "유형1": "解約金不給付型",
-        "유형2": "簡易核保型"
-      },
-      {
-        "보종명": "簡易癌症診斷附約（非分紅，解約金不給付）",
-        "유형1": "解約金不給付型",
-        "유형2": "一般核保型"
-      },
-      {
-        "보종명": "簡易癌症診斷附約（非分紅）",
-        "유형1": "一般型",
-        "유형2": "一般核保型"
-      }
-    ],
-    "total_count": 3
   },
   "execution_log": [
     {
@@ -118,9 +99,251 @@
           "parameters": {
             "keywords": [
               "보험종목",
-              "명칭",
-              "保險種類名稱"
+              "명칭"
             ],
+            "sections": [
+              {
+                "index": 0,
+                "title": "一、保險種類名稱",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "<table>...</table>",
+                    "table": {
+                      "table_title": "保險種類說明",
+                      "table_elements": [
+                        {
+                          "名稱": "簡易癌症診斷附約（非分紅，解約金不給付）",
+                          "保險種類": "解約金不給付型",
+                          "審核型態": "簡易核保型 / 一般核保型"
+                        },
+                        {
+                          "名稱": "簡易癌症診斷附約（非分紅）",
+                          "保險種類": "一般型",
+                          "審核型態": "一般核保型"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "一、保險種類名稱",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "<table>...</table>",
+                      "table": {
+                        "table_title": "保險種類說明",
+                        "table_elements": [
+                          {
+                            "名稱": "簡易癌症診斷附約（非分紅，解約金不給付）",
+                            "保險種類": "解約金不給付型",
+                            "審核型態": "簡易核保型 / 一般核保型"
+                          },
+                          {
+                            "名稱": "簡易癌症診斷附約（非分紅）",
+                            "保險種類": "一般型",
+                            "審核型態": "一般核保型"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "index": 1,
+                "title": "三、保險期間及保費繳納期間",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "<table>...</table>",
+                    "table": {
+                      "table_title": "投保資格",
+                      "table_elements": [
+                        {
+                          "保險種類": "解約金不給付型",
+                          "保險期間": "20年 / 30年 / 終身",
+                          "繳納期間": "10年 / 20年",
+                          "投保年齡": "15歲至65歲"
+                        },
+                        {
+                          "保險種類": "一般型",
+                          "保險期間": "20年 / 30年",
+                          "繳納期間": "10年 / 20年",
+                          "投保年齡": "15歲至60歲"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "三、保險期間及保費繳納期間",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "<table>...</table>",
+                      "table": {
+                        "table_title": "投保資格",
+                        "table_elements": [
+                          {
+                            "保險種類": "解約金不給付型",
+                            "保險期間": "20年 / 30年 / 終身",
+                            "繳納期間": "10年 / 20年",
+                            "投保年齡": "15歲至65歲"
+                          },
+                          {
+                            "保險種類": "一般型",
+                            "保險期間": "20年 / 30年",
+                            "繳納期間": "10年 / 20年",
+                            "投保年齡": "15歲至60歲"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "search_in_content": true
+          },
+          "success": false,
+          "error": "No sections found with keywords: ['보험종목', '명칭']",
+          "validation": null
+        },
+        {
+          "attempt": 2,
+          "tool": "llm_search",
+          "parameters": {
+            "keywords": [
+              "보험종목",
+              "명칭"
+            ],
+            "sections": [
+              {
+                "index": 0,
+                "title": "一、保險種類名稱",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "<table>...</table>",
+                    "table": {
+                      "table_title": "保險種類說明",
+                      "table_elements": [
+                        {
+                          "名稱": "簡易癌症診斷附約（非分紅，解約金不給付）",
+                          "保險種類": "解約金不給付型",
+                          "審核型態": "簡易核保型 / 一般核保型"
+                        },
+                        {
+                          "名稱": "簡易癌症診斷附約（非分紅）",
+                          "保險種類": "一般型",
+                          "審核型態": "一般核保型"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "一、保險種類名稱",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "<table>...</table>",
+                      "table": {
+                        "table_title": "保險種類說明",
+                        "table_elements": [
+                          {
+                            "名稱": "簡易癌症診斷附約（非分紅，解約金不給付）",
+                            "保險種類": "解約金不給付型",
+                            "審核型態": "簡易核保型 / 一般核保型"
+                          },
+                          {
+                            "名稱": "簡易癌症診斷附約（非分紅）",
+                            "保險種類": "一般型",
+                            "審核型態": "一般核保型"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "index": 1,
+                "title": "三、保險期間及保費繳納期間",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "<table>...</table>",
+                    "table": {
+                      "table_title": "投保資格",
+                      "table_elements": [
+                        {
+                          "保險種類": "解約金不給付型",
+                          "保險期間": "20年 / 30年 / 終身",
+                          "繳納期間": "10年 / 20年",
+                          "投保年齡": "15歲至65歲"
+                        },
+                        {
+                          "保險種類": "一般型",
+                          "保險期間": "20年 / 30年",
+                          "繳納期間": "10年 / 20年",
+                          "投保年齡": "15歲至60歲"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "三、保險期間及保費繳納期間",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "<table>...</table>",
+                      "table": {
+                        "table_title": "投保資格",
+                        "table_elements": [
+                          {
+                            "保險種類": "解約金不給付型",
+                            "保險期間": "20年 / 30年 / 終身",
+                            "繳納期間": "10年 / 20年",
+                            "投保年齡": "15歲至65歲"
+                          },
+                          {
+                            "保險種類": "一般型",
+                            "保險期間": "20年 / 30年",
+                            "繳納期間": "10年 / 20年",
+                            "投保年齡": "15歲至60歲"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "search_in_content": true
+          },
+          "success": true,
+          "error": null,
+          "validation": {
+            "is_valid": false,
+            "confidence": 1.0,
+            "errors": [
+              "No table found and title does not look like a definition/명칭 section"
+            ],
+            "suggestions": [
+              "Check search parameters or use LLM-based search"
+            ],
+            "reasoning": "Search result has no table and the section title does not clearly indicate definition information."
+          }
+        },
+        {
+          "attempt": 3,
+          "tool": "llm_search",
+          "parameters": {
+            "instruction": "보험 상품의 정의/명칭 정보를 담고 있는 섹션을 찾습니다.",
             "sections": [
               {
                 "index": 0,
@@ -229,95 +452,144 @@
           "success": true,
           "error": null,
           "validation": {
-            "is_valid": true,
-            "confidence": 0.95,
-            "errors": [],
-            "suggestions": [],
-            "reasoning": "섹션 제목 '一、保險種類名稱'은 보험 상품의 정의나 명칭 정보를 담고 있는 것으로 보입니다. 테이블에는 '名稱', '保險種類', '審核型態'와 같은 필드가 포함되어 있어 보험 상품의 구체적인 정보를 제공하고 있습니다. 또한, 데이터는 JSON 형식으로 추출 가능한 구조로 되어 있어, 검증 기준을 모두 충족합니다."
-          }
-        }
-      ],
-      "final_success": true
-    },
-    {
-      "task_id": 2,
-      "description": "보험 상품 정의 테이블 데이터 추출",
-      "attempts": [
-        {
-          "attempt": 1,
-          "tool": "rule_extract",
-          "parameters": {
-            "content": {
-              "table_title": "保險種類說明",
-              "table_elements": [
-                {
-                  "名稱": "簡易癌症診斷附約（非分紅，解約金不給付）",
-                  "保險種類": "解約金不給付型",
-                  "審核型態": "簡易核保型 / 一般核保型"
-                },
-                {
-                  "名稱": "簡易癌症診斷附約（非分紅）",
-                  "保險種類": "一般型",
-                  "審核型態": "一般核保型"
-                }
-              ]
-            }
-          },
-          "success": true,
-          "error": null,
-          "validation": {
-            "is_valid": true,
-            "confidence": 0.95,
-            "errors": [],
-            "suggestions": [],
-            "reasoning": "데이터 검증 기준에 따라 각 항목을 확인한 결과, 모든 기준을 충족하는 것으로 보입니다. Header는 각 열의 내용을 잘 설명하고 있으며, 데이터 행 수는 주어진 2개로 적절합니다. 주석 행이 포함되지 않았고, 데이터가 잘리거나 손상되지 않았습니다. 특수문자나 줄바꿈도 적절히 처리되었습니다. 모든 행을 확인한 결과, 문제가 발견되지 않았습니다.",
-            "invalid_row_indices": []
-          }
-        }
-      ],
-      "final_success": true
-    },
-    {
-      "task_id": 3,
-      "description": "보험 상품 정의의 모든 조합 생성",
-      "attempts": [
-        {
-          "attempt": 1,
-          "tool": "rule_cartesian",
-          "parameters": {
-            "header": [
-              "名稱",
-              "保險種類",
-              "審核型態"
+            "is_valid": false,
+            "confidence": 1.0,
+            "errors": [
+              "No table found and title does not look like a definition/명칭 section"
             ],
-            "data": [
-              [
-                "簡易癌症診斷附約（非分紅，解約金不給付）",
-                "解約金不給付型",
-                "簡易核保型 / 一般核保型"
-              ],
-              [
-                "簡易癌症診斷附約（非分紅）",
-                "一般型",
-                "一般核保型"
-              ]
+            "suggestions": [
+              "Check search parameters or use LLM-based search"
+            ],
+            "reasoning": "Search result has no table and the section title does not clearly indicate definition information."
+          }
+        },
+        {
+          "attempt": 4,
+          "tool": "llm_search",
+          "parameters": {
+            "instruction": "보험 상품의 정의/명칭 정보를 포함하는 섹션을 찾아주세요. 특히 명칭과 관련된 정보를 중점적으로 확인해주세요.",
+            "sections": [
+              {
+                "index": 0,
+                "title": "一、保險種類名稱",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "<table>...</table>",
+                    "table": {
+                      "table_title": "保險種類說明",
+                      "table_elements": [
+                        {
+                          "名稱": "簡易癌症診斷附約（非分紅，解約金不給付）",
+                          "保險種類": "解約金不給付型",
+                          "審核型態": "簡易核保型 / 一般核保型"
+                        },
+                        {
+                          "名稱": "簡易癌症診斷附約（非分紅）",
+                          "保險種類": "一般型",
+                          "審核型態": "一般核保型"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "一、保險種類名稱",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "<table>...</table>",
+                      "table": {
+                        "table_title": "保險種類說明",
+                        "table_elements": [
+                          {
+                            "名稱": "簡易癌症診斷附約（非分紅，解約金不給付）",
+                            "保險種類": "解約金不給付型",
+                            "審核型態": "簡易核保型 / 一般核保型"
+                          },
+                          {
+                            "名稱": "簡易癌症診斷附約（非分紅）",
+                            "保險種類": "一般型",
+                            "審核型態": "一般核保型"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "index": 1,
+                "title": "三、保險期間及保費繳納期間",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "<table>...</table>",
+                    "table": {
+                      "table_title": "投保資格",
+                      "table_elements": [
+                        {
+                          "保險種類": "解約金不給付型",
+                          "保險期間": "20年 / 30年 / 終身",
+                          "繳納期間": "10年 / 20年",
+                          "投保年齡": "15歲至65歲"
+                        },
+                        {
+                          "保險種類": "一般型",
+                          "保險期間": "20年 / 30年",
+                          "繳納期間": "10年 / 20年",
+                          "投保年齡": "15歲至60歲"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "三、保險期間及保費繳納期間",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "<table>...</table>",
+                      "table": {
+                        "table_title": "投保資格",
+                        "table_elements": [
+                          {
+                            "保險種類": "解約金不給付型",
+                            "保險期間": "20年 / 30年 / 終身",
+                            "繳納期間": "10年 / 20年",
+                            "投保年齡": "15歲至65歲"
+                          },
+                          {
+                            "保險種類": "一般型",
+                            "保險期間": "20年 / 30年",
+                            "繳納期間": "10年 / 20年",
+                            "投保年齡": "15歲至60歲"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
             ]
           },
           "success": true,
           "error": null,
           "validation": {
-            "is_valid": true,
+            "is_valid": false,
             "confidence": 1.0,
-            "errors": [],
-            "suggestions": [],
-            "reasoning": "Cartesian Product가 올바르게 생성되었습니다. 각 항목에는 '보종명', '유형1', '유형2' 키가 모두 존재하며, 슬래시로 구분된 값들이 각각 분리되었습니다. 생성된 조합 수(3)가 예상(3)과 일치하며, 중복이 없고 보종명이 완전합니다. 유형 필드도 깔끔하게 처리되었습니다.",
-            "expected_count": 3,
-            "actual_count": 3
+            "errors": [
+              "No table found and title does not look like a definition/명칭 section"
+            ],
+            "suggestions": [
+              "Check search parameters or use LLM-based search"
+            ],
+            "reasoning": "Search result has no table and the section title does not clearly indicate definition information."
           }
         }
       ],
-      "final_success": true
+      "final_success": false
     }
   ],
-  "error": null
+  "error": "Task 1 failed: No table found and title does not look like a definition/명칭 section"
 }

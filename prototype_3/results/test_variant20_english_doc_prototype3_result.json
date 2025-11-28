@@ -1,5 +1,5 @@
 {
-  "success": true,
+  "success": false,
   "document_analysis": {
     "structure_type": "list_of_dicts",
     "sections_path": [
@@ -37,7 +37,7 @@
       ]
     },
     "confidence": 0.95,
-    "reasoning": "The JSON document is structured as a list of dictionaries, where each dictionary represents a document with a 'doc_title' and 'elements'. The 'elements' key contains a list of sections, each with a 'title' and 'paragraphs'. The 'paragraphs' can contain tables, which are identified by the 'table' key and further detailed in 'table_elements'. The analysis is based on the provided sample, which includes two sections, each with a title and content in the form of paragraphs and tables."
+    "reasoning": "The JSON document is structured as a list of dictionaries, where each dictionary represents a document with a 'doc_title' and 'elements'. The 'elements' key contains a list of sections, each with a 'title' and 'paragraphs'. The 'paragraphs' contain tables, which are identified by the 'table' key and further detailed by 'table_elements'. The analysis is based on the provided sample, which includes two sections, and the structure is consistent across these sections."
   },
   "execution_plan": {
     "tasks": [
@@ -54,19 +54,21 @@
             "Product Name",
             "Plan Type"
           ],
-          "sections": "$sections"
+          "sections": "$sections",
+          "search_in_content": true
         },
         "depends_on": null
       },
       {
         "task_id": 2,
         "type": "extract",
-        "description": "보험 상품 정의 테이블 데이터 추출",
+        "description": "보험 상품 정의 데이터 추출",
         "strategy": "rule",
         "fallback": "llm",
         "tool_name": "rule_extract",
         "parameters": {
-          "content": "{{task1.found_table}}"
+          "content": "{{task1.found_content}}",
+          "content_type": "{{task1.content_type}}"
         },
         "depends_on": 1
       },
@@ -84,33 +86,8 @@
         "depends_on": 2
       }
     ],
-    "reasoning": "문서 구조가 표준적이며, 테이블에서 명확히 정의된 데이터를 추출하고 조합하는 작업이므로 Rule 기반 도구를 우선 사용합니다. 필요 시 LLM을 보조적으로 활용할 수 있습니다.",
+    "reasoning": "문서 구조 분석 결과와 형식 정보를 활용하여 적절한 도구를 선택하고, content_type을 자동으로 전달하여 효율적인 작업 수행을 보장합니다. 보험 상품 정의에 대한 조합을 생성하는 것이 목표이므로, 관련 섹션을 찾고 데이터를 추출한 후 Cartesian Product를 생성합니다.",
     "estimated_difficulty": "easy"
-  },
-  "final_data": {
-    "definitions": [
-      {
-        "보종명": "Accident Disability Rider (Non-Refund)",
-        "유형1": "Non-Refund",
-        "유형2": "Simplified (315)"
-      },
-      {
-        "보종명": "Accident Disability Rider (Non-Refund)",
-        "유형1": "Non-Refund",
-        "유형2": "Simplified (335)"
-      },
-      {
-        "보종명": "Accident Disability Rider (Non-Refund)",
-        "유형1": "Non-Refund",
-        "유형2": "Standard"
-      },
-      {
-        "보종명": "Accident Disability Rider",
-        "유형1": "Standard",
-        "유형2": "Standard"
-      }
-    ],
-    "total_count": 4
   },
   "execution_log": [
     {
@@ -233,100 +210,410 @@
                   ]
                 }
               }
-            ]
-          },
-          "success": true,
-          "error": null,
-          "validation": {
-            "is_valid": true,
-            "confidence": 0.95,
-            "errors": [],
-            "suggestions": [],
-            "reasoning": "섹션 제목 'Product Name and Type'는 보험 상품의 정의 및 명칭 정보를 담고 있는 것으로 보입니다. 테이블 제목 'Product Definition'도 이와 일치하며, 테이블 요소에는 'Product Name', 'Plan Type', 'Underwriting Type'과 같은 상품 정보가 포함되어 있습니다. 데이터는 JSON 형식으로 추출 가능한 구조를 가지고 있어 검증 기준을 충족합니다."
-          }
-        }
-      ],
-      "final_success": true
-    },
-    {
-      "task_id": 2,
-      "description": "보험 상품 정의 테이블 데이터 추출",
-      "attempts": [
-        {
-          "attempt": 1,
-          "tool": "rule_extract",
-          "parameters": {
-            "content": {
-              "table_title": "Product Definition",
-              "table_elements": [
-                {
-                  "Product Name": "Accident Disability Rider (Non-Refund)",
-                  "Plan Type": "Non-Refund",
-                  "Underwriting Type": "Simplified (315) / Simplified (335) / Standard"
-                },
-                {
-                  "Product Name": "Accident Disability Rider",
-                  "Plan Type": "Standard",
-                  "Underwriting Type": "Standard"
-                }
-              ]
-            }
-          },
-          "success": true,
-          "error": null,
-          "validation": {
-            "is_valid": true,
-            "confidence": 0.95,
-            "errors": [],
-            "suggestions": [],
-            "reasoning": "데이터 검증 기준에 따라 각 항목을 확인한 결과, 모든 기준을 충족하는 것으로 보입니다. Header는 각 열의 내용을 명확히 설명하고 있으며, 데이터 행 수는 주어진 데이터와 일치합니다. 주석 행이 포함되지 않았고, 데이터가 잘리거나 손상된 흔적이 없습니다. 특수문자나 줄바꿈도 적절히 처리되어 있습니다. 모든 행을 확인한 결과, 문제를 발견하지 못했습니다.",
-            "invalid_row_indices": []
-          }
-        }
-      ],
-      "final_success": true
-    },
-    {
-      "task_id": 3,
-      "description": "보험 상품 정의의 모든 조합 생성",
-      "attempts": [
-        {
-          "attempt": 1,
-          "tool": "rule_cartesian",
-          "parameters": {
-            "header": [
-              "Product Name",
-              "Plan Type",
-              "Underwriting Type"
             ],
-            "data": [
-              [
-                "Accident Disability Rider (Non-Refund)",
-                "Non-Refund",
-                "Simplified (315) / Simplified (335) / Standard"
-              ],
-              [
-                "Accident Disability Rider",
-                "Standard",
-                "Standard"
-              ]
+            "search_in_content": true
+          },
+          "success": true,
+          "error": null,
+          "validation": {
+            "is_valid": false,
+            "confidence": 1.0,
+            "errors": [
+              "No table found and title does not look like a definition/명칭 section"
+            ],
+            "suggestions": [
+              "Check search parameters or use LLM-based search"
+            ],
+            "reasoning": "Search result has no table and the section title does not clearly indicate definition information."
+          }
+        },
+        {
+          "attempt": 2,
+          "tool": "llm_search",
+          "parameters": {
+            "instruction": "보험 상품의 정의/명칭 정보를 담고 있는 섹션을 찾으세요",
+            "sections": [
+              {
+                "index": 0,
+                "title": "1. Product Name and Type",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "<table>...</table>",
+                    "table": {
+                      "table_title": "Product Definition",
+                      "table_elements": [
+                        {
+                          "Product Name": "Accident Disability Rider (Non-Refund)",
+                          "Plan Type": "Non-Refund",
+                          "Underwriting Type": "Simplified (315) / Simplified (335) / Standard"
+                        },
+                        {
+                          "Product Name": "Accident Disability Rider",
+                          "Plan Type": "Standard",
+                          "Underwriting Type": "Standard"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "1. Product Name and Type",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "<table>...</table>",
+                      "table": {
+                        "table_title": "Product Definition",
+                        "table_elements": [
+                          {
+                            "Product Name": "Accident Disability Rider (Non-Refund)",
+                            "Plan Type": "Non-Refund",
+                            "Underwriting Type": "Simplified (315) / Simplified (335) / Standard"
+                          },
+                          {
+                            "Product Name": "Accident Disability Rider",
+                            "Plan Type": "Standard",
+                            "Underwriting Type": "Standard"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "index": 1,
+                "title": "3. Coverage Period and Premium Payment",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "<table>...</table>",
+                    "table": {
+                      "table_title": "Eligibility",
+                      "table_elements": [
+                        {
+                          "Plan Type": "Non-Refund",
+                          "Coverage Period": "20 / 30 years, Whole Life",
+                          "Payment Period": "10 / 20 years",
+                          "Male Age": "15 - 65",
+                          "Female Age": "15 - 65"
+                        },
+                        {
+                          "Plan Type": "Standard",
+                          "Coverage Period": "20 / 30 years",
+                          "Payment Period": "10 / 20 years",
+                          "Male Age": "15 - 60",
+                          "Female Age": "15 - 60"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "3. Coverage Period and Premium Payment",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "<table>...</table>",
+                      "table": {
+                        "table_title": "Eligibility",
+                        "table_elements": [
+                          {
+                            "Plan Type": "Non-Refund",
+                            "Coverage Period": "20 / 30 years, Whole Life",
+                            "Payment Period": "10 / 20 years",
+                            "Male Age": "15 - 65",
+                            "Female Age": "15 - 65"
+                          },
+                          {
+                            "Plan Type": "Standard",
+                            "Coverage Period": "20 / 30 years",
+                            "Payment Period": "10 / 20 years",
+                            "Male Age": "15 - 60",
+                            "Female Age": "15 - 60"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
             ]
           },
           "success": true,
           "error": null,
           "validation": {
-            "is_valid": true,
+            "is_valid": false,
             "confidence": 1.0,
-            "errors": [],
-            "suggestions": [],
-            "reasoning": "Cartesian Product가 올바르게 생성되었습니다. 각 항목에는 '보종명', '유형1', '유형2' 키가 모두 존재하며, 슬래시로 구분된 값들이 각각 분리되었습니다. 생성된 조합 수(4)가 예상(4)과 일치하고, 중복이 없으며, 보종명이 완전하고 줄바꿈이 정상입니다. 유형 필드도 깔끔하게 처리되었습니다.",
-            "expected_count": 4,
-            "actual_count": 4
+            "errors": [
+              "No table found and title does not look like a definition/명칭 section"
+            ],
+            "suggestions": [
+              "Check search parameters or use LLM-based search"
+            ],
+            "reasoning": "Search result has no table and the section title does not clearly indicate definition information."
+          }
+        },
+        {
+          "attempt": 3,
+          "tool": "llm_search",
+          "parameters": {
+            "instruction": "보험 상품의 정의/명칭 정보를 담고 있는 섹션을 찾으세요",
+            "sections": [
+              {
+                "index": 0,
+                "title": "1. Product Name and Type",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "<table>...</table>",
+                    "table": {
+                      "table_title": "Product Definition",
+                      "table_elements": [
+                        {
+                          "Product Name": "Accident Disability Rider (Non-Refund)",
+                          "Plan Type": "Non-Refund",
+                          "Underwriting Type": "Simplified (315) / Simplified (335) / Standard"
+                        },
+                        {
+                          "Product Name": "Accident Disability Rider",
+                          "Plan Type": "Standard",
+                          "Underwriting Type": "Standard"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "1. Product Name and Type",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "<table>...</table>",
+                      "table": {
+                        "table_title": "Product Definition",
+                        "table_elements": [
+                          {
+                            "Product Name": "Accident Disability Rider (Non-Refund)",
+                            "Plan Type": "Non-Refund",
+                            "Underwriting Type": "Simplified (315) / Simplified (335) / Standard"
+                          },
+                          {
+                            "Product Name": "Accident Disability Rider",
+                            "Plan Type": "Standard",
+                            "Underwriting Type": "Standard"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "index": 1,
+                "title": "3. Coverage Period and Premium Payment",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "<table>...</table>",
+                    "table": {
+                      "table_title": "Eligibility",
+                      "table_elements": [
+                        {
+                          "Plan Type": "Non-Refund",
+                          "Coverage Period": "20 / 30 years, Whole Life",
+                          "Payment Period": "10 / 20 years",
+                          "Male Age": "15 - 65",
+                          "Female Age": "15 - 65"
+                        },
+                        {
+                          "Plan Type": "Standard",
+                          "Coverage Period": "20 / 30 years",
+                          "Payment Period": "10 / 20 years",
+                          "Male Age": "15 - 60",
+                          "Female Age": "15 - 60"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "3. Coverage Period and Premium Payment",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "<table>...</table>",
+                      "table": {
+                        "table_title": "Eligibility",
+                        "table_elements": [
+                          {
+                            "Plan Type": "Non-Refund",
+                            "Coverage Period": "20 / 30 years, Whole Life",
+                            "Payment Period": "10 / 20 years",
+                            "Male Age": "15 - 65",
+                            "Female Age": "15 - 65"
+                          },
+                          {
+                            "Plan Type": "Standard",
+                            "Coverage Period": "20 / 30 years",
+                            "Payment Period": "10 / 20 years",
+                            "Male Age": "15 - 60",
+                            "Female Age": "15 - 60"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "success": true,
+          "error": null,
+          "validation": {
+            "is_valid": false,
+            "confidence": 1.0,
+            "errors": [
+              "No table found and title does not look like a definition/명칭 section"
+            ],
+            "suggestions": [
+              "Check search parameters or use LLM-based search"
+            ],
+            "reasoning": "Search result has no table and the section title does not clearly indicate definition information."
+          }
+        },
+        {
+          "attempt": 4,
+          "tool": "llm_search",
+          "parameters": {
+            "instruction": "보험 상품의 정의/명칭 정보를 담고 있는 섹션을 찾으세요. 특히 'Product Definition' 또는 'Product Name and Type'와 관련된 정보를 포함한 섹션을 강조하세요.",
+            "sections": [
+              {
+                "index": 0,
+                "title": "1. Product Name and Type",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "<table>...</table>",
+                    "table": {
+                      "table_title": "Product Definition",
+                      "table_elements": [
+                        {
+                          "Product Name": "Accident Disability Rider (Non-Refund)",
+                          "Plan Type": "Non-Refund",
+                          "Underwriting Type": "Simplified (315) / Simplified (335) / Standard"
+                        },
+                        {
+                          "Product Name": "Accident Disability Rider",
+                          "Plan Type": "Standard",
+                          "Underwriting Type": "Standard"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "1. Product Name and Type",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "<table>...</table>",
+                      "table": {
+                        "table_title": "Product Definition",
+                        "table_elements": [
+                          {
+                            "Product Name": "Accident Disability Rider (Non-Refund)",
+                            "Plan Type": "Non-Refund",
+                            "Underwriting Type": "Simplified (315) / Simplified (335) / Standard"
+                          },
+                          {
+                            "Product Name": "Accident Disability Rider",
+                            "Plan Type": "Standard",
+                            "Underwriting Type": "Standard"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "index": 1,
+                "title": "3. Coverage Period and Premium Payment",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "<table>...</table>",
+                    "table": {
+                      "table_title": "Eligibility",
+                      "table_elements": [
+                        {
+                          "Plan Type": "Non-Refund",
+                          "Coverage Period": "20 / 30 years, Whole Life",
+                          "Payment Period": "10 / 20 years",
+                          "Male Age": "15 - 65",
+                          "Female Age": "15 - 65"
+                        },
+                        {
+                          "Plan Type": "Standard",
+                          "Coverage Period": "20 / 30 years",
+                          "Payment Period": "10 / 20 years",
+                          "Male Age": "15 - 60",
+                          "Female Age": "15 - 60"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "3. Coverage Period and Premium Payment",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "<table>...</table>",
+                      "table": {
+                        "table_title": "Eligibility",
+                        "table_elements": [
+                          {
+                            "Plan Type": "Non-Refund",
+                            "Coverage Period": "20 / 30 years, Whole Life",
+                            "Payment Period": "10 / 20 years",
+                            "Male Age": "15 - 65",
+                            "Female Age": "15 - 65"
+                          },
+                          {
+                            "Plan Type": "Standard",
+                            "Coverage Period": "20 / 30 years",
+                            "Payment Period": "10 / 20 years",
+                            "Male Age": "15 - 60",
+                            "Female Age": "15 - 60"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "success": true,
+          "error": null,
+          "validation": {
+            "is_valid": false,
+            "confidence": 1.0,
+            "errors": [
+              "No table found and title does not look like a definition/명칭 section"
+            ],
+            "suggestions": [
+              "Check search parameters or use LLM-based search"
+            ],
+            "reasoning": "Search result has no table and the section title does not clearly indicate definition information."
           }
         }
       ],
-      "final_success": true
+      "final_success": false
     }
   ],
-  "error": null
+  "error": "Task 1 failed: No table found and title does not look like a definition/명칭 section"
 }

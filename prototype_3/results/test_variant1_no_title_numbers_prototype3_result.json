@@ -54,19 +54,21 @@
             "명칭",
             "보험종목"
           ],
-          "sections": "$sections"
+          "sections": "$sections",
+          "search_in_content": true
         },
         "depends_on": null
       },
       {
         "task_id": 2,
         "type": "extract",
-        "description": "보험 상품 정의 테이블 데이터 추출",
+        "description": "보험 상품 정의 데이터 추출",
         "strategy": "rule",
         "fallback": "llm",
         "tool_name": "rule_extract",
         "parameters": {
-          "content": "{{task1.found_table}}"
+          "content": "{{task1.found_content}}",
+          "content_type": "{{task1.content_type}}"
         },
         "depends_on": 1
       },
@@ -74,39 +76,38 @@
         "task_id": 3,
         "type": "transform",
         "description": "보험 상품 정의의 모든 조합 생성",
-        "strategy": "llm",
+        "strategy": "rule",
         "fallback": null,
-        "tool_name": "llm_cartesian",
+        "tool_name": "rule_cartesian",
         "parameters": {
           "header": "{{task2.header}}",
-          "data": "{{task2.data}}",
-          "instruction": "슬래시(/)로 구분된 값들을 각각 분리하여 조합"
+          "data": "{{task2.data}}"
         },
         "depends_on": 2
       }
     ],
-    "reasoning": "문서가 표준 구조를 따르고 있으며, 보험 상품 정의 섹션은 명확한 키워드로 식별 가능하므로 Rule 도구를 우선 시도하고, 복잡한 조합 생성은 LLM 도구를 사용하여 처리합니다.",
-    "estimated_difficulty": "medium"
+    "reasoning": "문서 구조 분석 결과에 따라 '보험상품의 정의' 섹션에서 명칭과 보험종목 정보를 추출하고, 이를 조합하여 모든 가능한 보험 상품 정의를 생성하는 것이 목표입니다. 주어진 도구들 중 rule 기반 도구를 우선 사용하고, 실패 시 LLM 도구를 사용합니다. 각 단계는 이전 단계의 결과를 참조하여 진행됩니다.",
+    "estimated_difficulty": "easy"
   },
   "final_data": {
     "definitions": [
       {
-        "보종명": "[3-100%장해형]재해장해특약\n(무배당, 해약환급금 미지급형)",
+        "보종명": "[3-100%장해형]재해장해특약(무배당, 해약환급금 미지급형)",
         "유형1": "해약환급금 미지급형",
         "유형2": "간편심사(315)형"
       },
       {
-        "보종명": "[3-100%장해형]재해장해특약\n(무배당, 해약환급금 미지급형)",
+        "보종명": "[3-100%장해형]재해장해특약(무배당, 해약환급금 미지급형)",
         "유형1": "해약환급금 미지급형",
         "유형2": "간편심사(335)형"
       },
       {
-        "보종명": "[3-100%장해형]재해장해특약\n(무배당, 해약환급금 미지급형)",
+        "보종명": "[3-100%장해형]재해장해특약(무배당, 해약환급금 미지급형)",
         "유형1": "해약환급금 미지급형",
         "유형2": "간편심사(355)형"
       },
       {
-        "보종명": "[3-100%장해형]재해장해특약\n(무배당, 해약환급금 미지급형)",
+        "보종명": "[3-100%장해형]재해장해특약(무배당, 해약환급금 미지급형)",
         "유형1": "해약환급금 미지급형",
         "유형2": "일반심사형"
       },
@@ -131,8 +132,7 @@
         "유형2": "일반심사형"
       }
     ],
-    "total_count": 8,
-    "notes": "각 행의 '보험종목_1' 필드에서 슬래시(/)로 구분된 값을 개별적으로 조합하여 Cartesian Product를 생성하였습니다. 총 8개의 조합이 생성되었습니다."
+    "total_count": 8
   },
   "execution_log": [
     {
@@ -337,16 +337,17 @@
                   ]
                 }
               }
-            ]
+            ],
+            "search_in_content": true
           },
           "success": true,
           "error": null,
           "validation": {
             "is_valid": true,
-            "confidence": 0.9,
+            "confidence": 0.7,
             "errors": [],
             "suggestions": [],
-            "reasoning": "섹션 제목이 '보험상품의 정의'로 명확하게 정의와 관련된 정보를 담고 있음을 나타내고 있습니다. 테이블에는 '명칭', '보험종목', '보험종목_1'과 같은 필드가 포함되어 있어 보험 상품의 명칭 및 관련 정보를 제공하고 있습니다. 데이터는 JSON 형식으로 추출 가능하며, 각 필드가 명확하게 구분되어 있어 정보 추출에 용이합니다."
+            "reasoning": "섹션 제목이 정의/명칭 관련이며 테이블이 없으므로, 텍스트 기반 정의 섹션으로 간주합니다."
           }
         }
       ],
@@ -354,7 +355,7 @@
     },
     {
       "task_id": 2,
-      "description": "보험 상품 정의 테이블 데이터 추출",
+      "description": "보험 상품 정의 데이터 추출",
       "attempts": [
         {
           "attempt": 1,
@@ -374,7 +375,8 @@
                   "보험종목_1": "간편심사(315)형\n/간편심사(335)형\n/간편심사(355)형\n/일반심사형"
                 }
               ]
-            }
+            },
+            "content_type": "table"
           },
           "success": true,
           "error": null,
@@ -396,7 +398,7 @@
       "attempts": [
         {
           "attempt": 1,
-          "tool": "llm_cartesian",
+          "tool": "rule_cartesian",
           "parameters": {
             "header": [
               "명칭",
@@ -414,8 +416,7 @@
                 "일반형",
                 "간편심사(315)형\n/간편심사(335)형\n/간편심사(355)형\n/일반심사형"
               ]
-            ],
-            "instruction": "슬래시(/)로 구분된 값들을 각각 분리하여 조합"
+            ]
           },
           "success": true,
           "error": null,
@@ -424,7 +425,7 @@
             "confidence": 1.0,
             "errors": [],
             "suggestions": [],
-            "reasoning": "Cartesian Product가 올바르게 생성되었습니다. 각 항목에는 '보종명', '유형1', '유형2' 키가 모두 존재하며, 슬래시(/)로 구분된 값들이 각각 분리되었습니다. 생성된 조합 수(8)가 예상(8)과 일치하며, 중복이 없습니다. 보종명은 완전하고 줄바꿈(\n)이 정상적으로 포함되어 있습니다. 유형 필드도 깔끔하게 처리되었습니다.",
+            "reasoning": "Cartesian Product가 올바르게 생성되었습니다. 각 항목에는 '보종명', '유형1', '유형2' 키가 모두 존재하며, 슬래시(/)로 구분된 값들이 각각 분리되었습니다. 생성된 조합 수(8)가 예상(8)과 일치하며, 중복이 없습니다. 보종명은 완전하며 줄바꿈(\n)은 정상입니다. 유형 필드도 깔끔하게 처리되었습니다.",
             "expected_count": 8,
             "actual_count": 8
           }

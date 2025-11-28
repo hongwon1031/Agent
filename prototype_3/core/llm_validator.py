@@ -81,7 +81,7 @@ class LLMValidator:
         Search 결과 검증
 
         Args:
-            task_output: {"found_table": {...}, "section_title": "..."}
+            task_output: {"found_table": {...}, "section_title": "...", "found_content": [...]}
             context: {"all_sections": [...]}
 
         Returns:
@@ -89,33 +89,36 @@ class LLMValidator:
         """
         try:
             found_table = task_output.get("found_table")
+            found_content = task_output.get("found_content", [])
             section_title = task_output.get("section_title", "")
 
-            if not found_table:
-                return {
-                    "is_valid": False,
-                    "confidence": 1.0,
-                    "errors": ["No table found"],
-                    "suggestions": ["Try LLM-based search"],
-                    "reasoning": "Search result has no table"
-                }
-
-            # 테이블 미리보기
-            table_str = json.dumps(found_table, ensure_ascii=False)[:500]
+            # 테이블과 컨텐츠 미리보기 준비
+            table_str = json.dumps(found_table, ensure_ascii=False)[:500] if found_table else "없음"
+            content_str = json.dumps(found_content, ensure_ascii=False)[:1000] if found_content else "없음"
 
             prompt = f"""다음은 정의 섹션을 찾은 결과입니다.
 
-섹션 제목: {section_title}
+**섹션 제목**: {section_title if section_title else "(제목 없음)"}
 
-테이블 미리보기:
+**테이블 데이터**:
 {table_str}
+
+**섹션 컨텐츠 (전체)**:
+{content_str}
 
 **검증 목표**: 이 섹션이 보험 상품의 정의/명칭 정보를 담고 있는지 확인하세요.
 
 **검증 기준**:
-1. 제목이 적절한가? (정의, 명칭, 보험종목 등)
-2. 테이블에 상품 정보가 있어 보이는가?
-3. 데이터가 추출 가능한 형식인가?
+1. **제목이 없어도 괜찮습니다** - 컨텐츠 내용이 중요합니다
+2. 테이블이 있으면: 상품명/보험종목/유형 같은 정의 정보가 있는가?
+3. 테이블이 없으면: 텍스트로 정의/명칭을 설명하는가?
+4. 데이터가 추출 가능한 형식인가?
+5. **중요**: 테이블이나 텍스트 중 하나라도 정의 정보를 담고 있으면 valid입니다
+
+**판단 원칙**:
+- 하드코딩된 키워드에 의존하지 말고, 실제 내용을 보고 판단하세요
+- 제목이 없거나 비어있어도, 컨텐츠에 정의 정보가 있으면 valid입니다
+- "명칭", "보험종목", "유형", "상품명" 같은 단어가 테이블 헤더나 내용에 있으면 정의 섹션입니다
 
 다음 JSON 형식으로 반환:
 {{
@@ -123,7 +126,7 @@ class LLMValidator:
   "confidence": 0.0~1.0,
   "errors": ["에러1", ...] (is_valid=false인 경우),
   "suggestions": ["제안1", ...] (is_valid=false인 경우),
-  "reasoning": "판단 이유"
+  "reasoning": "판단 이유 (어떤 근거로 정의 섹션인지/아닌지 설명)"
 }}"""
 
             response = self.client.chat.completions.create(
@@ -155,7 +158,7 @@ class LLMValidator:
 
         Args:
             task_output: {"header": [...], "data": [[...], ...]}
-            context: {"original_table": {...}}
+            context: {"original_content": ... (원본 table 또는 text)}
 
         Returns:
             Dict: 검증 결과
@@ -173,24 +176,42 @@ class LLMValidator:
                     "reasoning": "Extraction result is empty"
                 }
 
-            # 전체 데이터 검증 (샘플 X)
-            prompt = f"""다음은 테이블에서 추출한 데이터입니다.
+            # 원본 컨텐츠 가져오기
+            original_content = context.get("original_content", "없음")
+            original_str = json.dumps(original_content, ensure_ascii=False)[:2000] if original_content != "없음" else "없음"
 
+            # 전체 데이터 검증 (샘플 X)
+            prompt = f"""다음은 원본 컨텐츠에서 데이터를 추출한 결과입니다.
+
+**원본 컨텐츠 (미리보기)**:
+{original_str}
+
+**추출된 결과**:
 Header: {json.dumps(header, ensure_ascii=False)}
 
 Data 행 수: {len(data)}
 전체 Data:
 {json.dumps(data, ensure_ascii=False, indent=2)}
 
-**검증 목표**: 추출이 올바르게 되었는지 전체 데이터를 확인하세요.
+**검증 목표**: 추출이 올바르게 되었는지 **원본과 비교**하여 전체 데이터를 확인하세요.
 
 **검증 기준**:
-1. Header가 의미있는가? (명칭, 유형 등)
-2. Data 행 수가 적절한가?
-3. 주석 행이 잘못 포함되지 않았는가? (※, 주:, * 등)
-4. 데이터가 잘리거나 손상되지 않았는가?
-5. 특수문자나 줄바꿈이 적절히 처리되었는가?
-6. **모든 행**을 확인하세요 (샘플만 보지 마세요)
+1. **원본 컨텐츠와 추출 데이터가 일치하는가?**
+   - 원본 text에서 "이 특약의 명칭은 XXX" 또는 "명칭: XXX" 처럼 **명칭/보종명을 명시**하는 부분이 있는가?
+   - 그 명칭이 추출된 "보종명" 필드와 **정확히 일치**하는가?
+   - **주의**: "다음과 같은 보험종목으로 구성됩니다: 1) AAA 2) BBB"에서 AAA, BBB는 **유형**이지 보종명이 아닙니다!
+   - "보험종목"이라는 단어는 "유형" 의미입니다. 보종명과 혼동하지 마세요!
+2. Header가 의미있는가? (명칭, 유형 등)
+3. Data 행 수가 적절한가?
+4. 주석 행이 잘못 포함되지 않았는가? (※, 주:, * 등)
+5. 데이터가 잘리거나 손상되지 않았는가?
+6. 특수문자나 줄바꿈이 적절히 처리되었는가?
+7. **모든 행**을 확인하세요 (샘플만 보지 마세요)
+
+**매우 중요**:
+- 원본에서 **"명칭은"** 또는 **"명칭:"** 뒤에 나오는 값이 진짜 보종명입니다
+- "보험종목으로 구성됩니다" 뒤의 1), 2) 리스트는 **유형**입니다
+- 추출된 보종명이 원문의 "명칭은 XXX" 부분과 **완전히 일치**하는지 확인하세요!
 
 다음 JSON 형식으로 반환:
 {{
@@ -198,7 +219,7 @@ Data 행 수: {len(data)}
   "confidence": 0.0~1.0,
   "errors": ["에러1", "에러2", ...],
   "suggestions": ["제안1", "제안2", ...],
-  "reasoning": "판단 이유",
+  "reasoning": "판단 이유 (원본과 비교한 결과)",
   "invalid_row_indices": [0, 3, ...]  (문제가 있는 행 인덱스)
 }}"""
 

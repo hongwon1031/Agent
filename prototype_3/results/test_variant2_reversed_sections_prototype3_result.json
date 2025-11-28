@@ -50,7 +50,7 @@
       ]
     },
     "confidence": 0.95,
-    "reasoning": "The JSON document is structured as a list of dictionaries, where each dictionary represents a document with a 'doc_title' and 'elements'. Each element has a 'title' and 'paragraphs', which can contain tables. The table data is stored in 'table' and 'table_elements'. The structure is consistent across the sample, allowing for confident extraction of sections and their contents."
+    "reasoning": "The JSON document is structured as a list of dictionaries, where each dictionary represents a document with a 'doc_title' and 'elements'. The 'elements' key contains a list of sections, each with a 'title' and 'paragraphs'. The 'paragraphs' contain content and potential tables, which are represented by 'table' and 'table_elements'. The structure is consistent across the sample, allowing for confident identification of the structure and fields."
   },
   "execution_plan": {
     "tasks": [
@@ -66,19 +66,21 @@
             "보험종목",
             "명칭"
           ],
-          "sections": "$sections"
+          "sections": "$sections",
+          "search_in_content": true
         },
         "depends_on": null
       },
       {
         "task_id": 2,
         "type": "extract",
-        "description": "보험 상품 정의 테이블 데이터 추출",
+        "description": "보험 상품 정의 데이터 추출",
         "strategy": "rule",
         "fallback": "llm",
         "tool_name": "rule_extract",
         "parameters": {
-          "content": "{{task1.found_table}}"
+          "content": "{{task1.found_content}}",
+          "content_type": "{{task1.content_type}}"
         },
         "depends_on": 1
       },
@@ -87,7 +89,7 @@
         "type": "transform",
         "description": "보험 상품 정의의 모든 조합 생성",
         "strategy": "rule",
-        "fallback": "llm",
+        "fallback": null,
         "tool_name": "rule_cartesian",
         "parameters": {
           "header": "{{task2.header}}",
@@ -96,7 +98,7 @@
         "depends_on": 2
       }
     ],
-    "reasoning": "문서 구조가 표준적이므로 Rule 기반 도구를 우선 사용하여 효율적으로 작업을 수행할 수 있습니다. 보험 상품 정의에 대한 명칭과 유형 정보를 추출하고, 이를 바탕으로 모든 가능한 조합을 생성합니다.",
+    "reasoning": "문서의 구조가 표준화되어 있으며, 섹션 내의 테이블에서 보험 상품 정의를 추출하고 이를 조합하는 작업이 필요합니다. Rule 기반 도구를 우선 사용하고, 실패 시 LLM 도구를 활용하여 유연성을 확보합니다.",
     "estimated_difficulty": "easy"
   },
   "final_data": {
@@ -282,16 +284,17 @@
                   ]
                 }
               }
-            ]
+            ],
+            "search_in_content": true
           },
           "success": true,
           "error": null,
           "validation": {
             "is_valid": true,
-            "confidence": 0.9,
+            "confidence": 0.7,
             "errors": [],
             "suggestions": [],
-            "reasoning": "섹션 제목이 '보험종목의 명칭'으로 명확하게 정의 및 명칭 정보를 다루고 있음을 나타내고 있습니다. 테이블에는 보험 상품의 명칭과 관련된 정보가 포함되어 있으며, '명칭', '보험종목', '보험종목_1' 등의 필드가 있어 상품 정보를 제공하고 있습니다. 데이터는 JSON 형식으로 추출 가능하며, 구조적으로도 잘 정리되어 있어 정보 추출에 문제가 없습니다."
+            "reasoning": "섹션 제목이 정의/명칭 관련이며 테이블이 없으므로, 텍스트 기반 정의 섹션으로 간주합니다."
           }
         }
       ],
@@ -299,7 +302,7 @@
     },
     {
       "task_id": 2,
-      "description": "보험 상품 정의 테이블 데이터 추출",
+      "description": "보험 상품 정의 데이터 추출",
       "attempts": [
         {
           "attempt": 1,
@@ -319,7 +322,8 @@
                   "보험종목_1": "간편심사(315)형\n/간편심사(335)형\n/간편심사(355)형\n/일반심사형"
                 }
               ]
-            }
+            },
+            "content_type": "table"
           },
           "success": true,
           "error": null,
@@ -327,8 +331,10 @@
             "is_valid": true,
             "confidence": 0.95,
             "errors": [],
-            "suggestions": [],
-            "reasoning": "데이터 검증 기준에 따라 각 항목을 확인한 결과, 모든 기준을 충족하는 것으로 보입니다. Header는 각 열의 내용을 잘 설명하고 있으며, 데이터 행 수는 주어진 데이터와 일치합니다. 주석 행이 포함되지 않았고, 데이터가 잘리거나 손상되지 않았습니다. 특수문자와 줄바꿈도 적절히 처리되었습니다. 모든 행을 확인한 결과, 문제가 발견되지 않았습니다.",
+            "suggestions": [
+              "데이터의 의미를 더 명확히 하기 위해 추가적인 설명이 필요할 수 있습니다."
+            ],
+            "reasoning": "데이터는 주어진 검증 기준에 따라 적절하게 추출된 것으로 보입니다. Header는 각 열의 내용을 잘 설명하고 있으며, 데이터 행 수는 주어진 데이터와 일치합니다. 주석 행이 포함되지 않았고, 데이터가 잘리거나 손상된 흔적이 없습니다. 특수문자와 줄바꿈도 적절히 처리되었습니다.",
             "invalid_row_indices": []
           }
         }
@@ -368,7 +374,7 @@
             "confidence": 1.0,
             "errors": [],
             "suggestions": [],
-            "reasoning": "Cartesian Product가 올바르게 생성되었습니다. 각 항목에는 '보종명', '유형1', '유형2' 키가 모두 존재하며, 슬래시(/)로 구분된 값들이 각각 분리되었습니다. 생성된 조합 수(8)가 예상(8)과 일치하며, 중복이 없습니다. 보종명은 완전하고 줄바꿈(\n)은 정상입니다. 유형 필드도 깔끔하게 처리되었습니다.",
+            "reasoning": "Cartesian Product가 올바르게 생성되었습니다. 각 항목에는 '보종명', '유형1', '유형2' 키가 모두 존재하며, 슬래시(/)로 구분된 값들이 각각 분리되었습니다. 생성된 조합 수(8)가 예상(8)과 일치하며, 중복이 없습니다. 보종명은 완전하며 줄바꿈(\n)은 정상입니다. 유형 필드도 깔끔하게 처리되었습니다.",
             "expected_count": 8,
             "actual_count": 8
           }
