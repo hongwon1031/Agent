@@ -4,38 +4,34 @@
     "tasks": [
       {
         "task_id": 1,
-        "type": "search",
-        "description": "보험 상품 정의 섹션 찾기",
-        "strategy": "rule",
-        "fallback": "llm",
-        "tool_name": "rule_search",
+        "type": "classify",
+        "description": "전체 섹션을 4가지 카테고리로 분류",
+        "strategy": "llm",
+        "fallback": null,
+        "tool_name": "section_classifier",
         "parameters": {
-          "keywords": [
-            "Product Name",
-            "Type"
-          ],
-          "sections": "$sections",
-          "search_in_content": true
+          "sections": "$sections"
         },
         "depends_on": null
       },
       {
         "task_id": 2,
         "type": "extract",
-        "description": "보험 상품 정의 데이터 추출",
-        "strategy": "rule",
-        "fallback": "llm",
-        "tool_name": "rule_extract",
+        "description": "분류된 정의 섹션에서 데이터 추출",
+        "strategy": "hybrid",
+        "fallback": null,
+        "tool_name": "definition_extract_v2",
         "parameters": {
-          "content": "{{task1.found_content}}",
-          "content_type": "{{task1.content_type}}"
+          "sections": "$sections",
+          "core_indices": "{{task1.definition_core}}",
+          "annotation_indices": "{{task1.definition_annotation}}"
         },
         "depends_on": 1
       },
       {
         "task_id": 3,
         "type": "transform",
-        "description": "보험 상품 정의의 모든 조합 생성",
+        "description": "Cartesian Product 생성",
         "strategy": "rule",
         "fallback": null,
         "tool_name": "rule_cartesian",
@@ -46,8 +42,8 @@
         "depends_on": 2
       }
     ],
-    "reasoning": "문서의 섹션 형식 정보에 따라 적절한 도구를 선택하고, 보험 상품 정의에 대한 모든 조합을 생성하기 위해 Cartesian Product를 사용합니다. 조건(보험기간/납입기간 등)은 이번 계획에 포함하지 않습니다.",
-    "estimated_difficulty": "easy"
+    "reasoning": "section_classifier를 사용하여 100% recall 보장, V2 workflow 적용",
+    "estimated_difficulty": "medium"
   },
   "final_data": {
     "definitions": [
@@ -77,16 +73,153 @@
   "execution_log": [
     {
       "task_id": 1,
-      "description": "보험 상품 정의 섹션 찾기",
+      "description": "전체 섹션을 4가지 카테고리로 분류",
       "attempts": [
         {
           "attempt": 1,
-          "tool": "rule_search",
+          "tool": "section_classifier",
           "parameters": {
-            "keywords": [
-              "Product Name",
-              "Type"
+            "sections": [
+              {
+                "index": 0,
+                "title": "1. Product Name and Type",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "<table>...</table>",
+                    "table": {
+                      "table_title": "Product Definition",
+                      "table_elements": [
+                        {
+                          "Product Name": "Accident Disability Rider (Non-Refund)",
+                          "Plan Type": "Non-Refund",
+                          "Underwriting Type": "Simplified (315) / Simplified (335) / Standard"
+                        },
+                        {
+                          "Product Name": "Accident Disability Rider",
+                          "Plan Type": "Standard",
+                          "Underwriting Type": "Standard"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "1. Product Name and Type",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "<table>...</table>",
+                      "table": {
+                        "table_title": "Product Definition",
+                        "table_elements": [
+                          {
+                            "Product Name": "Accident Disability Rider (Non-Refund)",
+                            "Plan Type": "Non-Refund",
+                            "Underwriting Type": "Simplified (315) / Simplified (335) / Standard"
+                          },
+                          {
+                            "Product Name": "Accident Disability Rider",
+                            "Plan Type": "Standard",
+                            "Underwriting Type": "Standard"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "index": 1,
+                "title": "3. Coverage Period and Premium Payment",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "<table>...</table>",
+                    "table": {
+                      "table_title": "Eligibility",
+                      "table_elements": [
+                        {
+                          "Plan Type": "Non-Refund",
+                          "Coverage Period": "20 / 30 years, Whole Life",
+                          "Payment Period": "10 / 20 years",
+                          "Male Age": "15 - 65",
+                          "Female Age": "15 - 65"
+                        },
+                        {
+                          "Plan Type": "Standard",
+                          "Coverage Period": "20 / 30 years",
+                          "Payment Period": "10 / 20 years",
+                          "Male Age": "15 - 60",
+                          "Female Age": "15 - 60"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "3. Coverage Period and Premium Payment",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "<table>...</table>",
+                      "table": {
+                        "table_title": "Eligibility",
+                        "table_elements": [
+                          {
+                            "Plan Type": "Non-Refund",
+                            "Coverage Period": "20 / 30 years, Whole Life",
+                            "Payment Period": "10 / 20 years",
+                            "Male Age": "15 - 65",
+                            "Female Age": "15 - 65"
+                          },
+                          {
+                            "Plan Type": "Standard",
+                            "Coverage Period": "20 / 30 years",
+                            "Payment Period": "10 / 20 years",
+                            "Male Age": "15 - 60",
+                            "Female Age": "15 - 60"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "success": true,
+          "error": null,
+          "output": {
+            "definition_core": [
+              0
             ],
+            "definition_annotation": [],
+            "condition": [
+              1
+            ],
+            "other": [],
+            "reasoning": "Section 0은 'Product Name and Type'이라는 제목과 테이블 형태로 보험 상품의 명칭과 유형을 정의하고 있으므로 definition_core로 분류됩니다. Section 1은 'Coverage Period and Premium Payment'라는 제목과 테이블 형태로 보장 기간과 보험료 납부에 관한 정보를 제공하므로 계약 관련 정보로 판단되어 condition으로 분류됩니다."
+          },
+          "validation": {
+            "is_valid": true,
+            "confidence": 0.95,
+            "errors": [],
+            "suggestions": [],
+            "reasoning": "section_classifier found 1 core, 0 annotation sections"
+          }
+        }
+      ],
+      "final_success": true
+    },
+    {
+      "task_id": 2,
+      "description": "분류된 정의 섹션에서 데이터 추출",
+      "attempts": [
+        {
+          "attempt": 1,
+          "tool": "definition_extract_v2",
+          "parameters": {
             "sections": [
               {
                 "index": 0,
@@ -195,96 +328,39 @@
                 }
               }
             ],
-            "search_in_content": true
-          },
-          "success": true,
-          "error": null,
-          "validation": {
-            "is_valid": true,
-            "confidence": 0.95,
-            "errors": [],
-            "suggestions": [],
-            "reasoning": "섹션 컨텐츠에 포함된 테이블은 'Product Definition'이라는 제목을 가지고 있으며, 'Product Name', 'Plan Type', 'Underwriting Type'과 같은 헤더를 포함하고 있습니다. 이러한 요소들은 보험 상품의 정의 및 명칭 정보를 제공하는 데 필요한 요소들입니다. 따라서 이 섹션은 보험 상품의 정의/명칭 정보를 담고 있다고 판단할 수 있습니다. 테이블 형식으로 데이터가 잘 구조화되어 있어 추출도 용이합니다."
-          }
-        }
-      ],
-      "final_success": true
-    },
-    {
-      "task_id": 2,
-      "description": "보험 상품 정의 데이터 추출",
-      "attempts": [
-        {
-          "attempt": 1,
-          "tool": "rule_extract",
-          "parameters": {
-            "content": {
-              "table_title": "Product Definition",
-              "table_elements": [
-                {
-                  "Product Name": "Accident Disability Rider (Non-Refund)",
-                  "Plan Type": "Non-Refund",
-                  "Underwriting Type": "Simplified (315) / Simplified (335) / Standard"
-                },
-                {
-                  "Product Name": "Accident Disability Rider",
-                  "Plan Type": "Standard",
-                  "Underwriting Type": "Standard"
-                }
-              ]
-            },
-            "content_type": "table"
-          },
-          "success": true,
-          "error": null,
-          "validation": {
-            "is_valid": false,
-            "confidence": 0.8,
-            "errors": [
-              "보종명과 유형1, 유형2의 계층 구조가 명확히 구분되지 않음",
-              "첫 번째 컬럼에 보종명과 하위 유형이 혼합되어 있음"
-            ],
-            "suggestions": [
-              "첫 번째 컬럼을 보종명만 포함하도록 수정",
-              "유형1과 유형2를 각각 별도의 컬럼으로 분리하여 계층 구조를 명확히 표현"
-            ],
-            "reasoning": "원문 텍스트는 'Product Name', 'Plan Type', 'Underwriting Type'의 세 가지 계층을 명확히 구분하고 있습니다. 그러나 도구가 추출한 표에서는 첫 번째 컬럼에 보종명과 하위 유형이 혼합되어 있어, 계층 구조가 명확히 드러나지 않습니다. 특히 'Accident Disability Rider (Non-Refund)'와 같은 항목은 보종명과 하위 유형이 결합된 형태로, 보종명만을 분리하여 첫 번째 컬럼에 포함해야 합니다. 또한, 'Plan Type'과 'Underwriting Type'은 각각 유형1과 유형2로 분리되어야 합니다.",
-            "invalid_row_indices": [
+            "core_indices": [
               0
-            ]
-          }
-        },
-        {
-          "attempt": 2,
-          "tool": "llm_extract",
-          "parameters": {
-            "content": {
-              "table_title": "Product Definition",
-              "table_elements": [
-                {
-                  "Product Name": "Accident Disability Rider (Non-Refund)",
-                  "Plan Type": "Non-Refund",
-                  "Underwriting Type": "Simplified (315) / Simplified (335) / Standard"
-                },
-                {
-                  "Product Name": "Accident Disability Rider",
-                  "Plan Type": "Standard",
-                  "Underwriting Type": "Standard"
-                }
-              ]
-            },
-            "content_type": "table",
-            "instruction": "보종명, 유형1, 유형2를 각각 별도의 컬럼으로 분리하고, 보종명은 첫 번째 컬럼에만 포함되도록 데이터를 추출하세요."
+            ],
+            "annotation_indices": []
           },
           "success": true,
           "error": null,
+          "output": {
+            "header": [
+              "Product Name",
+              "Plan Type",
+              "Underwriting Type"
+            ],
+            "data": [
+              [
+                "Accident Disability Rider (Non-Refund)",
+                "Non-Refund",
+                "Simplified (315) / Simplified (335) / Standard"
+              ],
+              [
+                "Accident Disability Rider",
+                "Standard",
+                "Standard"
+              ]
+            ],
+            "extraction_method": "v2_classifier_based"
+          },
           "validation": {
             "is_valid": true,
             "confidence": 0.95,
             "errors": [],
             "suggestions": [],
-            "reasoning": "표는 원문 텍스트의 구조를 잘 반영하고 있습니다. '보종명'은 'Product Name'에 해당하며, '유형1'은 'Plan Type', '유형2'는 'Underwriting Type'에 해당합니다. 각 행은 원문 텍스트의 각 상품 정의를 정확히 반영하고 있으며, 계층 구조가 명확하게 구분되어 있습니다. 'Accident Disability Rider (Non-Refund)'와 'Accident Disability Rider'라는 두 개의 상품명이 각각의 행에 올바르게 반영되어 있으며, 'Non-Refund'와 'Standard'라는 유형1, 그리고 'Simplified (315) / Simplified (335) / Standard'와 'Standard'라는 유형2가 정확히 매칭되어 있습니다. 따라서, 이 표는 원문 정의의 의미 구조를 잘 표현하고 있습니다.",
-            "invalid_row_indices": []
+            "reasoning": "definition_extract_v2 extracted table with 3 columns, 2 rows"
           }
         }
       ],
@@ -292,16 +368,16 @@
     },
     {
       "task_id": 3,
-      "description": "보험 상품 정의의 모든 조합 생성",
+      "description": "Cartesian Product 생성",
       "attempts": [
         {
           "attempt": 1,
           "tool": "rule_cartesian",
           "parameters": {
             "header": [
-              "보종명",
-              "유형1",
-              "유형2"
+              "Product Name",
+              "Plan Type",
+              "Underwriting Type"
             ],
             "data": [
               [
@@ -318,13 +394,37 @@
           },
           "success": true,
           "error": null,
+          "output": {
+            "definitions": [
+              {
+                "보종명": "Accident Disability Rider (Non-Refund)",
+                "유형1": "Non-Refund",
+                "유형2": "Simplified (315)"
+              },
+              {
+                "보종명": "Accident Disability Rider (Non-Refund)",
+                "유형1": "Non-Refund",
+                "유형2": "Simplified (335)"
+              },
+              {
+                "보종명": "Accident Disability Rider (Non-Refund)",
+                "유형1": "Non-Refund",
+                "유형2": "Standard"
+              },
+              {
+                "보종명": "Accident Disability Rider",
+                "유형1": "Standard",
+                "유형2": "Standard"
+              }
+            ],
+            "total_count": 4
+          },
           "validation": {
             "is_valid": true,
-            "confidence": 1.0,
+            "confidence": 0.95,
             "errors": [],
             "suggestions": [],
-            "reasoning": "Cartesian Product가 올바르게 생성되었습니다. 각 항목에는 '보종명', '유형1', '유형2' 키가 모두 존재하며, 슬래시로 구분된 값들이 각각 분리되었습니다. 생성된 조합 수(4)가 예상(4)과 일치하며, 중복이 없고, 보종명이 완전하며, 유형 필드도 깔끔합니다.",
-            "expected_count": 4,
+            "reasoning": "Cartesian Product가 올바르게 생성되었습니다. 원본 데이터의 'Underwriting Type' 컬럼에서 '/'가 주 구분자로 사용되어 'Simplified (315)', 'Simplified (335)', 'Standard'로 올바르게 분리되었습니다. 각 정의에는 '보종명', '유형1', '유형2'가 모두 포함되어 있으며, 중복된 조합이 없고, 예상되는 정의의 개수(4개)와 일치합니다. 따라서, 데이터는 유효합니다.",
             "actual_count": 4
           }
         }

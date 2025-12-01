@@ -11,8 +11,58 @@ Special tokens:
 """
 
 TOOL_SCHEMAS = {
+    "section_classifier": {
+        "description": "LLM-based 4-way section classifier (RECOMMENDED for definition extraction)",
+        "supported_formats": ["table", "text", "mixed"],
+        "parameters": {
+            "sections": {
+                "type": "list[dict]",
+                "description": "List of ALL sections to classify",
+                "required": True,
+                "value": "$sections"  # Runtime injection
+            }
+        },
+        "returns": {
+            "definition_core": "list[int] - Indices of core definition sections",
+            "definition_annotation": "list[int] - Indices of annotation sections",
+            "condition": "list[int] - Indices of condition sections",
+            "other": "list[int] - Indices of other sections",
+            "reasoning": "string - Classification reasoning"
+        }
+    },
+
+    "definition_extract_v2": {
+        "description": "Extract definition table from classified sections (works with section_classifier)",
+        "supported_formats": ["table", "text", "mixed"],
+        "parameters": {
+            "sections": {
+                "type": "list[dict]",
+                "description": "List of all sections",
+                "required": True,
+                "value": "$sections"  # Runtime injection
+            },
+            "core_indices": {
+                "type": "list[int]",
+                "description": "Indices of definition_core sections (from section_classifier)",
+                "required": True,
+                "example": "{{task1.definition_core}}"
+            },
+            "annotation_indices": {
+                "type": "list[int]",
+                "description": "Indices of definition_annotation sections (optional)",
+                "required": False,
+                "example": "{{task1.definition_annotation}}"
+            }
+        },
+        "returns": {
+            "header": "list[string] - Table headers",
+            "data": "list[list[string]] - Table rows",
+            "extraction_method": "string - Extraction method used"
+        }
+    },
+
     "rule_search": {
-        "description": "Rule-based keyword matching search in sections",
+        "description": "[DEPRECATED - Use section_classifier] Rule-based keyword matching search in sections",
         "supported_formats": ["table", "text"],  # 새로 추가
         "parameters": {
             "keywords": {
@@ -144,7 +194,7 @@ TOOL_SCHEMAS = {
     },
 
     "definition_search": {
-        "description": "Rule-based definition-aware search that collects multiple candidate sections with role(kind) tags",
+        "description": "[DEPRECATED - Use section_classifier] Rule-based definition-aware search that collects multiple candidate sections with role(kind) tags",
         "supported_formats": ["table", "text", "mixed"],
         "parameters": {
             "sections": {
@@ -160,7 +210,7 @@ TOOL_SCHEMAS = {
     },
 
     "definition_extract": {
-        "description": "Definition-aware extraction based on definition_candidates and sections",
+        "description": "[DEPRECATED - Use definition_extract_v2] Definition-aware extraction based on definition_candidates and sections",
         "supported_formats": ["table", "text", "mixed"],
         "parameters": {
             "sections": {

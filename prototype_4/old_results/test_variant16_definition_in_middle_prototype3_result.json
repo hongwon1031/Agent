@@ -1,0 +1,841 @@
+{
+  "success": false,
+  "execution_plan": {
+    "tasks": [
+      {
+        "task_id": 1,
+        "type": "search",
+        "description": "보험 상품 정의 섹션 찾기",
+        "strategy": "rule",
+        "fallback": "llm",
+        "tool_name": "rule_search",
+        "parameters": {
+          "keywords": [
+            "정의",
+            "명칭",
+            "보험종목"
+          ],
+          "sections": "$sections",
+          "search_in_content": true
+        },
+        "depends_on": null
+      },
+      {
+        "task_id": 2,
+        "type": "extract",
+        "description": "보험 상품 정의 데이터 추출",
+        "strategy": "rule",
+        "fallback": "llm",
+        "tool_name": "rule_extract",
+        "parameters": {
+          "content": "{{task1.found_content}}",
+          "content_type": "{{task1.content_type}}"
+        },
+        "depends_on": 1
+      },
+      {
+        "task_id": 3,
+        "type": "transform",
+        "description": "보험 상품 정의의 모든 조합 생성",
+        "strategy": "rule",
+        "fallback": null,
+        "tool_name": "rule_cartesian",
+        "parameters": {
+          "header": "{{task2.header}}",
+          "data": "{{task2.data}}"
+        },
+        "depends_on": 2
+      }
+    ],
+    "reasoning": "문서의 섹션 형식 정보를 활용하여 적절한 도구를 선택하고, 보험 상품 정의를 추출한 후 모든 조합을 생성하는 계획을 수립하였습니다. 조건(보험기간/납입기간 등)에 대한 Task는 포함하지 않았습니다.",
+    "estimated_difficulty": "easy"
+  },
+  "execution_log": [
+    {
+      "task_id": 1,
+      "description": "보험 상품 정의 섹션 찾기",
+      "attempts": [
+        {
+          "attempt": 1,
+          "tool": "rule_search",
+          "parameters": {
+            "keywords": [
+              "정의",
+              "명칭",
+              "보험종목"
+            ],
+            "sections": [
+              {
+                "index": 0,
+                "title": "2. 특약의 부가대상",
+                "content": [
+                  {
+                    "type": "text",
+                    "content": "- 간편심사형 : 이 종목은 유병력자 또는 고연령자 등 일반심사보험에 가입하기 어려운 피보험자를 대상으로 하는 “간편심사”보험에 부가한다.\n- 일반심사형 : 이 종목은 피보험자가 표준체에 해당하는 계약 전 알릴 의무 항목을 통하여 보험가입 여부에 대한 의적심사를 거쳐 가입 가능한 “일반심사”보험에 부가한다.",
+                    "table": {
+                      "table_title": "",
+                      "table_elements": []
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "2. 특약의 부가대상",
+                  "paragraphs": [
+                    {
+                      "type": "text",
+                      "content": "- 간편심사형 : 이 종목은 유병력자 또는 고연령자 등 일반심사보험에 가입하기 어려운 피보험자를 대상으로 하는 “간편심사”보험에 부가한다.\n- 일반심사형 : 이 종목은 피보험자가 표준체에 해당하는 계약 전 알릴 의무 항목을 통하여 보험가입 여부에 대한 의적심사를 거쳐 가입 가능한 “일반심사”보험에 부가한다.",
+                      "table": {
+                        "table_title": "",
+                        "table_elements": []
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "index": 1,
+                "title": "3. 보험기간, 보험료 납입기간, 피보험자 가입나이 및 보험료 납입주기",
+                "content": [
+                  {
+                    "type": "title",
+                    "content": "가. 해약환급금 미지급형",
+                    "table": []
+                  },
+                  {
+                    "type": "table",
+                    "content": "<table>\n <tr>\n  <td colspan=\"7\">\n   가입가능 조건\n  </td>\n </tr>\n <tr>\n  <td>\n   유형1\n  </td>\n  <td>\n   유형2\n  </td>\n  <td>\n   보험기간\n  </td>\n  <td>\n   보험료 납입기간\n  </td>\n  <td>\n   남자나이\n  </td>\n  <td>\n   여자나이\n  </td>\n  <td>\n   보험료 납입주기\n  </td>\n </tr>\n <tr>\n  <td>\n   간편심사형\n  </td>\n  <td>\n   -\n  </td>\n  <td rowspan=\"2\">\n   80/90/100세\n   <br/>\n   만기, 종신\n  </td>\n  <td rowspan=\"2\">\n   10/15/20/25/30년납\n  </td>\n  <td colspan=\"2\">\n   만15세 - min[세만기 - 년납, 90 - 년납, 80] 세\n  </td>\n  <td rowspan=\"2\">\n   월납\n  </td>\n </tr>\n <tr>\n  <td>\n   일반심사형\n  </td>\n  <td>\n   -\n  </td>\n  <td colspan=\"2\">\n   만15세 - min[세만기 - 년납, 90 - 년납, 70] 세\n  </td>\n </tr>\n</table>",
+                    "table": {
+                      "table_title": "가입가능 조건",
+                      "table_elements": [
+                        {
+                          "유형1": "간편심사형",
+                          "유형2": "-",
+                          "보험기간": "80/90/100세\n만기, 종신",
+                          "보험료 납입기간": "10/15/20/25/30년납",
+                          "남자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세",
+                          "여자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세",
+                          "보험료 납입주기": "월납"
+                        },
+                        {
+                          "유형1": "일반심사형",
+                          "유형2": "-",
+                          "보험기간": "80/90/100세\n만기, 종신",
+                          "보험료 납입기간": "10/15/20/25/30년납",
+                          "남자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+                          "여자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+                          "보험료 납입주기": "월납"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "table",
+                    "content": "<table>\n <tr>\n  <td colspan=\"7\">\n   가입불가 조건\n  </td>\n </tr>\n <tr>\n  <td>\n   유형1\n  </td>\n  <td>\n   유형2\n  </td>\n  <td>\n   보험기간\n  </td>\n  <td>\n   보험료 납입기간\n  </td>\n  <td>\n   남자나이\n  </td>\n  <td>\n   여자나이\n  </td>\n  <td>\n   보험료 납입주기\n  </td>\n </tr>\n <tr>\n  <td rowspan=\"40\">\n   해약환급금\n   <br/>\n   미지급형\n  </td>\n  <td rowspan=\"7\">\n   일반심사형\n  </td>\n  <td rowspan=\"5\">\n   80세만기\n  </td>\n  <td>\n   10년납\n  </td>\n  <td>\n   67~70세\n  </td>\n  <td>\n   70세\n  </td>\n  <td rowspan=\"40\">\n   월납\n  </td>\n </tr>\n <tr>\n  <td>\n   15년납\n  </td>\n  <td>\n   61~65세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   20년납\n  </td>\n  <td>\n   57~60세\n  </td>\n  <td>\n   60세\n  </td>\n </tr>\n <tr>\n  <td>\n   25년납\n  </td>\n  <td>\n   54~55세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   30년납\n  </td>\n  <td>\n   50세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td rowspan=\"2\">\n   90세만기\n  </td>\n  <td>\n   25년납\n  </td>\n  <td>\n   61~62세,64~65세\n  </td>\n  <td>\n  </td>\n </tr>\n <tr>\n  <td>\n   30년납\n  </td>\n  <td>\n   59~60세\n  </td>\n  <td>\n  </td>\n </tr>\n <tr>\n  <td rowspan=\"13\">\n   간편심사\n   <br/>\n   (315)형\n  </td>\n  <td rowspan=\"5\">\n   80세만기\n  </td>\n  <td>\n   10년납\n  </td>\n  <td>\n   68~70세\n  </td>\n  <td>\n   70세\n  </td>\n </tr>\n <tr>\n  <td>\n   15년납\n  </td>\n  <td>\n   59~65세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   20년납\n  </td>\n  <td>\n   56~60세\n  </td>\n  <td>\n   60세\n  </td>\n </tr>\n <tr>\n  <td>\n   25년납\n  </td>\n  <td>\n   50~55세\n  </td>\n  <td>\n  </td>\n </tr>\n <tr>\n  <td>\n   30년납\n  </td>\n  <td>\n   49~50세\n  </td>\n  <td>\n   50세\n  </td>\n </tr>\n <tr>\n  <td rowspan=\"4\">\n   90세만기\n  </td>\n  <td>\n   10년납\n  </td>\n  <td>\n   80세\n  </td>\n  <td>\n   80세\n  </td>\n </tr>\n <tr>\n  <td>\n   20년납\n  </td>\n  <td>\n   60~64세\n  </td>\n  <td>\n  </td>\n </tr>\n <tr>\n  <td>\n   25년납\n  </td>\n  <td>\n   58~65세\n  </td>\n  <td>\n  </td>\n </tr>\n <tr>\n  <td>\n   30년납\n  </td>\n  <td>\n   55~60세\n  </td>\n  <td>\n  </td>\n </tr>\n <tr>\n  <td rowspan=\"2\">\n   100세만기\n  </td>\n  <td>\n   25년납\n  </td>\n  <td>\n   59~65세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   30년납\n  </td>\n  <td>\n   57~60세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td rowspan=\"2\">\n   종신\n  </td>\n  <td>\n   25년납\n  </td>\n  <td>\n   59~65세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   30년납\n  </td>\n  <td>\n   57~60세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td rowspan=\"12\">\n   간편심사\n   <br/>\n   (335)형\n  </td>\n  <td rowspan=\"5\">\n   80세만기\n  </td>\n  <td>\n   10년납\n  </td>\n  <td>\n   68~70세\n  </td>\n  <td>\n   70세\n  </td>\n </tr>\n <tr>\n  <td>\n   15년납\n  </td>\n  <td>\n   60~65세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   20년납\n  </td>\n  <td>\n   57~60세\n  </td>\n  <td>\n   60세\n  </td>\n </tr>\n <tr>\n  <td>\n   25년납\n  </td>\n  <td>\n   52~55세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   30년납\n  </td>\n  <td>\n   49~50세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td rowspan=\"3\">\n   90세만기\n  </td>\n  <td>\n   10년납\n  </td>\n  <td>\n   80세\n  </td>\n  <td>\n   80세\n  </td>\n </tr>\n <tr>\n  <td>\n   25년납\n  </td>\n  <td>\n   59~65세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   30년납\n  </td>\n  <td>\n   57~60세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td rowspan=\"2\">\n   100세만기\n  </td>\n  <td>\n   25년납\n  </td>\n  <td>\n   60~63세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   30년납\n  </td>\n  <td>\n   60세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td rowspan=\"2\">\n   종신\n  </td>\n  <td>\n   25년납\n  </td>\n  <td>\n   60~62세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   30년납\n  </td>\n  <td>\n   59~60세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td rowspan=\"8\">\n   간편심사\n   <br/>\n   (355)형\n  </td>\n  <td rowspan=\"5\">\n   80세만기\n  </td>\n  <td>\n   10년납\n  </td>\n  <td>\n   69~70세\n  </td>\n  <td>\n   70세\n  </td>\n </tr>\n <tr>\n  <td>\n   15년납\n  </td>\n  <td>\n   60~65세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   20년납\n  </td>\n  <td>\n   58~60세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   25년납\n  </td>\n  <td>\n   54~55세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   30년납\n  </td>\n  <td>\n   50세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td rowspan=\"3\">\n   90세만기\n  </td>\n  <td>\n   10년납\n  </td>\n  <td>\n   80세\n  </td>\n  <td>\n   80세\n  </td>\n </tr>\n <tr>\n  <td>\n   25년납\n  </td>\n  <td>\n   60~65세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   30년납\n  </td>\n  <td>\n   59~60세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n</table>",
+                    "table": {
+                      "table_title": "가입불가 조건",
+                      "table_elements": [
+                        {
+                          "유형1": "해약환급금\n미지급형",
+                          "유형2": "일반심사형",
+                          "보험기간": "80세만기",
+                          "보험료 납입기간": "10년납",
+                          "남자나이": "67~70세",
+                          "여자나이": "70세",
+                          "보험료 납입주기": "월납"
+                        },
+                        {
+                          "유형1": "해약환급금\n미지급형",
+                          "유형2": "간편심사\n(355)형",
+                          "보험기간": "90세만기",
+                          "보험료 납입기간": "30년납",
+                          "남자나이": "59~60세",
+                          "여자나이": "-",
+                          "보험료 납입주기": "월납"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "title",
+                    "content": "나. 일반형",
+                    "table": []
+                  },
+                  {
+                    "type": "table",
+                    "content": "<table>\n <tr>\n  <td colspan=\"7\">\n   가입가능 조건\n  </td>\n </tr>\n <tr>\n  <td>\n   유형1\n  </td>\n  <td>\n   유형2\n  </td>\n  <td>\n   보험기간\n  </td>\n  <td>\n   보험료 납입기간\n  </td>\n  <td>\n   남자나이\n  </td>\n  <td>\n   여자나이\n  </td>\n  <td>\n   보험료 납입주기\n  </td>\n </tr>\n <tr>\n  <td>\n   간편심사형\n  </td>\n  <td>\n   -\n  </td>\n  <td rowspan=\"2\">\n   25/30년 만기,\n   <br/>\n   80/90/100세\n   <br/>\n   만기, 종신\n  </td>\n  <td rowspan=\"2\">\n   5/7/10/15/20/25/30년납\n  </td>\n  <td colspan=\"2\">\n   만15세 - min[세만기 - 년납, 90 - 년납, 80] 세\n   <br/>\n   만15세 - min[100 - 년만기, 90 - 년납, 80] 세\n  </td>\n  <td rowspan=\"2\">\n   월납\n  </td>\n </tr>\n <tr>\n  <td>\n   일반심사형\n  </td>\n  <td>\n   -\n  </td>\n  <td colspan=\"2\">\n   만15세 - min[세만기 - 년납, 90 - 년납, 70] 세\n   <br/>\n   만15세 - min[100 - 년만기, 90 - 년납, 70] 세\n  </td>\n </tr>\n</table>",
+                    "table": {
+                      "table_title": "가입가능 조건",
+                      "table_elements": [
+                        {
+                          "유형1": "간편심사형",
+                          "유형2": "-",
+                          "보험기간": "25/30년 만기,\n80/90/100세\n만기, 종신",
+                          "보험료 납입기간": "5/7/10/15/20/25/30년납",
+                          "남자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세\n만15세 - min[100 - 년만기, 90 - 년납, 80] 세",
+                          "여자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세\n만15세 - min[100 - 년만기, 90 - 년납, 80] 세",
+                          "보험료 납입주기": "월납"
+                        },
+                        {
+                          "유형1": "일반심사형",
+                          "유형2": "-",
+                          "보험기간": "25/30년 만기,\n80/90/100세\n만기, 종신",
+                          "보험료 납입기간": "5/7/10/15/20/25/30년납",
+                          "남자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세\n만15세 - min[100 - 년만기, 90 - 년납, 70] 세",
+                          "여자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세\n만15세 - min[100 - 년만기, 90 - 년납, 70] 세",
+                          "보험료 납입주기": "월납"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "content": "※ 보험료 납입기간은 보험기간을 초과할 수 없음(이하 모든 보험종목별 동일 적용됨)",
+                    "table": {
+                      "table_title": "",
+                      "table_elements": []
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "3. 보험기간, 보험료 납입기간, 피보험자 가입나이 및 보험료 납입주기",
+                  "paragraphs": [
+                    {
+                      "type": "title",
+                      "content": "가. 해약환급금 미지급형",
+                      "table": []
+                    },
+                    {
+                      "type": "table",
+                      "content": "<table>\n <tr>\n  <td colspan=\"7\">\n   가입가능 조건\n  </td>\n </tr>\n <tr>\n  <td>\n   유형1\n  </td>\n  <td>\n   유형2\n  </td>\n  <td>\n   보험기간\n  </td>\n  <td>\n   보험료 납입기간\n  </td>\n  <td>\n   남자나이\n  </td>\n  <td>\n   여자나이\n  </td>\n  <td>\n   보험료 납입주기\n  </td>\n </tr>\n <tr>\n  <td>\n   간편심사형\n  </td>\n  <td>\n   -\n  </td>\n  <td rowspan=\"2\">\n   80/90/100세\n   <br/>\n   만기, 종신\n  </td>\n  <td rowspan=\"2\">\n   10/15/20/25/30년납\n  </td>\n  <td colspan=\"2\">\n   만15세 - min[세만기 - 년납, 90 - 년납, 80] 세\n  </td>\n  <td rowspan=\"2\">\n   월납\n  </td>\n </tr>\n <tr>\n  <td>\n   일반심사형\n  </td>\n  <td>\n   -\n  </td>\n  <td colspan=\"2\">\n   만15세 - min[세만기 - 년납, 90 - 년납, 70] 세\n  </td>\n </tr>\n</table>",
+                      "table": {
+                        "table_title": "가입가능 조건",
+                        "table_elements": [
+                          {
+                            "유형1": "간편심사형",
+                            "유형2": "-",
+                            "보험기간": "80/90/100세\n만기, 종신",
+                            "보험료 납입기간": "10/15/20/25/30년납",
+                            "남자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세",
+                            "여자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세",
+                            "보험료 납입주기": "월납"
+                          },
+                          {
+                            "유형1": "일반심사형",
+                            "유형2": "-",
+                            "보험기간": "80/90/100세\n만기, 종신",
+                            "보험료 납입기간": "10/15/20/25/30년납",
+                            "남자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+                            "여자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+                            "보험료 납입주기": "월납"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "type": "table",
+                      "content": "<table>\n <tr>\n  <td colspan=\"7\">\n   가입불가 조건\n  </td>\n </tr>\n <tr>\n  <td>\n   유형1\n  </td>\n  <td>\n   유형2\n  </td>\n  <td>\n   보험기간\n  </td>\n  <td>\n   보험료 납입기간\n  </td>\n  <td>\n   남자나이\n  </td>\n  <td>\n   여자나이\n  </td>\n  <td>\n   보험료 납입주기\n  </td>\n </tr>\n <tr>\n  <td rowspan=\"40\">\n   해약환급금\n   <br/>\n   미지급형\n  </td>\n  <td rowspan=\"7\">\n   일반심사형\n  </td>\n  <td rowspan=\"5\">\n   80세만기\n  </td>\n  <td>\n   10년납\n  </td>\n  <td>\n   67~70세\n  </td>\n  <td>\n   70세\n  </td>\n  <td rowspan=\"40\">\n   월납\n  </td>\n </tr>\n <tr>\n  <td>\n   15년납\n  </td>\n  <td>\n   61~65세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   20년납\n  </td>\n  <td>\n   57~60세\n  </td>\n  <td>\n   60세\n  </td>\n </tr>\n <tr>\n  <td>\n   25년납\n  </td>\n  <td>\n   54~55세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   30년납\n  </td>\n  <td>\n   50세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td rowspan=\"2\">\n   90세만기\n  </td>\n  <td>\n   25년납\n  </td>\n  <td>\n   61~62세,64~65세\n  </td>\n  <td>\n  </td>\n </tr>\n <tr>\n  <td>\n   30년납\n  </td>\n  <td>\n   59~60세\n  </td>\n  <td>\n  </td>\n </tr>\n <tr>\n  <td rowspan=\"13\">\n   간편심사\n   <br/>\n   (315)형\n  </td>\n  <td rowspan=\"5\">\n   80세만기\n  </td>\n  <td>\n   10년납\n  </td>\n  <td>\n   68~70세\n  </td>\n  <td>\n   70세\n  </td>\n </tr>\n <tr>\n  <td>\n   15년납\n  </td>\n  <td>\n   59~65세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   20년납\n  </td>\n  <td>\n   56~60세\n  </td>\n  <td>\n   60세\n  </td>\n </tr>\n <tr>\n  <td>\n   25년납\n  </td>\n  <td>\n   50~55세\n  </td>\n  <td>\n  </td>\n </tr>\n <tr>\n  <td>\n   30년납\n  </td>\n  <td>\n   49~50세\n  </td>\n  <td>\n   50세\n  </td>\n </tr>\n <tr>\n  <td rowspan=\"4\">\n   90세만기\n  </td>\n  <td>\n   10년납\n  </td>\n  <td>\n   80세\n  </td>\n  <td>\n   80세\n  </td>\n </tr>\n <tr>\n  <td>\n   20년납\n  </td>\n  <td>\n   60~64세\n  </td>\n  <td>\n  </td>\n </tr>\n <tr>\n  <td>\n   25년납\n  </td>\n  <td>\n   58~65세\n  </td>\n  <td>\n  </td>\n </tr>\n <tr>\n  <td>\n   30년납\n  </td>\n  <td>\n   55~60세\n  </td>\n  <td>\n  </td>\n </tr>\n <tr>\n  <td rowspan=\"2\">\n   100세만기\n  </td>\n  <td>\n   25년납\n  </td>\n  <td>\n   59~65세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   30년납\n  </td>\n  <td>\n   57~60세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td rowspan=\"2\">\n   종신\n  </td>\n  <td>\n   25년납\n  </td>\n  <td>\n   59~65세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   30년납\n  </td>\n  <td>\n   57~60세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td rowspan=\"12\">\n   간편심사\n   <br/>\n   (335)형\n  </td>\n  <td rowspan=\"5\">\n   80세만기\n  </td>\n  <td>\n   10년납\n  </td>\n  <td>\n   68~70세\n  </td>\n  <td>\n   70세\n  </td>\n </tr>\n <tr>\n  <td>\n   15년납\n  </td>\n  <td>\n   60~65세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   20년납\n  </td>\n  <td>\n   57~60세\n  </td>\n  <td>\n   60세\n  </td>\n </tr>\n <tr>\n  <td>\n   25년납\n  </td>\n  <td>\n   52~55세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   30년납\n  </td>\n  <td>\n   49~50세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td rowspan=\"3\">\n   90세만기\n  </td>\n  <td>\n   10년납\n  </td>\n  <td>\n   80세\n  </td>\n  <td>\n   80세\n  </td>\n </tr>\n <tr>\n  <td>\n   25년납\n  </td>\n  <td>\n   59~65세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   30년납\n  </td>\n  <td>\n   57~60세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td rowspan=\"2\">\n   100세만기\n  </td>\n  <td>\n   25년납\n  </td>\n  <td>\n   60~63세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   30년납\n  </td>\n  <td>\n   60세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td rowspan=\"2\">\n   종신\n  </td>\n  <td>\n   25년납\n  </td>\n  <td>\n   60~62세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   30년납\n  </td>\n  <td>\n   59~60세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td rowspan=\"8\">\n   간편심사\n   <br/>\n   (355)형\n  </td>\n  <td rowspan=\"5\">\n   80세만기\n  </td>\n  <td>\n   10년납\n  </td>\n  <td>\n   69~70세\n  </td>\n  <td>\n   70세\n  </td>\n </tr>\n <tr>\n  <td>\n   15년납\n  </td>\n  <td>\n   60~65세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   20년납\n  </td>\n  <td>\n   58~60세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   25년납\n  </td>\n  <td>\n   54~55세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   30년납\n  </td>\n  <td>\n   50세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td rowspan=\"3\">\n   90세만기\n  </td>\n  <td>\n   10년납\n  </td>\n  <td>\n   80세\n  </td>\n  <td>\n   80세\n  </td>\n </tr>\n <tr>\n  <td>\n   25년납\n  </td>\n  <td>\n   60~65세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n <tr>\n  <td>\n   30년납\n  </td>\n  <td>\n   59~60세\n  </td>\n  <td>\n   -\n  </td>\n </tr>\n</table>",
+                      "table": {
+                        "table_title": "가입불가 조건",
+                        "table_elements": [
+                          {
+                            "유형1": "해약환급금\n미지급형",
+                            "유형2": "일반심사형",
+                            "보험기간": "80세만기",
+                            "보험료 납입기간": "10년납",
+                            "남자나이": "67~70세",
+                            "여자나이": "70세",
+                            "보험료 납입주기": "월납"
+                          },
+                          {
+                            "유형1": "해약환급금\n미지급형",
+                            "유형2": "간편심사\n(355)형",
+                            "보험기간": "90세만기",
+                            "보험료 납입기간": "30년납",
+                            "남자나이": "59~60세",
+                            "여자나이": "-",
+                            "보험료 납입주기": "월납"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "type": "title",
+                      "content": "나. 일반형",
+                      "table": []
+                    },
+                    {
+                      "type": "table",
+                      "content": "<table>\n <tr>\n  <td colspan=\"7\">\n   가입가능 조건\n  </td>\n </tr>\n <tr>\n  <td>\n   유형1\n  </td>\n  <td>\n   유형2\n  </td>\n  <td>\n   보험기간\n  </td>\n  <td>\n   보험료 납입기간\n  </td>\n  <td>\n   남자나이\n  </td>\n  <td>\n   여자나이\n  </td>\n  <td>\n   보험료 납입주기\n  </td>\n </tr>\n <tr>\n  <td>\n   간편심사형\n  </td>\n  <td>\n   -\n  </td>\n  <td rowspan=\"2\">\n   25/30년 만기,\n   <br/>\n   80/90/100세\n   <br/>\n   만기, 종신\n  </td>\n  <td rowspan=\"2\">\n   5/7/10/15/20/25/30년납\n  </td>\n  <td colspan=\"2\">\n   만15세 - min[세만기 - 년납, 90 - 년납, 80] 세\n   <br/>\n   만15세 - min[100 - 년만기, 90 - 년납, 80] 세\n  </td>\n  <td rowspan=\"2\">\n   월납\n  </td>\n </tr>\n <tr>\n  <td>\n   일반심사형\n  </td>\n  <td>\n   -\n  </td>\n  <td colspan=\"2\">\n   만15세 - min[세만기 - 년납, 90 - 년납, 70] 세\n   <br/>\n   만15세 - min[100 - 년만기, 90 - 년납, 70] 세\n  </td>\n </tr>\n</table>",
+                      "table": {
+                        "table_title": "가입가능 조건",
+                        "table_elements": [
+                          {
+                            "유형1": "간편심사형",
+                            "유형2": "-",
+                            "보험기간": "25/30년 만기,\n80/90/100세\n만기, 종신",
+                            "보험료 납입기간": "5/7/10/15/20/25/30년납",
+                            "남자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세\n만15세 - min[100 - 년만기, 90 - 년납, 80] 세",
+                            "여자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세\n만15세 - min[100 - 년만기, 90 - 년납, 80] 세",
+                            "보험료 납입주기": "월납"
+                          },
+                          {
+                            "유형1": "일반심사형",
+                            "유형2": "-",
+                            "보험기간": "25/30년 만기,\n80/90/100세\n만기, 종신",
+                            "보험료 납입기간": "5/7/10/15/20/25/30년납",
+                            "남자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세\n만15세 - min[100 - 년만기, 90 - 년납, 70] 세",
+                            "여자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세\n만15세 - min[100 - 년만기, 90 - 년납, 70] 세",
+                            "보험료 납입주기": "월납"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "type": "text",
+                      "content": "※ 보험료 납입기간은 보험기간을 초과할 수 없음(이하 모든 보험종목별 동일 적용됨)",
+                      "table": {
+                        "table_title": "",
+                        "table_elements": []
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "index": 2,
+                "title": "4. 의무가입에 관한 사항",
+                "content": [
+                  {
+                    "type": "text",
+                    "content": "해당사항 없음",
+                    "table": {
+                      "table_title": "",
+                      "table_elements": []
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "4. 의무가입에 관한 사항",
+                  "paragraphs": [
+                    {
+                      "type": "text",
+                      "content": "해당사항 없음",
+                      "table": {
+                        "table_title": "",
+                        "table_elements": []
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "index": 3,
+                "title": "1. 보험종목의 명칭",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "<table>\n <tr>\n  <td>\n   명칭\n  </td>\n  <td colspan=\"2\">\n   보험종목\n  </td>\n </tr>\n <tr>\n  <td>\n   [3-100%장해형]재해장해특약\n   <br/>\n   (무배당, 해약환급금 미지급형)\n  </td>\n  <td>\n   해약환급금 미지급형\n  </td>\n  <td rowspan=\"2\">\n   간편심사(315)형\n   <br/>\n   /간편심사(335)형\n   <br/>\n   /간편심사(355)형\n   <br/>\n   /일반심사형\n  </td>\n </tr>\n <tr>\n  <td>\n   [3-100%장해형]재해장해특약(무배당)\n  </td>\n  <td>\n   일반형\n  </td>\n </tr>\n</table>",
+                    "table": {
+                      "table_title": "",
+                      "table_elements": [
+                        {
+                          "명칭": "[3-100%장해형]재해장해특약\n(무배당, 해약환급금 미지급형)",
+                          "보험종목": "해약환급금 미지급형",
+                          "보험종목_1": "간편심사(315)형\n/간편심사(335)형\n/간편심사(355)형\n/일반심사형"
+                        },
+                        {
+                          "명칭": "[3-100%장해형]재해장해특약(무배당)",
+                          "보험종목": "일반형",
+                          "보험종목_1": "간편심사(315)형\n/간편심사(335)형\n/간편심사(355)형\n/일반심사형"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "content": "㈜ 간편심사(3N5)형(이하 “간편심사형”이라 한다.)의 경우, 상품명 앞에 “(간편)”을 부가하며 N은 1, 3 또는 5를 말한다.",
+                    "table": {
+                      "table_title": "",
+                      "table_elements": []
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "1. 보험종목의 명칭",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "<table>\n <tr>\n  <td>\n   명칭\n  </td>\n  <td colspan=\"2\">\n   보험종목\n  </td>\n </tr>\n <tr>\n  <td>\n   [3-100%장해형]재해장해특약\n   <br/>\n   (무배당, 해약환급금 미지급형)\n  </td>\n  <td>\n   해약환급금 미지급형\n  </td>\n  <td rowspan=\"2\">\n   간편심사(315)형\n   <br/>\n   /간편심사(335)형\n   <br/>\n   /간편심사(355)형\n   <br/>\n   /일반심사형\n  </td>\n </tr>\n <tr>\n  <td>\n   [3-100%장해형]재해장해특약(무배당)\n  </td>\n  <td>\n   일반형\n  </td>\n </tr>\n</table>",
+                      "table": {
+                        "table_title": "",
+                        "table_elements": [
+                          {
+                            "명칭": "[3-100%장해형]재해장해특약\n(무배당, 해약환급금 미지급형)",
+                            "보험종목": "해약환급금 미지급형",
+                            "보험종목_1": "간편심사(315)형\n/간편심사(335)형\n/간편심사(355)형\n/일반심사형"
+                          },
+                          {
+                            "명칭": "[3-100%장해형]재해장해특약(무배당)",
+                            "보험종목": "일반형",
+                            "보험종목_1": "간편심사(315)형\n/간편심사(335)형\n/간편심사(355)형\n/일반심사형"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "type": "text",
+                      "content": "㈜ 간편심사(3N5)형(이하 “간편심사형”이라 한다.)의 경우, 상품명 앞에 “(간편)”을 부가하며 N은 1, 3 또는 5를 말한다.",
+                      "table": {
+                        "table_title": "",
+                        "table_elements": []
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "index": 4,
+                "title": "5. 배당에 관한 사항",
+                "content": [
+                  {
+                    "type": "text",
+                    "content": "해당사항 없음",
+                    "table": {
+                      "table_title": "",
+                      "table_elements": []
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "5. 배당에 관한 사항",
+                  "paragraphs": [
+                    {
+                      "type": "text",
+                      "content": "해당사항 없음",
+                      "table": {
+                        "table_title": "",
+                        "table_elements": []
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "index": 5,
+                "title": "6. 보험료에 관한 사항",
+                "content": [
+                  {
+                    "type": "text",
+                    "content": "보험료는 이 특약의 “보험료 및 해약환급금 산출방법서”에서 정한 방법에 따라 피보험자의 성별, 나이, 보험기간, 보험료 납입기간 및 보험료 납입주기 등에 따라 산출된 금액을 말한다.",
+                    "table": {
+                      "table_title": "",
+                      "table_elements": []
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "6. 보험료에 관한 사항",
+                  "paragraphs": [
+                    {
+                      "type": "text",
+                      "content": "보험료는 이 특약의 “보험료 및 해약환급금 산출방법서”에서 정한 방법에 따라 피보험자의 성별, 나이, 보험기간, 보험료 납입기간 및 보험료 납입주기 등에 따라 산출된 금액을 말한다.",
+                      "table": {
+                        "table_title": "",
+                        "table_elements": []
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "index": 6,
+                "title": "7. 보험료 할인에 관한 사항",
+                "content": [
+                  {
+                    "type": "text",
+                    "content": "해당사항 없음",
+                    "table": {
+                      "table_title": "",
+                      "table_elements": []
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "7. 보험료 할인에 관한 사항",
+                  "paragraphs": [
+                    {
+                      "type": "text",
+                      "content": "해당사항 없음",
+                      "table": {
+                        "table_title": "",
+                        "table_elements": []
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "index": 7,
+                "title": "8. 보험료 선납에 관한 사항",
+                "content": [
+                  {
+                    "type": "text",
+                    "content": "계약자는 당월분을 제외하여 6개월분 이하의 보험료를 선납할 수 있으며, 3개월분 이상의 보험료를 선납하는 경우에는 해당보험료를 특약체결시점의 평균공시이율로 할인하여 영수한다.",
+                    "table": {
+                      "table_title": "",
+                      "table_elements": []
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "8. 보험료 선납에 관한 사항",
+                  "paragraphs": [
+                    {
+                      "type": "text",
+                      "content": "계약자는 당월분을 제외하여 6개월분 이하의 보험료를 선납할 수 있으며, 3개월분 이상의 보험료를 선납하는 경우에는 해당보험료를 특약체결시점의 평균공시이율로 할인하여 영수한다.",
+                      "table": {
+                        "table_title": "",
+                        "table_elements": []
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "search_in_content": true
+          },
+          "success": true,
+          "error": null,
+          "validation": {
+            "is_valid": true,
+            "confidence": 0.9,
+            "errors": [],
+            "suggestions": [],
+            "reasoning": "제공된 섹션 컨텐츠에는 '유형1', '유형2'와 같은 정의 정보가 포함되어 있습니다. 이는 보험 상품의 유형을 설명하는 것으로 볼 수 있으며, 따라서 정의 섹션으로 판단할 수 있습니다. 또한, '보험기간', '보험료 납입기간', '보험료 납입주기' 등의 정보도 보험 상품의 특성을 설명하는 데 사용되므로, 정의 섹션의 기준을 충족합니다."
+          }
+        }
+      ],
+      "final_success": true
+    },
+    {
+      "task_id": 2,
+      "description": "보험 상품 정의 데이터 추출",
+      "attempts": [
+        {
+          "attempt": 1,
+          "tool": "rule_extract",
+          "parameters": {
+            "content": {
+              "table_title": "가입가능 조건",
+              "table_elements": [
+                {
+                  "유형1": "간편심사형",
+                  "유형2": "-",
+                  "보험기간": "80/90/100세\n만기, 종신",
+                  "보험료 납입기간": "10/15/20/25/30년납",
+                  "남자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세",
+                  "여자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세",
+                  "보험료 납입주기": "월납"
+                },
+                {
+                  "유형1": "일반심사형",
+                  "유형2": "-",
+                  "보험기간": "80/90/100세\n만기, 종신",
+                  "보험료 납입기간": "10/15/20/25/30년납",
+                  "남자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+                  "여자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+                  "보험료 납입주기": "월납"
+                }
+              ]
+            },
+            "content_type": "table"
+          },
+          "success": true,
+          "error": null,
+          "validation": {
+            "is_valid": false,
+            "confidence": 0.7,
+            "errors": [
+              "보종명(상품명)이 명확히 정의되지 않음",
+              "유형1과 유형2의 계층 구조가 명확하지 않음",
+              "표의 첫 번째 컬럼이 보종명을 포함하지 않음"
+            ],
+            "suggestions": [
+              "보종명(상품명)을 명확히 정의하고 첫 번째 컬럼에 포함",
+              "유형1과 유형2의 계층 구조를 명확히 구분",
+              "헤더에 보종명, 유형1, 유형2를 포함하여 계층 구조를 반영"
+            ],
+            "reasoning": "원문 텍스트에서 보종명(상품명)이 명확히 정의되지 않았고, 유형1과 유형2의 계층 구조가 명확하지 않습니다. 표의 첫 번째 컬럼이 보종명을 포함하지 않으며, 헤더가 충분한 계층 구조를 반영하지 못하고 있습니다. 따라서, 표가 원문 정의 구조를 잘 표현하지 못하고 있습니다.",
+            "invalid_row_indices": [
+              0,
+              1
+            ]
+          }
+        },
+        {
+          "attempt": 2,
+          "tool": "llm_extract",
+          "parameters": {
+            "content": {
+              "table_title": "가입가능 조건",
+              "table_elements": [
+                {
+                  "유형1": "간편심사형",
+                  "유형2": "-",
+                  "보험기간": "80/90/100세\n만기, 종신",
+                  "보험료 납입기간": "10/15/20/25/30년납",
+                  "남자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세",
+                  "여자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세",
+                  "보험료 납입주기": "월납"
+                },
+                {
+                  "유형1": "일반심사형",
+                  "유형2": "-",
+                  "보험기간": "80/90/100세\n만기, 종신",
+                  "보험료 납입기간": "10/15/20/25/30년납",
+                  "남자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+                  "여자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+                  "보험료 납입주기": "월납"
+                }
+              ]
+            },
+            "content_type": "table",
+            "instruction": "보종명, 유형1, 유형2의 계층 구조를 명확히 하여 데이터를 추출하고, 표의 첫 번째 컬럼에 보종명을 포함하도록 하세요."
+          },
+          "success": true,
+          "error": null,
+          "validation": {
+            "is_valid": false,
+            "confidence": 0.8,
+            "errors": [
+              "보종명(상품명)이 명확히 정의되지 않았음",
+              "유형1과 유형2의 구분이 명확하지 않음",
+              "보종명과 유형1, 유형2의 계층 구조가 명확히 반영되지 않음"
+            ],
+            "suggestions": [
+              "보종명(상품명)을 명확히 정의하고 첫 번째 컬럼에 반영",
+              "유형1과 유형2의 구분을 명확히 하여 각각의 컬럼에 반영",
+              "보종명, 유형1, 유형2의 계층 구조를 명확히 반영할 수 있는 헤더 구조 제안"
+            ],
+            "reasoning": "원문 텍스트에서 보종명(상품명)이 명확히 정의되지 않았고, 유형1과 유형2의 구분이 명확하지 않다. 표의 첫 번째 컬럼이 '가입가능 조건'으로 되어 있어 보종명으로 보기 어렵고, 유형1과 유형2가 각각의 컬럼에 명확히 구분되어 있지 않다. 따라서, 표가 원문 정의 구조를 제대로 반영하지 못하고 있다.",
+            "invalid_row_indices": [
+              0,
+              1
+            ]
+          }
+        },
+        {
+          "attempt": 3,
+          "tool": "llm_extract",
+          "parameters": {
+            "content": {
+              "table_title": "가입가능 조건",
+              "table_elements": [
+                {
+                  "유형1": "간편심사형",
+                  "유형2": "-",
+                  "보험기간": "80/90/100세\n만기, 종신",
+                  "보험료 납입기간": "10/15/20/25/30년납",
+                  "남자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세",
+                  "여자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세",
+                  "보험료 납입주기": "월납"
+                },
+                {
+                  "유형1": "일반심사형",
+                  "유형2": "-",
+                  "보험기간": "80/90/100세\n만기, 종신",
+                  "보험료 납입기간": "10/15/20/25/30년납",
+                  "남자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+                  "여자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+                  "보험료 납입주기": "월납"
+                }
+              ]
+            },
+            "content_type": "table",
+            "instruction": "보종명, 유형1, 유형2의 계층 구조를 명확히 하여 데이터를 추출하고, 표의 첫 번째 컬럼에 보종명을 포함하도록 하세요. 보종명을 정확히 정의하고 유형1과 유형2의 구분을 명확히 하여 각각의 컬럼에 반영하세요."
+          },
+          "success": true,
+          "error": null,
+          "validation": {
+            "is_valid": false,
+            "confidence": 0.8,
+            "errors": [
+              "보종명(상품명)이 명확히 정의되지 않음",
+              "유형1과 유형2의 계층 구조가 명확하지 않음",
+              "보종명과 유형1, 유형2의 계층이 혼동됨"
+            ],
+            "suggestions": [
+              "보종명(상품명)을 명확히 정의하고 첫 번째 컬럼에 반영",
+              "유형1과 유형2의 계층을 명확히 구분하여 반영",
+              "헤더 구조를 보종명, 유형1, 유형2의 3단계 계층으로 수정"
+            ],
+            "reasoning": "원문 텍스트에서 보종명(상품명)이 명확히 정의되지 않았고, 유형1과 유형2의 계층 구조가 명확하지 않다. 표의 첫 번째 컬럼이 보종명을 포함하지 않고, 유형1과 유형2의 구분이 명확하지 않아 계층 구조가 혼동되어 있다. 따라서 표가 원문 정의 구조를 잘 표현하지 못하고 있다.",
+            "invalid_row_indices": [
+              0,
+              1
+            ]
+          }
+        },
+        {
+          "attempt": 4,
+          "tool": "llm_extract",
+          "parameters": {
+            "content": {
+              "table_title": "가입가능 조건",
+              "table_elements": [
+                {
+                  "유형1": "간편심사형",
+                  "유형2": "-",
+                  "보험기간": "80/90/100세\n만기, 종신",
+                  "보험료 납입기간": "10/15/20/25/30년납",
+                  "남자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세",
+                  "여자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세",
+                  "보험료 납입주기": "월납"
+                },
+                {
+                  "유형1": "일반심사형",
+                  "유형2": "-",
+                  "보험기간": "80/90/100세\n만기, 종신",
+                  "보험료 납입기간": "10/15/20/25/30년납",
+                  "남자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+                  "여자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+                  "보험료 납입주기": "월납"
+                }
+              ]
+            },
+            "content_type": "table",
+            "instruction": "보종명(상품명)을 명확히 정의하고 첫 번째 컬럼에 포함하세요. 유형1과 유형2의 계층 구조를 명확히 구분하고 각각의 컬럼에 반영하세요. 보종명, 유형1, 유형2의 3단계 계층 구조를 반영하여 데이터를 추출하세요."
+          },
+          "success": true,
+          "error": null,
+          "validation": {
+            "is_valid": false,
+            "confidence": 0.8,
+            "errors": [
+              "보종명(상품명)이 명확히 정의되지 않았음",
+              "유형1과 유형2의 계층 구조가 명확하지 않음",
+              "보종명과 유형1, 유형2가 혼동되어 있음"
+            ],
+            "suggestions": [
+              "보종명을 명확히 정의하고 첫 번째 컬럼에 반영",
+              "유형1과 유형2의 계층을 명확히 구분",
+              "헤더 구조를 보종명, 유형1, 유형2의 계층에 맞게 수정"
+            ],
+            "reasoning": "원문 텍스트에서 보종명(상품명)이 명확히 정의되지 않았고, 유형1과 유형2의 계층 구조가 명확하지 않다. 표의 첫 번째 컬럼이 보종명을 포함하지 않고, 유형1과 유형2가 혼동되어 있어 정의 섹션의 의미 구조를 제대로 반영하지 못하고 있다.",
+            "invalid_row_indices": [
+              0,
+              1
+            ]
+          }
+        },
+        {
+          "attempt": 5,
+          "tool": "llm_extract",
+          "parameters": {
+            "content": {
+              "table_title": "가입가능 조건",
+              "table_elements": [
+                {
+                  "유형1": "간편심사형",
+                  "유형2": "-",
+                  "보험기간": "80/90/100세\n만기, 종신",
+                  "보험료 납입기간": "10/15/20/25/30년납",
+                  "남자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세",
+                  "여자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세",
+                  "보험료 납입주기": "월납"
+                },
+                {
+                  "유형1": "일반심사형",
+                  "유형2": "-",
+                  "보험기간": "80/90/100세\n만기, 종신",
+                  "보험료 납입기간": "10/15/20/25/30년납",
+                  "남자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+                  "여자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+                  "보험료 납입주기": "월납"
+                }
+              ]
+            },
+            "content_type": "table",
+            "instruction": "보종명(상품명)을 명확히 정의하고 첫 번째 컬럼에 포함하세요. 유형1과 유형2의 계층 구조를 명확히 구분하고 각각의 컬럼에 반영하세요. 보종명, 유형1, 유형2의 3단계 계층 구조를 반영하여 데이터를 추출하세요. 각 항목의 명확한 구분을 위해 추가적인 설명이나 주석을 제거하고, 명확한 데이터 추출을 위해 계층 구조를 시각적으로 반영하세요."
+          },
+          "success": true,
+          "error": null,
+          "validation": {
+            "is_valid": false,
+            "confidence": 0.8,
+            "errors": [
+              "보종명(상품명)이 명확히 정의되지 않았음",
+              "유형1과 유형2의 구분이 명확하지 않음",
+              "보종명 계층이 표에서 손실됨"
+            ],
+            "suggestions": [
+              "보종명을 명확히 정의하고 첫 번째 컬럼에 반영",
+              "유형1과 유형2를 명확히 구분하여 표에 반영",
+              "보종명, 유형1, 유형2의 계층 구조를 명확히 반영하는 헤더 구조 제안"
+            ],
+            "reasoning": "원문 텍스트에서 보종명(상품명)이 명확히 정의되지 않았고, 유형1과 유형2의 구분이 명확하지 않다. 표의 첫 번째 컬럼이 보종명을 포함하지 않고, 유형1과 유형2의 구분이 명확하지 않아 계층 구조가 손실되었다. 따라서 표가 원문 정의 구조를 잘 표현하지 못하고 있다.",
+            "invalid_row_indices": [
+              0,
+              1
+            ]
+          }
+        },
+        {
+          "attempt": 6,
+          "tool": "llm_extract",
+          "parameters": {
+            "content": {
+              "table_title": "가입가능 조건",
+              "table_elements": [
+                {
+                  "유형1": "간편심사형",
+                  "유형2": "-",
+                  "보험기간": "80/90/100세\n만기, 종신",
+                  "보험료 납입기간": "10/15/20/25/30년납",
+                  "남자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세",
+                  "여자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세",
+                  "보험료 납입주기": "월납"
+                },
+                {
+                  "유형1": "일반심사형",
+                  "유형2": "-",
+                  "보험기간": "80/90/100세\n만기, 종신",
+                  "보험료 납입기간": "10/15/20/25/30년납",
+                  "남자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+                  "여자나이": "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+                  "보험료 납입주기": "월납"
+                }
+              ]
+            },
+            "content_type": "table",
+            "instruction": "보종명(상품명)을 명확히 정의하고 첫 번째 컬럼에 포함하세요. 유형1과 유형2의 계층 구조를 명확히 구분하고 각각의 컬럼에 반영하세요. 보종명, 유형1, 유형2의 3단계 계층 구조를 반영하여 데이터를 추출하세요. 특히, 보종명(상품명)을 명확히 식별할 수 있도록 하고, 유형1과 유형2의 구분을 명확히 하여 표에 반영하세요."
+          },
+          "success": true,
+          "error": null,
+          "validation": {
+            "is_valid": false,
+            "confidence": 0.8,
+            "errors": [
+              "보종명(상품명)이 명확히 정의되지 않았음",
+              "표의 첫 번째 컬럼에 보종명이 아닌 '보험상품'이라는 일반적인 명칭이 사용됨",
+              "유형1과 유형2의 구분이 명확하지 않음",
+              "보종명과 유형1, 유형2의 계층 구조가 명확히 반영되지 않음"
+            ],
+            "suggestions": [
+              "보종명(상품명)을 명확히 정의하고 첫 번째 컬럼에 반영",
+              "유형1과 유형2의 구분을 명확히 하여 각각의 컬럼에 반영",
+              "보종명, 유형1, 유형2의 계층 구조를 명확히 반영할 수 있는 헤더 구조 제안"
+            ],
+            "reasoning": "원문 텍스트에서 보종명(상품명)이 명확히 정의되지 않았고, 표의 첫 번째 컬럼에 '보험상품'이라는 일반적인 명칭이 사용되어 보종명 계층이 손실되었습니다. 또한, 유형1과 유형2의 구분이 명확하지 않으며, 전체적인 계층 구조가 표에 제대로 반영되지 않았습니다.",
+            "invalid_row_indices": [
+              0,
+              1
+            ]
+          }
+        }
+      ],
+      "final_success": false
+    }
+  ],
+  "error": "Task 2 failed: 보종명(상품명)이 명확히 정의되지 않았음"
+}

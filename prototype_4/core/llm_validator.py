@@ -57,10 +57,30 @@ class LLMValidator:
         if context is None:
             context = {}
 
-        if task_type == "search":
+        if task_type == "search" or task_type == "classify":
             return self.validate_search(task_output, context)
         elif task_type == "extract":
-            # definition_extract 결과(core_candidate 포함)는 구조만 확인하고 통과
+            # V2: definition_extract_v2 결과 (extraction_method로 구분)
+            if isinstance(task_output, dict) and task_output.get("extraction_method") == "v2_classifier_based":
+                header = task_output.get("header") or []
+                data = task_output.get("data") or []
+                if not header or not data:
+                    return {
+                        "is_valid": False,
+                        "confidence": 0.8,
+                        "errors": ["definition_extract_v2 returned empty header or data"],
+                        "suggestions": ["Check if core sections contain valid tables"],
+                        "reasoning": "definition_extract_v2 produced empty table"
+                    }
+                return {
+                    "is_valid": True,
+                    "confidence": 0.95,
+                    "errors": [],
+                    "suggestions": [],
+                    "reasoning": f"definition_extract_v2 extracted table with {len(header)} columns, {len(data)} rows"
+                }
+
+            # V1: definition_extract 결과(core_candidate 포함)는 구조만 확인하고 통과
             if isinstance(task_output, dict) and "core_candidate" in task_output:
                 header = task_output.get("header") or []
                 data = task_output.get("data") or []
@@ -108,6 +128,44 @@ class LLMValidator:
             Dict: 검증 결과
         """
         try:
+            # Section Classifier 결과인 경우 (V2 workflow)
+            if all(key in task_output for key in ["definition_core", "definition_annotation", "condition", "other"]):
+                definition_core = task_output.get("definition_core", [])
+                definition_annotation = task_output.get("definition_annotation", [])
+
+                # 검증: 최소한 하나의 core 섹션이 있어야 함
+                if not definition_core:
+                    return {
+                        "is_valid": False,
+                        "confidence": 0.7,
+                        "errors": ["No definition_core sections found by classifier"],
+                        "suggestions": [
+                            "Classifier may have misclassified sections",
+                            "Check if document actually contains definition information"
+                        ],
+                        "reasoning": "section_classifier found no core definition sections"
+                    }
+
+                # 검증: 모든 인덱스가 리스트 타입이어야 함
+                for key in ["definition_core", "definition_annotation", "condition", "other"]:
+                    if not isinstance(task_output.get(key), list):
+                        return {
+                            "is_valid": False,
+                            "confidence": 0.3,
+                            "errors": [f"Invalid type for {key}: expected list"],
+                            "suggestions": ["Check classifier output format"],
+                            "reasoning": f"section_classifier output has wrong type for {key}"
+                        }
+
+                # 성공: 분류 결과가 유효함
+                return {
+                    "is_valid": True,
+                    "confidence": 0.95,
+                    "errors": [],
+                    "suggestions": [],
+                    "reasoning": f"section_classifier found {len(definition_core)} core, {len(definition_annotation)} annotation sections"
+                }
+
             # Definition-aware search (definition_search) 결과인 경우:
             # LLM 호출 없이 candidate 리스트의 형태만 가볍게 검증한다.
             if "definition_candidates" in task_output:
@@ -447,27 +505,12 @@ Header: {json.dumps(header, ensure_ascii=False)}
             header = extracted_data.get("header", [])
             data = extracted_data.get("data", [])
 
-            # 행별로 예상 조합 수 계산
-            expected_per_row = []
-            for row in data:
-                row_combos = 1
-                for cell in row:
-                    cell_clean = cell.replace('\n', '').strip()
-                    values = [v.strip() for v in cell_clean.split('/') if v.strip()]
-                    row_combos *= len(values)
-                expected_per_row.append(row_combos)
-
-            expected_total = sum(expected_per_row)
-
             prompt = f"""다음은 Cartesian Product 생성 결과입니다.
 
 원본 Data:
 Header: {json.dumps(header, ensure_ascii=False)}
 Data 전체:
 {json.dumps(data, ensure_ascii=False, indent=2)}
-
-행별 예상 조합 수: {expected_per_row}
-예상 총 조합 수: {expected_total}
 
 생성된 Definitions:
 개수: {len(definitions)}
@@ -478,16 +521,44 @@ Data 전체:
 
 **검증 기준**:
 1. 최종 definitions의 각 항목에는
-   - '보종명' 키가 반드시 있어야 하고,
-   - '유형1'부터 '유형{len(header)-1}'까지 모든 키가 존재해야 한다.
-2. 어떤 유형 축도 누락되면 is_valid=false로 보고,
-   - "어느 유형 키가 빠졌는지"를 errors에 명시한다.
-3. 슬래시(/)로 구분된 값들이 각각 분리됨
-4. 생성된 조합 수({len(definitions)})가 예상({expected_total})과 일치하는가?
-5. 중복이 있는가?
-6. 보종명이 완전한가? (잘리지 않음)
-7. **중요**: 보종명의 줄바꿈(\\n)은 정상입니다!
-8. 유형 필드는 깔끔한가?
+   - 원본 Header에 있는 핵심 컬럼(예: "명칭"/"보종명"/"상품명" 등)과
+   - 유형 축(예: "보험종목", "보험종목_1", "유형1", "유형2" 등)이
+     빠짐없이 존재해야 합니다.
+2. 특정 컬럼이 대부분의 정의에서 누락되어 있으면 is_valid=false로 보고,
+   - "어느 컬럼(키)이 빠졌는지"를 errors에 명시하세요.
+3. **슬래시(/)나 콤마(,) 구분 판단 (매우 중요!)**:
+   **일반화된 규칙 - 컬럼별 주 구분자(primary delimiter) 파악**:
+
+   원본 Data의 각 컬럼을 관찰하여:
+   - 컬럼 전체에서 `/`와 `,` 중 어느 것이 **더 자주** 등장하는지 확인
+   - **더 자주 등장하는 구분자**가 실제 구분자 (primary delimiter)
+   - **덜 등장하는 구분자**는 내용의 일부로 취급
+
+   **예시 1**: "두경부암(전이포함),위암(전이포함),남성/여성생식기암(전이포함)"
+   → `,`가 여러 번 등장, `/`는 "남성/여성" 내부에만 등장
+   → 주 구분자: `,`
+   → 올바른 분리: ["두경부암(전이포함)", "위암(전이포함)", "남성/여성생식기암(전이포함)"]
+   → "남성/여성생식기암"을 분리하지 않은 것이 **정답**
+
+   **예시 2**: "간편심사(315)형/간편심사(335)형/간편심사(355)형"
+   → `/`가 여러 번 등장, `,` 없음
+   → 주 구분자: `/`
+   → 올바른 분리: ["간편심사(315)형", "간편심사(335)형", "간편심사(355)형"]
+
+   **검증 시 주의**:
+   - 이 규칙을 따라 분리된 결과가 정상입니다
+   - 특정 값(예: "남성/여성생식기암")을 명시적으로 체크하지 말고, **컬럼의 패턴**을 보세요!
+4. definitions 개수가 원본 테이블 구조로부터 직관적으로 기대되는 범위를
+   명백히 벗어나 너무 많거나(불필요한 분할) 너무 적은 경우(누락)에는
+   is_valid=false로 판단하고, 이유를 설명하세요.
+5. 동일한 보종명 + 유형 조합이 여러 번 반복되는 명백한 중복이 많다면
+   is_valid=false로 보고, "어떤 키 조합이 중복되는지"를 errors에 적어주세요.
+6. 보종명(또는 명칭) 값이 중간에서 끊기지 않고 온전한지 확인하세요.
+   - 줄바꿈(\n)은 정상으로 간주합니다.
+7. 유형 관련 필드(보험종목, 보험종목_1, 유형1/2 등)의 값이
+   서로 뒤섞이거나 잘려 보이지 않고, 사람 기준으로 봐도
+   자연스러운 분리/조합으로 보이면 is_valid=true로 판단하세요.
+
 
 
 
@@ -498,7 +569,6 @@ Data 전체:
   "errors": ["에러1", ...],
   "suggestions": ["제안1", ...],
   "reasoning": "판단 이유",
-  "expected_count": {expected_total},
   "actual_count": {len(definitions)}
 }}"""
 

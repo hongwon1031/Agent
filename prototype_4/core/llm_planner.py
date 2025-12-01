@@ -109,26 +109,81 @@ class LLMPlanner:
 {tool_schemas}
 
 **계획 수립 전략**:
-1. 섹션 형식 정보를 활용하여 적절한 도구 선택
-   - Text 형식 섹션 → text 지원 도구 선택 (rule_search, rule_extract 등)
-   - Table 형식 섹션 → table 우선, text fallback
-2. Rule 도구 우선, 실패 시 LLM fallback
-3. content_type 파라미터를 명시적으로 전달
-4. Search의 content_type을 Extract에 전달: "{{{{task1.content_type}}}}"
-5. 각 Task는 이전 Task 결과 참조 가능 ("depends_on")
+1. **RECOMMENDED (V2 Workflow)**: 정의 추출 작업에는 section_classifier + definition_extract_v2 사용
+   - Task 1: section_classifier로 모든 섹션 분류 (type: "classify")
+   - Task 2: definition_extract_v2로 정의 추출 (type: "extract")
+   - Task 3: rule_cartesian으로 조합 생성 (type: "transform")
+   - 이 방식이 100% recall을 보장하며 가장 안정적입니다
+
+2. **Legacy Workflow (호환성용)**: definition_search + definition_extract 또는 rule_search + rule_extract
+   - 표준적인 키워드나 구조가 명확한 경우에만 사용
+   - 비표준 제목이나 제목 없는 섹션은 놓칠 수 있음
+
+3. 일반 원칙:
+   - Rule 도구 우선, 실패 시 LLM fallback
+   - content_type 파라미터를 명시적으로 전달
+   - 각 Task는 이전 Task 결과 참조 가능 ("depends_on")
 
 **Task 타입**:
-- "search": 정의 섹션/테이블 찾기
+- "classify": 섹션 분류 (section_classifier 전용)
+- "search": 정의 섹션/테이블 찾기 (legacy)
 - "extract": 데이터 추출
 - "transform": 데이터 변환 (Cartesian Product 등)
 
 **중요**:
+- 정의 추출 작업에는 **section_classifier + definition_extract_v2를 우선 사용**하세요
 - 단계 수는 유동적 (3단계일 필요 없음)
-- Rule 도구를 먼저 시도하고, 실패 시 LLM fallback
 - 파라미터에 이전 Task 결과 참조는 "{{{{taskN.field}}}}" 형식
 - Runtime injection 파라미터("$sections" 등)는 정확히 명시된 대로 사용할 것
 
-**예시 출력 (table 형식)**:
+**예시 출력 (V2 Workflow - RECOMMENDED)**:
+{{
+  "tasks": [
+    {{
+      "task_id": 1,
+      "type": "classify",
+      "description": "전체 섹션을 4가지 카테고리로 분류",
+      "strategy": "llm",
+      "fallback": null,
+      "tool_name": "section_classifier",
+      "parameters": {{
+        "sections": "$sections"
+      }},
+      "depends_on": null
+    }},
+    {{
+      "task_id": 2,
+      "type": "extract",
+      "description": "분류된 정의 섹션에서 데이터 추출",
+      "strategy": "hybrid",
+      "fallback": null,
+      "tool_name": "definition_extract_v2",
+      "parameters": {{
+        "sections": "$sections",
+        "core_indices": "{{{{task1.definition_core}}}}",
+        "annotation_indices": "{{{{task1.definition_annotation}}}}"
+      }},
+      "depends_on": 1
+    }},
+    {{
+      "task_id": 3,
+      "type": "transform",
+      "description": "Cartesian Product 생성",
+      "strategy": "rule",
+      "fallback": null,
+      "tool_name": "rule_cartesian",
+      "parameters": {{
+        "header": "{{{{task2.header}}}}",
+        "data": "{{{{task2.data}}}}"
+      }},
+      "depends_on": 2
+    }}
+  ],
+  "reasoning": "section_classifier를 사용하여 100% recall 보장, V2 workflow 적용",
+  "estimated_difficulty": "medium"
+}}
+
+**예시 출력 (Legacy - 표준 구조인 경우만)**:
 {{
   "tasks": [
     {{
@@ -253,6 +308,7 @@ class LLMPlanner:
    - 도구 변경: rule → llm (정확한 tool 이름 사용!)
    - 파라미터 조정 (schema 참고)
    - instruction 추가 (LLM 도구인 경우)
+     - transform task에서 llm_cartesian을 다시 사용할 때는, validation_result.errors를 요약해서 parameters.instruction에 넣어라.
 
 3. **이전 실수 회피**:
    - 같은 도구/파라미터 재시도 금지

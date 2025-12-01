@@ -13,8 +13,9 @@ from core.llm_planner import LLMPlanner
 from core.llm_validator import LLMValidator
 from tools.hybrid_tools import (
     RuleSearchTool, LLMSearchTool, DefinitionSearchTool,
-    RuleExtractTool, LLMExtractTool, DefinitionExtractTool,
-    RuleCartesianTool, LLMCartesianTool
+    RuleExtractTool, LLMExtractTool, DefinitionExtractTool, DefinitionExtractToolV2,
+    RuleCartesianTool, LLMCartesianTool,
+    SectionClassifierTool
 )
 
 
@@ -46,15 +47,24 @@ class Prototype3Agent:
 
         # 모든 도구 초기화
         self.tools = {
+            # New V2 tools (recommended)
+            "section_classifier": SectionClassifierTool(),
+            "definition_extract_v2": DefinitionExtractToolV2(),
+
+            # Legacy tools (kept for backward compatibility)
             "rule_search": RuleSearchTool(),
             "definition_search": DefinitionSearchTool(),
+            "definition_extract": DefinitionExtractTool(),
             "llm_search": LLMSearchTool(),
+
+            # Extract tools
             "rule_extract": RuleExtractTool(),
             "llm_extract": LLMExtractTool(),
+
+            # Transform tools
             "rule_cartesian": RuleCartesianTool(),
             "llm_cartesian": LLMCartesianTool(),
         }
-        self.tools["definition_extract"] = DefinitionExtractTool()
 
     def run(self, doc: Any) -> Dict[str, Any]:
         """
@@ -219,7 +229,10 @@ class Prototype3Agent:
                 "success": result.success,
                 "error": result.error
             }
-
+            # ✅ 각 시도의 tool 출력도 로그에 포함
+            if result.success:
+                attempt_log["output"] = result.data
+                
             if not result.success:
                 # 도구 실행 실패
                 print(f"  [FAIL] Tool execution failed: {result.error}")

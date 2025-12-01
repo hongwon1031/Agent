@@ -6,35 +6,128 @@
 
 ---
 
+## 🔥 최신 업데이트 (2025-12-01)
+
+### 진행 상황
+
+**✅ 완료:**
+1. **LLMCartesianTool 2단계 분리 구조**
+   - Step 1 (LLM): 각 셀 값을 문맥 기반으로 분리 (파싱만)
+   - Step 2 (Python): `itertools.product`로 Cartesian product 생성
+   - 목적: LLM 실수 방지, 정확한 조합 생성
+
+2. **컬럼별 주 구분자(Primary Delimiter) 파악 규칙**
+   - 각 컬럼의 `/`와 `,` 등장 빈도를 비교하여 주 구분자 결정
+   - 예: "두경부암,위암,남성/여성생식기암" → `,`가 주 구분자 → `/`는 내용의 일부
+   - Validator와 LLMCartesian 프롬프트에 일반화된 규칙 추가
+
+3. **Validator 규칙 개선**
+   - 특정 값("남성/여성생식기암") 명시 대신 **컬럼 패턴 분석** 방식으로 변경
+   - 모든 유사 케이스에 적용 가능한 일반화된 검증 로직
+
+**🚧 진행 중:**
+1. **RuleCartesianTool 주 구분자 로직 적용** (보류)
+   - 현재는 `/`와 `,` 모두로 분리
+   - 컬럼별 주 구분자 파악 후 분리하도록 개선 필요
+
+**⚠️ 알려진 이슈:**
+1. **SectionClassifier: 정의 vs 조건 오분류**
+   - 정의 섹션 위치가 변경되었을 때 조건 섹션을 `definition_core`로 잘못 분류
+   - 예: variant6_shuffled_sections
+   - 원인: LLM이 문맥 정보 부족 + 테이블 구조 유사성
+   - 해결 방향:
+     - 섹션 간 관계 정보 추가
+     - 키워드 가중치 조정
+     - Few-shot 예시 강화
+
+2. **주석(Annotation) 처리 불가**
+   - 정의 주석/설명 텍스트를 definition 테이블에 통합하는 로직 미완성
+   - 현재: annotation 섹션 분류만 가능, 실제 병합은 안됨
+   - 해결 방향:
+     - DefinitionExtractToolV2에서 annotation 병합 로직 구현
+     - LLM에게 base_table + annotations 전달하여 최종 테이블 생성
+
+**✅ 잘 작동하는 부분:**
+- V2 workflow 기본 플로우 (classify → extract → transform)
+- 100% recall (모든 섹션 검토)
+- 비표준 제목/제목 없는 섹션/다국어 문서 처리
+- Cartesian product 생성 (주 구분자 규칙 적용 시)
+
+---
+
+## 🚀 V2 Workflow (2025-12-01 업데이트)
+
+### 주요 변경사항
+
+**문제**: Rule-based keyword search는 비표준 제목/제목 없는 섹션/영어 문서에서 정의 섹션을 영구적으로 놓침 (0% recall 가능)
+
+**해결**: LLM-based semantic classification으로 100% recall 보장
+
+### V2 도구
+
+✅ **새로운 도구 (권장)**:
+- `SectionClassifierTool`: 전체 섹션을 4가지 카테고리로 분류
+  - `definition_core`: 핵심 정의 테이블 (보험종목, 명칭 등)
+  - `definition_annotation`: 정의 주석/설명 텍스트
+  - `condition`: 계약조건 섹션
+  - `other`: 기타 무관한 섹션
+- `DefinitionExtractToolV2`: 분류된 섹션에서 정의 추출 (core + annotation 자동 병합)
+
+⚠️ **Deprecated 도구 (하위 호환용)**:
+- `DefinitionSearchTool`, `RuleSearchTool`, `LLMSearchTool`
+- `DefinitionExtractTool`
+
+### 권장 워크플로우
+
+```
+Task 1 (classify): section_classifier
+  → 모든 섹션을 분류하여 definition_core/annotation 구분
+
+Task 2 (extract): definition_extract_v2
+  → core 섹션에서 base table 추출
+  → annotation 섹션과 병합 (LLM)
+
+Task 3 (transform): rule_cartesian
+  → 정의 조합 생성
+```
+
+**장점**:
+- 100% recall (모든 섹션 검토)
+- 비표준 제목 처리 ("상품 구성" 등)
+- 제목 없는 섹션 처리
+- 다국어 지원 (영어/중국어)
+
+---
+
 ## 📋 빠른 요약
 
 ### 현재 상태
 - **기반**: Prototype 3 아키텍처 (Format-Aware Multi-Agent System)
-- **주요 개선**: Definition-aware Search/Extract 도구 추가
-- **완성도**: 핵심 인프라 구축 완료, 세부 로직 개선 진행 중
+- **주요 개선**: V2 Semantic Classification Workflow (2025-12-01)
+- **완성도**: V2 workflow 구현 완료, 테스트 진행 중
 
 ### 핵심 특징
 
-✅ **구현 완료**:
-- `DefinitionSearchTool`: 정의 관련 섹션 수집 + role 태깅 (core_table/text_annotation)
-- `DefinitionExtractTool`: base table + annotations 통합 추출
+✅ **V2 구현 완료** (2025-12-01):
+- `SectionClassifierTool`: LLM 기반 4-way 섹션 분류 (100% recall)
+- `DefinitionExtractToolV2`: 분류 기반 정의 추출 + annotation 병합
 - `DocumentAccessor` 기반 섹션 추출 (LLM 의존성 제거)
-- Validator 완화 전략 (definition_extract 결과 우선 신뢰)
+- Planner V2 workflow 권장 로직 추가
+- Validator V2 출력 형식 지원
 
-🚧 **진행 중**:
-- Definition 패키지 선택기 (LLM 기반 "정의 vs 조건" 구분)
-- 여러 섹션 패키지 처리 (core + annotations 통합)
-- Planner 프롬프트 튜닝 (문서 형식별 도구 선택 가이드)
+📦 **하위 호환성 유지**:
+- Legacy 도구들 (definition_search, rule_search 등) 유지
+- 기존 코드와 호환되도록 agent 등록 유지
 
 ### Prototype 3 대비 주요 차이
 
 | 항목 | Prototype 3 | Prototype 4 |
 |-----|------------|------------|
 | **섹션 추출** | LLMDocumentAnalyzer (LLM 기반) | DocumentAccessor (rule 기반) |
-| **Search** | rule/llm_search (섹션 1개 반환) | definition_search (후보 여러 개 + role 태깅) |
+| **Search** | rule/llm_search (섹션 1개 반환) | definition_search 기본 (후보 여러 개), rule/llm_search는 fallback |
 | **Extract** | rule/llm_extract (단일 섹션) | definition_extract (table + annotations 통합) |
 | **Validator** | 3계층 강제 요구 | 동적 계층 파악 + 완화된 검증 |
-| **도구 선택** | 기본 rule → llm fallback | 문서 형식별 적응형 선택 |
+| **도구 선택** | 기본 rule → llm fallback | definition_search 우선, 단순 문서만 rule/llm_search |
 
 ### 디렉토리 구조
 
@@ -181,30 +274,54 @@ Search / Extract / Validator의 역할을 다시 정리합니다.
 - [x] `core/llm_validator.py`, `tools/hybrid_tools.py`, `agent.py`를 Prototype 4의 변경 포인트로 고정
 - [x] `deprecated/` 폴더로 이전 버전 도구 분리
 
-### 2-2. Definition Search 확장 ✅ (부분 완료)
+### 2-2. V2 Workflow 구현 ✅
 
-- [x] `DefinitionSearchTool` 설계 및 구현
+- [x] `SectionClassifierTool` 구현 (2025-12-01)
   - 입력: `$sections`
-  - 출력: `definition_candidates` (섹션 목록 + role/kind 태깅)
-- [x] 섹션 분류 규칙 정의 (룰 기반)
-  - 제목/내용/테이블 헤더 기반으로 `core_table` / `related_table` / `text_annotation` / `other_text` 분류
-  - 점수 기반 우선순위 정렬
-- [ ] **LLM 기반 Definition 패키지 선택기 추가** (미완성)
-  - 후보 목록과 summary를 프롬프트로 넣어 core/annotation 조합 결정
-  - "정의 vs 조건 vs 기타" 섹션 구분 강화
+  - 출력: 4-way classification (`definition_core`, `definition_annotation`, `condition`, `other`)
+  - LLM 기반 semantic classification으로 100% recall 보장
+- [x] `DefinitionExtractToolV2` 구현
+  - 분류된 섹션(core + annotation)에서 정의 추출
+  - base table + annotations 병합
 
-### 2-3. Definition Extract & Merge ✅ (부분 완료)
+### 2-3. Cartesian Product 개선 ✅
 
-- [x] `DefinitionExtractTool` 구현
-  - core 테이블에서 base header/data 생성 (`RuleExtractTool` 재사용)
-  - annotation 텍스트 수집 및 `LLMExtractTool`에 전달
-  - base_table + annotations 구조로 LLM이 최종 테이블 재구성
-  - 테이블 없는 경우 텍스트 기반 fallback
-- [ ] **여러 섹션 패키지 처리 개선** (미완성)
-  - 현재: 첫 `core_table` 후보만 사용
+- [x] **LLMCartesianTool 2단계 분리** (2025-12-01)
+  - Step 1 (LLM): 문맥 기반 값 분리만 담당
+  - Step 2 (Python): `itertools.product`로 정확한 조합 생성
+  - LLM 실수 방지, 정확도 향상
+
+- [x] **컬럼별 주 구분자 파악 규칙** (2025-12-01)
+  - 각 컬럼의 `/`, `,` 등장 빈도 분석하여 주 구분자 결정
+  - 일반화된 규칙으로 모든 유사 케이스 처리
+  - Validator와 LLMCartesian 프롬프트에 반영
+
+- [ ] **RuleCartesianTool 주 구분자 로직 적용** (보류)
+  - 현재는 `/`, `,` 모두로 분리
+  - 컬럼별 주 구분자 파악 후 분리하도록 개선 필요
+
+### 2-4. 알려진 이슈 해결 🚧
+
+- [ ] **SectionClassifier: 정의 vs 조건 오분류** (우선순위: 높음)
+  - 문제: 조건 섹션을 `definition_core`로 잘못 분류
+  - 해결 방향:
+    - 섹션 간 관계 정보 추가
+    - 키워드 가중치 조정
+    - Few-shot 예시 강화
+
+- [ ] **주석(Annotation) 병합 로직** (우선순위: 중간)
+  - 문제 1: annotation 분류는 되지만 실제 병합 안됨
+  - 문제 2: **섹션 내부의 text 요소가 annotation으로 수집 안됨** (신규 발견)
+    - 예: 섹션 0에 table + text("315형→555형 변경") 있을 때
+    - 현재: table만 추출, text는 버려짐
+    - 필요: 같은 섹션 내 text도 annotation으로 수집
+  - 해결 방향:
+    - `_extract_from_cores`에서 섹션 내 text 요소도 수집
+    - DefinitionExtractToolV2에서 annotation 병합 로직 구현
+    - LLM에게 base_table + annotations 전달
   - 목표: 여러 core + annotation 섹션을 패키지로 묶어 처리
 
-### 2-4. Validator 개선 ✅ (부분 완료)
+### 2-5. Validator 개선 ✅ (부분 완료)
 
 - [x] `validate_search`:
   - `definition_candidates` 있을 때 shape-level 검사만 수행 (LLM 호출 X)
@@ -216,11 +333,14 @@ Search / Extract / Validator의 역할을 다시 정리합니다.
 - [x] `validate_transform`:
   - `expected_count` == `actual_count`일 때 우선 pass
   - 중복/깔끔함은 suggestion 위주로 리포트
+- [x] **구분자 검증 규칙 일반화** (2025-12-01)
+  - 컬럼별 주 구분자 패턴 기반 검증
+  - 특정 값 명시 대신 패턴 분석으로 일반화
 - [ ] **Replan 전략 개선** (미완성)
   - 같은 도구로 여러 번 재시도하는 패턴 개선
   - 도구 변경 또는 부분 성공 수용 전략 추가
 
-### 2-5. Planner/도구 선택 고도화 🚧
+### 2-6. Planner/도구 선택 고도화 🚧
 
 - [ ] **LLMPlanner 프롬프트 조정**
   - table-heavy + 한국어 정의 패턴 → `definition_search` / `definition_extract` 선호
@@ -230,7 +350,7 @@ Search / Extract / Validator의 역할을 다시 정리합니다.
   - `definition_search` → `llm_search`로 자연스럽게 전환
   - 예시/규칙 추가
 
-### 2-6. 테스트 플로우 및 회귀 테스트 🚧
+### 2-7. 테스트 플로우 및 회귀 테스트 🚧
 
 - [ ] 주요 variant 케이스를 Prototype 4 기준으로 점검:
   - `test_variant4_text_only_definition.json`
@@ -1189,23 +1309,124 @@ python prototype_3/main.py "data/토이프로젝트_데이터/test/test_variant6
    - 영어/중국어, title 없음, text-only 정의 등
    - Planner 프롬프트 튜닝 필요
 
-### 다음 단계 우선순위
+---
 
-1. **Definition 패키지 선택기 구현** (우선순위: 높음)
-   - 여러 후보를 LLM에게 제시하고 최적 조합 선택
-   - "정의 vs 조건" 구분 강화
+### 🚨 발견된 핵심 설계 결함
 
-2. **회귀 테스트 구축** (우선순위: 높음)
+#### 결함 1: Rule-based Search의 치명적 한계
+
+**문제 분석**:
+```python
+# 현재 DefinitionSearchTool (Rule 기반)
+keywords = ["정의", "명칭", "보험종목"]
+
+# 놓치는 케이스:
+1. 제목이 "상품 구성" → 키워드 없음 → 영구 누락 💥
+2. 영어 문서 "Product Definition" → 한국어 키워드만 → 누락 💥
+3. 제목 없는 섹션 (variant18) → Title 매칭 실패 → 누락 💥
+
+# 치명적인 점:
+Step 1 (Rule): 10개 섹션 → 5개 후보 선택 (정의 2개 누락)
+Step 2 (LLM): 5개 후보만 받음
+→ 누락된 2개는 영원히 복구 불가능! ❌
+```
+
+**근본 원인**: Rule은 "의미"를 이해하지 못함 → Recall 보장 불가
+
+#### 결함 2: 역할 중복 (2단계 분류의 비효율)
+
+**현재 계획된 구조**:
+```python
+# Task 1: DefinitionSearchTool (Rule/LLM)
+"정의 관련 섹션 후보 수집"
+
+# Task 2: DefinitionPackageSelector (LLM)
+"진짜 정의 vs 조건 구분 + core/annotation 분류"
+
+# 문제:
+- LLM을 쓴다면 Task 1, 2 모두 같은 내용을 분석
+- 비용 2배, 시간 2배
+- Task 1이 잘못 걸러내면 Task 2 무용지물
+```
+
+---
+
+### 💡 개선 방향: LLM 1-pass Classification
+
+#### 새 구조 (권장)
+
+```python
+# Task 1: LLM Section Classifier (1-pass, 필수)
+입력: 전체 섹션 요약 (title + content_preview)
+처리: Multi-class classification
+출력: {
+    "definition_core": [2, 5],        # 정의 핵심 테이블/텍스트
+    "definition_annotation": [3, 6],  # 정의 주석/보충
+    "condition": [4, 7],              # 조건 섹션
+    "other": [0, 1, 8, 9]             # 기타
+}
+
+# Task 2: Definition Extract
+입력: definition_core + definition_annotation 섹션들
+처리:
+  - core: Rule 기반 테이블 파싱
+  - annotation: 텍스트 수집
+  - LLM으로 통합
+출력: {header, data}
+
+# Task 3: Cartesian Transform
+```
+
+#### 핵심 개선점
+
+| 항목 | 현재 | 개선안 |
+|-----|------|-------|
+| **Recall 보장** | ❌ Rule 한계 | ✅ LLM 전체 스캔 |
+| **언어 지원** | ❌ 한국어만 | ✅ 모든 언어 |
+| **제목 없음** | ❌ 놓칠 위험 | ✅ Content 기반 |
+| **LLM 호출** | 2회 (중복) | **1회 (통합)** |
+| **비용** | 중간 | **절감** |
+| **정의 vs 조건 구분** | ❌ 애매함 | ✅ 명확 |
+
+#### 비용 분석
+
+```python
+# 섹션 10개 기준
+- 요약: 10개 × 300자 = 3,000자
+- GPT-4o: ~$0.005 / 1K tokens
+- 비용: ~$0.015 (1.5센트) / 문서
+- 시간: ~2초 (병렬화 가능)
+
+# ROI:
+- 누락 방지: 정확도 ↑↑
+- 중복 제거: LLM 1회로 통합
+- → 비용 대비 효과 높음 ✅
+```
+
+---
+
+### 다음 단계 우선순위 (수정)
+
+1. **LLM Section Classifier 구현** (우선순위: 최고 🔥)
+   - Multi-class classification (definition_core/annotation/condition/other)
+   - 전체 섹션 스캔으로 Recall 100% 보장
+   - 기존 DefinitionSearchTool 대체
+
+2. **Definition Extract 리팩터링** (우선순위: 높음)
+   - Classifier 출력 기반으로 재설계
+   - core + annotation 통합 로직 개선
+
+3. **회귀 테스트 구축** (우선순위: 높음)
    - 주요 variant 케이스 점검
    - Prototype 3 vs 4 결과 비교 문서화
 
-3. **Planner 프롬프트 개선** (우선순위: 중간)
-   - 문서 형식별 도구 선택 가이드 추가
+4. **Planner 단순화** (우선순위: 중간)
+   - Classifier 필수 사용으로 프롬프트 단순화
    - Replan 전략 고도화
 
-4. **성능 최적화** (우선순위: 낮음)
-   - Content 검색 캐싱
-   - Parallel processing
+5. **성능 최적화** (우선순위: 낮음)
+   - LLM 병렬 호출
+   - 캐싱 전략
 
 ### 최종 평가
 

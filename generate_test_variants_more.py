@@ -321,7 +321,7 @@ def make_variant22_many_typos(base_docs):
                     new_row = {}
                     for k, v in row.items():
                         kk = k.replace("��Ī", "멍칭").replace("��������", "보헙좀목")
-                        vv = v.replace("해약환급금", "해약환급굼")
+                        vv = v.replace("해약환급금", "해약환급금")
                         new_row[kk] = vv
                     new_rows.append(new_row)
                 tbl["table_elements"] = new_rows

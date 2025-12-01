@@ -528,6 +528,8 @@ class DefinitionSearchTool:
 
 class DefinitionExtractTool:
     """
+    [DEPRECATED - Use DefinitionExtractToolV2]
+
     Definition-aware Extract: definition_candidates + sections 기반으로
     핵심 정의 테이블을 추출하고 표 형태(header, data)로 반환한다.
 
@@ -745,6 +747,222 @@ class DefinitionExtractTool:
                 error=f"DefinitionExtractTool error: {str(e)}",
                 tool_name=self.name
             )
+
+
+class DefinitionExtractToolV2:
+    """
+    V2: Works with SectionClassifierTool output
+
+    Extracts definition tables from classified sections:
+    - Uses core_indices (definition_core) as primary source
+    - Merges with annotation_indices (definition_annotation) if present
+    - Handles both table and text-only cases
+    """
+
+    def __init__(self):
+        self.name = "definition_extract_v2"
+
+    def execute(self, doc: Any, params: Dict[str, Any]) -> ToolResult:
+        """
+        Extract definition table from classified sections
+
+        Args:
+            params:
+                sections: list[dict] - All sections
+                core_indices: list[int] - Indices of definition_core sections
+                annotation_indices: list[int] - Indices of definition_annotation sections (optional)
+
+        Returns:
+            ToolResult with data:
+                {
+                    "header": list[str],
+                    "data": list[list[str]],
+                    "extraction_method": str
+                }
+        """
+        try:
+            sections = params.get("sections", [])
+            core_indices = params.get("core_indices", [])
+            annotation_indices = params.get("annotation_indices", [])
+
+            if not sections:
+                return ToolResult(
+                    success=False,
+                    error="No sections provided",
+                    tool_name=self.name
+                )
+
+            if not core_indices:
+                return ToolResult(
+                    success=False,
+                    error="No core_indices provided - classification may have failed",
+                    tool_name=self.name
+                )
+
+            # Step 1: Extract base table from core sections
+            header, rows = self._extract_from_cores(sections, core_indices, doc)
+
+            if not header and not rows:
+                return ToolResult(
+                    success=False,
+                    error="Failed to extract base table from core sections",
+                    tool_name=self.name
+                )
+
+            # Step 2: If annotations exist, merge them
+            if annotation_indices:
+                header, rows = self._merge_with_annotations(
+                    sections, annotation_indices, header, rows, doc
+                )
+
+            return ToolResult(
+                success=True,
+                data={
+                    "header": header,
+                    "data": rows,
+                    "extraction_method": "v2_classifier_based"
+                },
+                tool_name=self.name
+            )
+
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                error=f"DefinitionExtractToolV2 error: {str(e)}",
+                tool_name=self.name
+            )
+
+    def _extract_from_cores(
+        self, sections: List[Dict], core_indices: List[int], doc: Any
+    ) -> tuple[List[str], List[List[str]]]:
+        """
+        Extract base table from core sections
+
+        Returns:
+            (header, rows)
+        """
+        # Try each core section until we get a valid table
+        for idx in core_indices:
+            if idx < 0 or idx >= len(sections):
+                continue
+
+            section = sections[idx]
+            content = section.get("content", [])
+
+            # Look for table in content
+            for item in content:
+                if not isinstance(item, dict):
+                    continue
+
+                if "table" in item:
+                    table = item["table"]
+
+                    # Try rule-based extraction first
+                    extractor = RuleExtractTool()
+                    result = extractor.execute(doc, {
+                        "content": table,
+                        "content_type": "table"
+                    })
+
+                    if result.success and result.data:
+                        header = result.data.get("header", [])
+                        rows = result.data.get("data", [])
+                        if header and rows:
+                            return header, rows
+
+        # If no table found, try text-based extraction
+        text_fragments = []
+        for idx in core_indices:
+            if idx < 0 or idx >= len(sections):
+                continue
+
+            section = sections[idx]
+            content = section.get("content", [])
+
+            for item in content:
+                if isinstance(item, dict):
+                    text = item.get("content", "") or item.get("text", "")
+                    if text and isinstance(text, str):
+                        text_fragments.append(text.strip())
+                elif isinstance(item, str):
+                    text_fragments.append(item.strip())
+
+        if text_fragments:
+            combined = "\n\n".join(text_fragments)
+            llm_extractor = LLMExtractTool()
+            result = llm_extractor.execute(doc, {
+                "content": combined,
+                "content_type": "text",
+                "instruction": "보험 상품의 명칭/보험종목/유형 정보를 표 형태로 추출하세요."
+            })
+
+            if result.success and result.data:
+                return result.data.get("header", []), result.data.get("data", [])
+
+        return [], []
+
+    def _merge_with_annotations(
+        self,
+        sections: List[Dict],
+        annotation_indices: List[int],
+        base_header: List[str],
+        base_rows: List[List[str]],
+        doc: Any
+    ) -> tuple[List[str], List[List[str]]]:
+        """
+        Merge annotation text with base table using LLM
+
+        Returns:
+            (merged_header, merged_rows)
+        """
+        # Collect annotation texts
+        annotation_texts = []
+        for idx in annotation_indices:
+            if idx < 0 or idx >= len(sections):
+                continue
+
+            section = sections[idx]
+            content = section.get("content", [])
+
+            for item in content:
+                if isinstance(item, dict):
+                    text = item.get("content", "") or item.get("text", "")
+                    if text and isinstance(text, str):
+                        annotation_texts.append(text.strip())
+                elif isinstance(item, str):
+                    annotation_texts.append(item.strip())
+
+        if not annotation_texts:
+            return base_header, base_rows
+
+        # Use LLM to merge
+        combined_content = {
+            "base_table": {
+                "header": base_header,
+                "data": base_rows
+            },
+            "annotations": "\n\n".join(annotation_texts)
+        }
+
+        llm_extractor = LLMExtractTool()
+        result = llm_extractor.execute(doc, {
+            "content": combined_content,
+            "content_type": "mixed",
+            "instruction": (
+                "JSON의 base_table.header/base_table.data는 기존 정의 테이블이고, "
+                "annotations는 해당 정의에 대한 설명/변경/예외 텍스트입니다. "
+                "annotations를 반영하여 최종 정의 테이블을 header/data 형태로 다시 구성하세요. "
+                "가능하면 컬럼 구조는 유지하고, 값만 필요할 때 수정하거나 추가/제거하세요."
+            )
+        })
+
+        if result.success and result.data:
+            merged_header = result.data.get("header", base_header)
+            merged_rows = result.data.get("data", base_rows)
+            return merged_header, merged_rows
+
+        # Fallback to base if LLM merge fails
+        return base_header, base_rows
 
 
 class RuleExtractTool:
@@ -1101,11 +1319,17 @@ class RuleCartesianTool:
             definitions = []
 
             for row in data:
-                # 각 셀을 슬래시로 분리
+                # 각 셀을 슬래시(/) 또는 쉼표(,)로 분리
                 options = []
                 for cell in row:
                     cell_clean = cell.replace('\n', '').strip()
-                    values = [v.strip() for v in cell_clean.split('/') if v.strip()]
+                    # 먼저 슬래시로 분리
+                    slash_parts = cell_clean.split('/')
+                    # 각 슬래시 part를 다시 쉼표로 분리
+                    values = []
+                    for part in slash_parts:
+                        comma_parts = [v.strip() for v in part.split(',') if v.strip()]
+                        values.extend(comma_parts)
                     options.append(values)
 
                 # 조합 생성
@@ -1155,7 +1379,10 @@ class LLMCartesianTool:
 
     def execute(self, doc: Any, params: Dict[str, Any]) -> ToolResult:
         """
-        LLM으로 조합 생성 + 컬럼명 매핑
+        LLM으로 값 분리 + Python으로 Cartesian product 생성
+
+        Step 1 (LLM): 각 셀의 값을 의미적으로 분리하여 리스트로 변환
+        Step 2 (Python): itertools.product로 정확한 Cartesian product 생성
 
         Args:
             doc: 문서
@@ -1167,6 +1394,16 @@ class LLMCartesianTool:
         try:
             header = params.get("header", [])
             data = params.get("data", [])
+            instruction = params.get("instruction", "").strip()
+
+            # Optional extra instruction block, built outside the f-string to
+            # avoid backslashes inside f-string expressions.
+            extra_instruction = ""
+            if instruction:
+                extra_instruction = (
+                    "**추가 지시사항 (이전 시도 에러 기반)**:\n"
+                    f"{instruction}\n\n"
+                )
 
             if not header or not data:
                 return ToolResult(
@@ -1175,28 +1412,91 @@ class LLMCartesianTool:
                     tool_name=self.name
                 )
 
-            prompt = f"""다음 데이터에서 Cartesian Product를 생성하세요.
+            # Step 1: LLM으로 값 분리
+            prompt = f"""다음 데이터의 각 셀 값을 문맥을 고려하여 독립된 옵션들로 분리하고, JSON 형식으로 반환하세요.
 
 Header: {json.dumps(header, ensure_ascii=False)}
 Data:
 {json.dumps(data, ensure_ascii=False, indent=2)}
 
-**규칙**:
-1. "명칭" 컬럼 → "보종명" 필드
-2. 다른 컬럼들 → "유형1", "유형2", ... 필드
-3. 슬래시(/)로 분리된 값들은 각각 조합
-4. 줄바꿈은 보종명에서만 유지, 유형은 제거
-5. 행별로 독립적인 조합 생성
+{extra_instruction}
 
-다음 JSON 형식으로 반환:
+**중요 규칙**:
+1. **컬럼별 주 구분자(primary delimiter) 파악**:
+   각 셀의 값을 분리하기 전에, **해당 셀이 속한 컬럼 전체**를 관찰하세요:
+
+   - 컬럼에서 `/`와 `,` 중 **어느 것이 더 자주** 등장하는지 확인
+   - **더 자주 등장하는 구분자**를 실제 구분자로 사용
+   - **덜 등장하는 구분자**는 내용의 일부로 취급 (분리하지 않음)
+
+   **예시**:
+   - 컬럼 값: "두경부암(전이포함),위암(전이포함),남성/여성생식기암(전이포함)"
+     → `,`가 여러 번, `/`는 한 번만 등장
+     → 주 구분자: `,`
+     → 분리 결과: ["두경부암(전이포함)", "위암(전이포함)", "남성/여성생식기암(전이포함)"]
+     → "남성/여성생식기암"은 분리하지 않음 (/ is not primary delimiter)
+
+   - 컬럼 값: "간편심사(315)형/간편심사(335)형/간편심사(355)형"
+     → `/`가 여러 번, `,` 없음
+     → 주 구분자: `/`
+     → 분리 결과: ["간편심사(315)형", "간편심사(335)형", "간편심사(355)형"]
+
+2. 줄바꿈(\\n)과 공백은 strip하되, 보종명(첫 번째 컬럼)은 줄바꿈 유지
+
+3. 각 행은 독립적으로 처리
+
+**출력 형식 (중요!)**:
+각 행을 셀 단위로 분리하고, 각 셀은 옵션 리스트로 표현.
+
 {{
-  "definitions": [
-    {{"보종명": "...", "유형1": "...", ...}},
-    ...
-  ],
-  "total_count": 24,
-  "notes": "처리 내용"
-}}"""
+  "parsed_rows": [
+    [
+      ["보종명1"],
+      ["유형값1"],
+      ["옵션A", "옵션B", "옵션C"],
+      ["암종류1", "암종류2", ...]
+    ],
+    [...]
+  ]
+}}
+
+**예시 1**:
+Input:
+Header: ["명칭", "유형", "보험종목"]
+Data: [["특약A", "일반형", "간편심사(315)형/간편심사(335)형"]]
+
+Output:
+{{
+  "parsed_rows": [
+    [
+      ["특약A"],
+      ["일반형"],
+      ["간편심사(315)형", "간편심사(335)형"]
+    ]
+  ]
+}}
+
+**예시 2**:
+Input:
+Header: ["명칭", "유형", "보험종목", "보장계약"]
+Data: [["특약B", "해약환급금미지급형", "간편심사(315)형/간편심사(335)형", "두경부암(전이포함),위암(전이포함),남성/여성생식기암(전이포함)"]]
+
+Output:
+{{
+  "parsed_rows": [
+    [
+      ["특약B"],
+      ["해약환급금미지급형"],
+      ["간편심사(315)형", "간편심사(335)형"],
+      ["두경부암(전이포함)", "위암(전이포함)", "남성/여성생식기암(전이포함)"]
+    ]
+  ]
+}}
+
+주의:
+- 위 예시 2에서 "보장계약" 컬럼은 `,`가 주 구분자이므로 `/`는 내용의 일부입니다!
+- 각 셀은 header 개수와 동일하게 맞춰야 함!
+"""
 
             response = self.client.chat.completions.create(
                 model="gpt-4o",
@@ -1206,21 +1506,42 @@ Data:
                 max_tokens=4000
             )
 
-            result = json.loads(response.choices[0].message.content)
+            llm_result = json.loads(response.choices[0].message.content)
 
-            if not result.get("definitions"):
+            if not llm_result.get("parsed_rows"):
                 return ToolResult(
                     success=False,
-                    error="LLM failed to generate combinations",
+                    error="LLM failed to parse values",
                     tool_name=self.name
                 )
+
+            # Step 2: Python으로 Cartesian product 생성
+            from itertools import product
+
+            parsed_rows = llm_result["parsed_rows"]
+            all_definitions = []
+
+            for row in parsed_rows:
+                # row = [["보종명"], ["유형값"], ["옵션1", "옵션2"], ["암1", "암2", ...]]
+                # 각 셀이 옵션 리스트를 가지고 있음
+                # Cartesian product로 모든 조합 생성
+
+                if not row:
+                    continue
+
+                # Cartesian product 생성
+                for combo in product(*row):
+                    definition = {"보종명": combo[0]}
+                    for i, value in enumerate(combo[1:], start=1):
+                        definition[f"유형{i}"] = value
+                    all_definitions.append(definition)
 
             return ToolResult(
                 success=True,
                 data={
-                    "definitions": result["definitions"],
-                    "total_count": result["total_count"],
-                    "notes": result.get("notes", "")
+                    "definitions": all_definitions,
+                    "total_count": len(all_definitions),
+                    "notes": f"LLM parsing + Python Cartesian. {llm_result.get('notes', '')}"
                 },
                 tool_name=self.name
             )
@@ -1231,3 +1552,251 @@ Data:
                 error=f"LLMCartesianTool error: {str(e)}",
                 tool_name=self.name
             )
+
+
+class SectionClassifierTool:
+    """
+    LLM-based multi-class section classifier
+
+    Performs 4-way classification of ALL sections:
+    - definition_core: Core definition tables (보험종목, 명칭 등)
+    - definition_annotation: Text annotations/explanations for definitions
+    - condition: Condition tables (가입조건, 계약조건 등)
+    - other: Unrelated sections
+
+    This ensures 100% recall - no sections are missed.
+    """
+
+    def __init__(self):
+        self.name = "section_classifier"
+        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+    def execute(self, doc: Any, params: Dict[str, Any]) -> ToolResult:
+        """
+        Classify all sections into 4 categories
+
+        Args:
+            params:
+                sections: list[dict] - All sections from DocumentAccessor
+
+        Returns:
+            ToolResult with data:
+                {
+                    "definition_core": [int] - Section indices,
+                    "definition_annotation": [int] - Section indices,
+                    "condition": [int] - Section indices,
+                    "other": [int] - Section indices
+                }
+        """
+        try:
+            sections = params.get("sections", [])
+
+            if not sections:
+                return ToolResult(
+                    success=False,
+                    error="No sections provided",
+                    tool_name=self.name
+                )
+
+            # Step 1: Create section summaries
+            summaries = []
+            for section in sections:
+                summary = {
+                    "index": section.get("index"),
+                    "title": section.get("title", ""),
+                    "preview": self._get_preview(section),
+                    "has_table": self._has_table(section),
+                    "has_text": self._has_text(section)
+                }
+                summaries.append(summary)
+
+            # Step 2: Build classification prompt
+            prompt = self._build_classification_prompt(summaries)
+
+            # Step 3: Call LLM
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+                temperature=0,
+                max_tokens=4000
+            )
+
+            result = json.loads(response.choices[0].message.content)
+
+            # Step 4: Validate structure
+            required_keys = ["definition_core", "definition_annotation", "condition", "other"]
+            for key in required_keys:
+                if key not in result:
+                    return ToolResult(
+                        success=False,
+                        error=f"LLM response missing key: {key}",
+                        tool_name=self.name
+                    )
+                if not isinstance(result[key], list):
+                    return ToolResult(
+                        success=False,
+                        error=f"Invalid type for {key}: expected list, got {type(result[key])}",
+                        tool_name=self.name
+                    )
+
+            # Step 5: Return classification
+            return ToolResult(
+                success=True,
+                data={
+                    "definition_core": result["definition_core"],
+                    "definition_annotation": result["definition_annotation"],
+                    "condition": result["condition"],
+                    "other": result["other"],
+                    "reasoning": result.get("reasoning", "")
+                },
+                tool_name=self.name
+            )
+
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                error=f"SectionClassifierTool error: {str(e)}",
+                tool_name=self.name
+            )
+
+    def _get_preview(self, section: Dict, max_chars: int = 300) -> str:
+        """
+        Extract content preview from section
+
+        Args:
+            section: Section dict from DocumentAccessor
+            max_chars: Maximum characters to preview
+
+        Returns:
+            str: Preview text
+        """
+        content = section.get("content", [])
+
+        if not content:
+            return ""
+
+        # Collect text from content items
+        texts = []
+        for item in content[:3]:  # Only first 3 items
+            if isinstance(item, dict):
+                if "table" in item:
+                    # Table preview: show headers + first row
+                    table = item["table"]
+                    if isinstance(table, dict):
+                        headers = table.get("header", [])
+                        data = table.get("data", [])
+                        if headers:
+                            texts.append(f"[Table: {', '.join(headers[:3])}")
+                            if data:
+                                texts.append(f" | {', '.join(str(x) for x in data[0][:3])}]")
+                            else:
+                                texts.append("]")
+                elif "text" in item:
+                    texts.append(str(item["text"]))
+            elif isinstance(item, str):
+                texts.append(item)
+
+        preview = " ".join(texts)
+
+        if len(preview) > max_chars:
+            return preview[:max_chars] + "..."
+
+        return preview
+
+    def _has_table(self, section: Dict) -> bool:
+        """Check if section contains table"""
+        content = section.get("content", [])
+        for item in content:
+            if isinstance(item, dict) and "table" in item:
+                return True
+        return False
+
+    def _has_text(self, section: Dict) -> bool:
+        """Check if section contains text"""
+        content = section.get("content", [])
+        for item in content:
+            if isinstance(item, dict) and "text" in item:
+                return True
+            elif isinstance(item, str):
+                return True
+        return False
+
+    def _build_classification_prompt(self, summaries: List[Dict]) -> str:
+        """
+        Build LLM prompt for section classification
+
+        Args:
+            summaries: List of section summaries
+
+        Returns:
+            str: Classification prompt
+        """
+        prompt = """당신은 보험 약관 문서의 섹션을 분류하는 전문가입니다.
+
+**임무**: 주어진 모든 섹션을 4가지 카테고리로 분류하세요.
+
+**카테고리 정의**:
+
+1. **definition_core** (핵심 정의 섹션)
+   - 보험 상품의 명칭, 보험종목, 유형 등을 정의하는 **표(table)** 형태의 섹션
+   - 예시 제목: "보험의 명칭", "보험종목", "상품 구성", "Product Definition"
+   - 특징: 테이블 형태로 구조화된 정의 데이터
+
+2. **definition_annotation** (정의 주석/설명 섹션)
+   - 정의에 대한 **텍스트 설명/주석**을 담고 있는 섹션
+   - 예시 내용: "※ 이 보험은...", "주) 보험종목은...", 각주, 참고사항
+   - 특징: definition_core를 보완하는 텍스트 정보
+
+3. **condition** (계약조건 섹션)
+   - 가입조건, 계약조건, 보장내용 등을 담은 섹션
+   - 예시 제목: "가입조건", "보장내용", "계약조건"
+   - 특징: 정의가 아닌 계약 관련 정보
+
+4. **other** (기타 무관한 섹션)
+   - 위 3가지에 해당하지 않는 모든 섹션
+   - 예시: 목차, 서문, 부록 등
+
+**중요 규칙**:
+- 제목이 표준적이지 않아도(예: "상품 구성") 의미상 정의 섹션이면 definition_core로 분류
+- 제목이 없어도 내용을 보고 분류
+- 영어/중국어 문서도 의미를 파악하여 분류
+- 모든 섹션은 정확히 하나의 카테고리에 속해야 함
+
+**입력 섹션**:
+
+"""
+
+        # Add section summaries
+        for i, s in enumerate(summaries):
+            prompt += f"\n[Section {s['index']}]\n"
+            prompt += f"Title: {s['title'] or '(no title)'}\n"
+            prompt += f"Has Table: {s['has_table']}\n"
+            prompt += f"Has Text: {s['has_text']}\n"
+            prompt += f"Preview: {s['preview'][:200]}\n"
+            prompt += "---\n"
+
+        prompt += """
+
+**출력 형식** (JSON):
+
+{
+    "definition_core": [섹션 인덱스들],
+    "definition_annotation": [섹션 인덱스들],
+    "condition": [섹션 인덱스들],
+    "other": [섹션 인덱스들],
+    "reasoning": "분류 근거에 대한 간단한 설명"
+}
+
+**예시**:
+{
+    "definition_core": [0, 2],
+    "definition_annotation": [1, 3],
+    "condition": [4],
+    "other": [5, 6],
+    "reasoning": "Section 0과 2는 보험종목/명칭 테이블, Section 1과 3은 정의에 대한 주석, Section 4는 가입조건, 나머지는 목차/서문"
+}
+
+이제 위 섹션들을 분류해주세요:"""
+
+        return prompt
