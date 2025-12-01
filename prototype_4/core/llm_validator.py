@@ -60,7 +60,26 @@ class LLMValidator:
         if task_type == "search":
             return self.validate_search(task_output, context)
         elif task_type == "extract":
-            # Use definition-aware extract validator
+            # definition_extract 결과(core_candidate 포함)는 구조만 확인하고 통과
+            if isinstance(task_output, dict) and "core_candidate" in task_output:
+                header = task_output.get("header") or []
+                data = task_output.get("data") or []
+                if not header or not data:
+                    return {
+                        "is_valid": False,
+                        "confidence": 0.8,
+                        "errors": ["Definition extract returned empty header or data"],
+                        "suggestions": ["Check definition_search/definition_extract rules"],
+                        "reasoning": "definition_extract produced empty table"
+                    }
+                return {
+                    "is_valid": True,
+                    "confidence": 0.9,
+                    "errors": [],
+                    "suggestions": [],
+                    "reasoning": "definition_extract output schema is valid (header/data/core_candidate present)"
+                }
+            # 그 외 extract는 기존 definition-aware validator 사용
             return self.validate_extract_definitions(task_output, context)
         elif task_type == "transform":
             return self.validate_transform(task_output, context)
@@ -89,6 +108,49 @@ class LLMValidator:
             Dict: 검증 결과
         """
         try:
+            # Definition-aware search (definition_search) 결과인 경우:
+            # LLM 호출 없이 candidate 리스트의 형태만 가볍게 검증한다.
+            if "definition_candidates" in task_output:
+                candidates = task_output.get("definition_candidates") or []
+
+                # 빈 리스트이거나 리스트가 아닌 경우 -> invalid
+                if not isinstance(candidates, List) or not candidates:
+                    return {
+                        "is_valid": False,
+                        "confidence": 0.5,
+                        "errors": ["No definition candidates found"],
+                        "suggestions": [
+                            "Check definition_search rules or fall back to llm_search"
+                        ],
+                        "reasoning": "definition_search returned empty or malformed candidate list"
+                    }
+
+                invalid_indices = [
+                    idx for idx, c in enumerate(candidates)
+                    if not isinstance(c, dict) or "index" not in c or "kind" not in c
+                ]
+                if invalid_indices:
+                    return {
+                        "is_valid": False,
+                        "confidence": 0.3,
+                        "errors": [
+                            f"Invalid candidate entries at positions: {invalid_indices}"
+                        ],
+                            "suggestions": [
+                            "Ensure each candidate has 'index' and 'kind' fields"
+                        ],
+                        "reasoning": "definition_search candidate schema is inconsistent"
+                    }
+
+                # shape만 정상이라면 일단 통과 (세부 평가는 Extract/Transform 단계에서 수행)
+                return {
+                    "is_valid": True,
+                    "confidence": 0.9,
+                    "errors": [],
+                    "suggestions": [],
+                    "reasoning": f"{len(candidates)} definition candidates collected (schema-level validation only)"
+                }
+
             found_table = task_output.get("found_table")
             found_content = task_output.get("found_content", [])
             section_title = task_output.get("section_title", "")

@@ -12,8 +12,8 @@ from typing import Dict, Any, List
 from core.llm_planner import LLMPlanner
 from core.llm_validator import LLMValidator
 from tools.hybrid_tools import (
-    RuleSearchTool, LLMSearchTool,
-    RuleExtractTool, LLMExtractTool,
+    RuleSearchTool, LLMSearchTool, DefinitionSearchTool,
+    RuleExtractTool, LLMExtractTool, DefinitionExtractTool,
     RuleCartesianTool, LLMCartesianTool
 )
 
@@ -31,7 +31,7 @@ class Prototype3Agent:
         6. 최종 결과 반환
     """
 
-    def __init__(self, max_replan_per_task: int = 3):
+    def __init__(self, max_replan_per_task: int = 6):
         """
         Initialize agent
 
@@ -47,12 +47,14 @@ class Prototype3Agent:
         # 모든 도구 초기화
         self.tools = {
             "rule_search": RuleSearchTool(),
+            "definition_search": DefinitionSearchTool(),
             "llm_search": LLMSearchTool(),
             "rule_extract": RuleExtractTool(),
             "llm_extract": LLMExtractTool(),
             "rule_cartesian": RuleCartesianTool(),
             "llm_cartesian": LLMCartesianTool(),
         }
+        self.tools["definition_extract"] = DefinitionExtractTool()
 
     def run(self, doc: Any) -> Dict[str, Any]:
         """
