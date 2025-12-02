@@ -1,0 +1,118 @@
+[
+  {
+    "doc_title": "멀티클라우드 서비스 약관 (KR/EN/JP 혼합) – Definition Stress Test",
+    "elements": [
+      {
+        "title": "1. 용어의 정의 (Definitions)",
+        "paragraphs": [
+          {
+            "type": "text",
+            "content": "본 약관에서 사용하는 주요 용어의 정의는 아래와 같습니다. 각 용어는 언어(한국어/English/日本語) 혼합으로 표현될 수 있으며, 동일한 의미를 갖습니다.",
+            "table": {
+              "table_title": "",
+              "table_elements": []
+            }
+          },
+          {
+            "type": "text",
+            "content": "① \"Basic Workspace\" (이하 “B-WS”)란, 최대 3명의 사용자와 50GB 이하의 스토리지를 제공하는 최소 기능의 워크스페이스 플랜을 의미합니다.\n   - 지원 기능: 파일 업로드, 댓글(Comment), 기본 알림\n   - 미지원 기능: API Access, Audit Log, SSO",
+            "table": {
+              "table_title": "",
+              "table_elements": []
+            }
+          },
+          {
+            "type": "text",
+            "content": "② \"Pro Workspace\" (이하 “P-WS”)란, 3명 초과 50명 이하의 사용자와 2TB 이하의 스토리지를 제공하는 고급 워크스페이스 플랜을 의미합니다.\n   - 지원 기능: B-WS 전 기능 + API Access + Webhook + 일부 Audit Log\n   - 제한 사항: Region 선택은 ap-northeast-2(서울)로 한정",
+            "table": {
+              "table_title": "",
+              "table_elements": []
+            }
+          },
+          {
+            "type": "text",
+            "content": "③ \"Enterprise Workspace\" (이하 “E-WS”)란, 사용자 수 제한이 없고 2TB 초과 스토리지, 전용 VPC, 전용 Support Manager를 제공하는 엔터프라이즈 플랜을 의미합니다.\n   - 지원 기능: P-WS 전 기능 + Full Audit Log + SSO(SAML 2.0) + 전용 SLA\n   - 별도 계약 문서(Enterprise Order Form)가 우선 적용됩니다.",
+            "table": {
+              "table_title": "",
+              "table_elements": []
+            }
+          },
+          {
+            "type": "text",
+            "content": "④ \"Add-on(애드온)\"이란, B-WS, P-WS, E-WS에 추가적으로 결합할 수 있는 기능 단위의 옵션을 말하며, 예시는 다음과 같습니다:\n   1) \"AI-Assist Pack\": 월간 10,000 AI 호출, 초과분은 별도 과금\n   2) \"Extended Log Pack\": 기본 보관기간(30일)을 365일까지 연장\n   3) \"JP-Localization Pack\": 일본어 전용 UI 및 현지화 템플릿 제공",
+            "table": {
+              "table_title": "",
+              "table_elements": []
+            }
+          }
+        ]
+      },
+      {
+        "title": "2. 플랜 매핑 예시 (Non-tabular Definition)",
+        "paragraphs": [
+          {
+            "type": "text",
+            "content": "다음 매핑은 예시일 뿐이며, 실제 상품 정의는 1. 용어의 정의를 기준으로 합니다.\n\n- B-WS => code: BASIC, tier: entry, emoji: 🔹\n- P-WS => code: PRO, tier: growth, emoji: 🔷\n- E-WS => code: ENT, tier: enterprise, emoji: 🛡️\n\n위 코드는 내부 Billing 시스템에서만 사용되며, 고객-facing 문서에서는 노출되지 않을 수 있습니다.",
+            "table": {
+              "table_title": "",
+              "table_elements": []
+            }
+          }
+        ]
+      },
+      {
+        "title": "3. 사용 조건 (Conditions) – 표 혼합 예시",
+        "paragraphs": [
+          {
+            "type": "table",
+            "content": "",
+            "table": {
+              "table_title": "플랜별 기본 제한",
+              "table_elements": [
+                {
+                  "플랜코드": "BASIC",
+                  "최대사용자수": "3",
+                  "스토리지한도": "50GB",
+                  "API허용": "N"
+                },
+                {
+                  "플랜코드": "PRO",
+                  "최대사용자수": "50",
+                  "스토리지한도": "2TB",
+                  "API허용": "Y"
+                },
+                {
+                  "플랜코드": "ENT",
+                  "최대사용자수": "제한없음",
+                  "스토리지한도": "커스텀",
+                  "API허용": "Y"
+                }
+              ]
+            }
+          },
+          {
+            "type": "text",
+            "content": "※ 위 표는 조건(Condition)에 가까운 정보이며, 엄밀한 의미의 상품 정의는 아닙니다. 예를 들어 ENT의 '스토리지한도: 커스텀'은 별도 계약서에서만 구체화됩니다.",
+            "table": {
+              "table_title": "",
+              "table_elements": []
+            }
+          }
+        ]
+      },
+      {
+        "title": "4. 혼합 언어 및 깨진 인코딩 예시",
+        "paragraphs": [
+          {
+            "type": "text",
+            "content": "이 섹션은 인코딩 스트레스 테스트용입니다: \n- 한글 깨짐 예시: ��품, ����, �쒖옉\n- 일본어: 利用規約, 契約者, 無制限\n- 문자열 내 이스케이프: \"\\uD83D\\uDE80\" (🚀), \"\\u03A9\" (Ω)\n- 특수 기호: #, @, %, ∑, ∂, ∞, ±",
+            "table": {
+              "table_title": "",
+              "table_elements": []
+            }
+          }
+        ]
+      }
+    ]
+  }
+]

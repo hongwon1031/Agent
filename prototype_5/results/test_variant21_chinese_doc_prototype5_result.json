@@ -1,0 +1,442 @@
+{
+  "success": true,
+  "execution_plan": {
+    "domain_analysis": {
+      "entities": "보험 상품 정의와 그 조합",
+      "categories": [
+        "definition_core",
+        "definition_annotation",
+        "condition",
+        "other"
+      ],
+      "key_fields": [
+        "product_name",
+        "product_type",
+        "insurance_period",
+        "premium_payment_period",
+        "eligibility_age"
+      ]
+    },
+    "tasks": [
+      {
+        "task_id": 1,
+        "type": "classify",
+        "description": "문서의 섹션을 의미 기반 카테고리로 분류",
+        "strategy": "llm",
+        "fallback": null,
+        "tool_name": "section_classifier",
+        "parameters": {
+          "sections": "$sections",
+          "instruction": "This is an insurance policy document. Classify sections into:\n- definition_core: Sections containing main product definitions with names and types (e.g., 名稱, 保險種類)\n- definition_annotation: Sections with annotations or additional explanations about definitions (e.g., notes, special conditions)\n- condition: Sections detailing coverage conditions or eligibility criteria (e.g., 保險期間, 繳納期間)\n- other: All other sections that do not fit the above categories\nOutput JSON: {\"definition_core\": [section_indices], \"definition_annotation\": [section_indices], \"condition\": [section_indices], \"other\": [section_indices], \"reasoning\": \"...\"}"
+        },
+        "depends_on": null
+      },
+      {
+        "task_id": 2,
+        "type": "extract",
+        "description": "분류된 섹션에서 보험 상품 정의 추출",
+        "strategy": "llm",
+        "fallback": null,
+        "tool_name": "definition_extract_v2",
+        "parameters": {
+          "sections": "$sections",
+          "core_indices": "{{task1.definition_core}}",
+          "instruction": "Extract the following fields from the definition tables:\n- Product name (名稱)\n- Product type (保險種類)\n- Insurance period (保險期間)\n- Premium payment period (繳納期間)\n- Eligibility age (投保年齡)\nRules:\n- Skip rows marked with annotations like ※ or *.\n- Normalize whitespace and special characters.\n- Output should include a header list and data rows list."
+        },
+        "depends_on": 1
+      },
+      {
+        "task_id": 3,
+        "type": "transform",
+        "description": "추출된 데이터로부터 가능한 모든 조합 생성",
+        "strategy": "llm",
+        "fallback": null,
+        "tool_name": "llm_cartesian",
+        "parameters": {
+          "header": "{{task2.header}}",
+          "data": "{{task2.data}}",
+          "instruction": "Generate all possible combinations from the extracted data:\n- Delimiter rules:\n  - Product name uses / as delimiter.\n  - Product type uses , as delimiter.\n  - Insurance period and premium payment period use / as delimiter.\n- Split multi-value cells based on the most frequent delimiter.\n- Strip whitespace from split values.\n- Generate Cartesian product across columns to create one definition per combination.\n- Output should be a list of definitions with fields."
+        },
+        "depends_on": 2
+      }
+    ],
+    "reasoning": "The document contains mixed-format sections with structured tables, making it suitable for LLM-based classification and extraction. The use of LLM tools allows for flexible handling of annotations and delimiter-based transformations, which is crucial given the potential variability in section content and structure.",
+    "estimated_difficulty": "medium"
+  },
+  "final_data": {
+    "definitions": [
+      {
+        "보종명": "簡易癌症診斷附約（非分紅，解約金不給付）",
+        "유형1": "解約金不給付型",
+        "유형2": "簡易核保型"
+      },
+      {
+        "보종명": "簡易癌症診斷附約（非分紅，解約金不給付）",
+        "유형1": "解約金不給付型",
+        "유형2": "一般核保型"
+      },
+      {
+        "보종명": "簡易癌症診斷附約（非分紅）",
+        "유형1": "一般型",
+        "유형2": "一般核保型"
+      }
+    ],
+    "total_count": 3,
+    "notes": "LLM parsing + Python Cartesian. "
+  },
+  "execution_log": [
+    {
+      "task_id": 1,
+      "description": "문서의 섹션을 의미 기반 카테고리로 분류",
+      "attempts": [
+        {
+          "attempt": 1,
+          "tool": "section_classifier",
+          "parameters": {
+            "sections": [
+              {
+                "index": 0,
+                "title": "一、保險種類名稱",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "<table>...</table>",
+                    "table": {
+                      "table_title": "保險種類說明",
+                      "table_elements": [
+                        {
+                          "名稱": "簡易癌症診斷附約（非分紅，解約金不給付）",
+                          "保險種類": "解約金不給付型",
+                          "審核型態": "簡易核保型 / 一般核保型"
+                        },
+                        {
+                          "名稱": "簡易癌症診斷附約（非分紅）",
+                          "保險種類": "一般型",
+                          "審核型態": "一般核保型"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "一、保險種類名稱",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "<table>...</table>",
+                      "table": {
+                        "table_title": "保險種類說明",
+                        "table_elements": [
+                          {
+                            "名稱": "簡易癌症診斷附約（非分紅，解約金不給付）",
+                            "保險種類": "解約金不給付型",
+                            "審核型態": "簡易核保型 / 一般核保型"
+                          },
+                          {
+                            "名稱": "簡易癌症診斷附約（非分紅）",
+                            "保險種類": "一般型",
+                            "審核型態": "一般核保型"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "index": 1,
+                "title": "三、保險期間及保費繳納期間",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "<table>...</table>",
+                    "table": {
+                      "table_title": "投保資格",
+                      "table_elements": [
+                        {
+                          "保險種類": "解約金不給付型",
+                          "保險期間": "20年 / 30年 / 終身",
+                          "繳納期間": "10年 / 20年",
+                          "投保年齡": "15歲至65歲"
+                        },
+                        {
+                          "保險種類": "一般型",
+                          "保險期間": "20年 / 30年",
+                          "繳納期間": "10年 / 20年",
+                          "投保年齡": "15歲至60歲"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "三、保險期間及保費繳納期間",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "<table>...</table>",
+                      "table": {
+                        "table_title": "投保資格",
+                        "table_elements": [
+                          {
+                            "保險種類": "解約金不給付型",
+                            "保險期間": "20年 / 30年 / 終身",
+                            "繳納期間": "10年 / 20年",
+                            "投保年齡": "15歲至65歲"
+                          },
+                          {
+                            "保險種類": "一般型",
+                            "保險期間": "20年 / 30年",
+                            "繳納期間": "10年 / 20年",
+                            "投保年齡": "15歲至60歲"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "instruction": "This is an insurance policy document. Classify sections into:\n- definition_core: Sections containing main product definitions with names and types (e.g., 名稱, 保險種類)\n- definition_annotation: Sections with annotations or additional explanations about definitions (e.g., notes, special conditions)\n- condition: Sections detailing coverage conditions or eligibility criteria (e.g., 保險期間, 繳納期間)\n- other: All other sections that do not fit the above categories\nOutput JSON: {\"definition_core\": [section_indices], \"definition_annotation\": [section_indices], \"condition\": [section_indices], \"other\": [section_indices], \"reasoning\": \"...\"}"
+          },
+          "success": true,
+          "error": null,
+          "output": {
+            "definition_core": [
+              0
+            ],
+            "definition_annotation": [],
+            "condition": [
+              1
+            ],
+            "other": [],
+            "reasoning": "Section 0 contains the main product definitions with names and types, which fits the 'definition_core' category. It lists the insurance product names and types, which are core definitions of the insurance policy. Section 1 details the insurance period and premium payment period, which are conditions related to the coverage and eligibility criteria, fitting the 'condition' category."
+          },
+          "validation": {
+            "is_valid": true,
+            "problem_type": null,
+            "confidence": 0.95,
+            "errors": [],
+            "suggestions": [],
+            "reasoning": "section_classifier found 1 core, 0 annotation sections"
+          }
+        }
+      ],
+      "final_success": true
+    },
+    {
+      "task_id": 2,
+      "description": "분류된 섹션에서 보험 상품 정의 추출",
+      "attempts": [
+        {
+          "attempt": 1,
+          "tool": "definition_extract_v2",
+          "parameters": {
+            "sections": [
+              {
+                "index": 0,
+                "title": "一、保險種類名稱",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "<table>...</table>",
+                    "table": {
+                      "table_title": "保險種類說明",
+                      "table_elements": [
+                        {
+                          "名稱": "簡易癌症診斷附約（非分紅，解約金不給付）",
+                          "保險種類": "解約金不給付型",
+                          "審核型態": "簡易核保型 / 一般核保型"
+                        },
+                        {
+                          "名稱": "簡易癌症診斷附約（非分紅）",
+                          "保險種類": "一般型",
+                          "審核型態": "一般核保型"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "一、保險種類名稱",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "<table>...</table>",
+                      "table": {
+                        "table_title": "保險種類說明",
+                        "table_elements": [
+                          {
+                            "名稱": "簡易癌症診斷附約（非分紅，解約金不給付）",
+                            "保險種類": "解約金不給付型",
+                            "審核型態": "簡易核保型 / 一般核保型"
+                          },
+                          {
+                            "名稱": "簡易癌症診斷附約（非分紅）",
+                            "保險種類": "一般型",
+                            "審核型態": "一般核保型"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "index": 1,
+                "title": "三、保險期間及保費繳納期間",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "<table>...</table>",
+                    "table": {
+                      "table_title": "投保資格",
+                      "table_elements": [
+                        {
+                          "保險種類": "解約金不給付型",
+                          "保險期間": "20年 / 30年 / 終身",
+                          "繳納期間": "10年 / 20年",
+                          "投保年齡": "15歲至65歲"
+                        },
+                        {
+                          "保險種類": "一般型",
+                          "保險期間": "20年 / 30年",
+                          "繳納期間": "10年 / 20年",
+                          "投保年齡": "15歲至60歲"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "三、保險期間及保費繳納期間",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "<table>...</table>",
+                      "table": {
+                        "table_title": "投保資格",
+                        "table_elements": [
+                          {
+                            "保險種類": "解約金不給付型",
+                            "保險期間": "20年 / 30年 / 終身",
+                            "繳納期間": "10年 / 20年",
+                            "投保年齡": "15歲至65歲"
+                          },
+                          {
+                            "保險種類": "一般型",
+                            "保險期間": "20年 / 30年",
+                            "繳納期間": "10年 / 20年",
+                            "投保年齡": "15歲至60歲"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "core_indices": [
+              0
+            ],
+            "instruction": "Extract the following fields from the definition tables:\n- Product name (名稱)\n- Product type (保險種類)\n- Insurance period (保險期間)\n- Premium payment period (繳納期間)\n- Eligibility age (投保年齡)\nRules:\n- Skip rows marked with annotations like ※ or *.\n- Normalize whitespace and special characters.\n- Output should include a header list and data rows list."
+          },
+          "success": true,
+          "error": null,
+          "output": {
+            "header": [
+              "名稱",
+              "保險種類",
+              "審核型態"
+            ],
+            "data": [
+              [
+                "簡易癌症診斷附約（非分紅，解約金不給付）",
+                "解約金不給付型",
+                "簡易核保型 / 一般核保型"
+              ],
+              [
+                "簡易癌症診斷附約（非分紅）",
+                "一般型",
+                "一般核保型"
+              ]
+            ],
+            "extraction_method": "v2_classifier_based"
+          },
+          "validation": {
+            "is_valid": true,
+            "problem_type": null,
+            "confidence": 0.95,
+            "errors": [],
+            "suggestions": [],
+            "reasoning": "definition_extract_v2 extracted table with 3 columns, 2 rows"
+          }
+        }
+      ],
+      "final_success": true
+    },
+    {
+      "task_id": 3,
+      "description": "추출된 데이터로부터 가능한 모든 조합 생성",
+      "attempts": [
+        {
+          "attempt": 1,
+          "tool": "llm_cartesian",
+          "parameters": {
+            "header": [
+              "名稱",
+              "保險種類",
+              "審核型態"
+            ],
+            "data": [
+              [
+                "簡易癌症診斷附約（非分紅，解約金不給付）",
+                "解約金不給付型",
+                "簡易核保型 / 一般核保型"
+              ],
+              [
+                "簡易癌症診斷附約（非分紅）",
+                "一般型",
+                "一般核保型"
+              ]
+            ],
+            "instruction": "Generate all possible combinations from the extracted data:\n- Delimiter rules:\n  - Product name uses / as delimiter.\n  - Product type uses , as delimiter.\n  - Insurance period and premium payment period use / as delimiter.\n- Split multi-value cells based on the most frequent delimiter.\n- Strip whitespace from split values.\n- Generate Cartesian product across columns to create one definition per combination.\n- Output should be a list of definitions with fields."
+          },
+          "success": true,
+          "error": null,
+          "output": {
+            "definitions": [
+              {
+                "보종명": "簡易癌症診斷附約（非分紅，解約金不給付）",
+                "유형1": "解約金不給付型",
+                "유형2": "簡易核保型"
+              },
+              {
+                "보종명": "簡易癌症診斷附約（非分紅，解約金不給付）",
+                "유형1": "解約金不給付型",
+                "유형2": "一般核保型"
+              },
+              {
+                "보종명": "簡易癌症診斷附約（非分紅）",
+                "유형1": "一般型",
+                "유형2": "一般核保型"
+              }
+            ],
+            "total_count": 3,
+            "notes": "LLM parsing + Python Cartesian. "
+          },
+          "validation": {
+            "is_valid": true,
+            "confidence": 0.95,
+            "errors": [],
+            "suggestions": [],
+            "reasoning": "Cartesian Product 생성 결과는 주어진 검증 기준을 충족합니다. 원본 데이터의 '審核型態' 컬럼에서 '/'가 주 구분자로 사용되어 '簡易核保型'과 '一般核保型'으로 올바르게 분리되었습니다. 각 정의는 원본 데이터의 모든 핵심 컬럼을 포함하고 있으며, 예상되는 정의의 개수(3개)와 일치합니다. 중복된 조합이나 누락된 컬럼도 없습니다. 따라서, 생성된 결과는 유효합니다.",
+            "actual_count": 3
+          }
+        }
+      ],
+      "final_success": true
+    }
+  ],
+  "error": null
+}

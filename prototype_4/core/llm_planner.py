@@ -77,12 +77,12 @@ class LLMPlanner:
                     "estimated_difficulty": "easy" | "medium" | "hard"
                 }
         """
-        # 문서 샘플 (일부만)
-        doc_sample = json.dumps(doc, ensure_ascii=False)[:2000]
+        # 문서 샘플
+        doc_sample = json.dumps(doc, ensure_ascii=False)
 
         # Tool schemas 가져오기
         tool_schemas = get_schema_prompt()
-
+        
         # DocumentAccessor로 형식 정보 가져오기
         from core.document_accessor import DocumentAccessor
         accessor = DocumentAccessor(doc)
@@ -91,9 +91,10 @@ class LLMPlanner:
         # [DEPRECATED] DocumentAnalyzer 결과 사용 중단
         # OLD prompt included: **문서 구조 분석 결과**: {json.dumps(structure_analysis, ...)}
 
-        prompt = f"""다음 문서에서 "{goal}"하는 계획을 수립하세요.
+        prompt = f"""당신은 문서 분석 파이프라인의 계획 수립 전문가입니다.
+주어진 문서와 목표를 분석하여 최적의 실행 계획을 수립하세요.
 
-**문서 형식 정보**:
+**문서 정보**:
 {json.dumps(doc_summary, ensure_ascii=False, indent=2)}
 
 **형식별 섹션 분포**:
@@ -106,43 +107,67 @@ class LLMPlanner:
 
 **목표**: {goal}
 
+---
+
+**사용 가능한 도구**:
 {tool_schemas}
 
-**계획 수립 전략**:
-1. **RECOMMENDED (V2 Workflow)**: 정의 추출 작업에는 section_classifier + definition_extract_v2 사용
-   - Task 1: section_classifier로 모든 섹션 분류 (type: "classify")
-   - Task 2: definition_extract_v2로 정의 추출 (type: "extract")
-   - Task 3: rule_cartesian으로 조합 생성 (type: "transform")
-   - 이 방식이 100% recall을 보장하며 가장 안정적입니다
+---
 
-2. **Legacy Workflow (호환성용)**: definition_search + definition_extract 또는 rule_search + rule_extract
-   - 표준적인 키워드나 구조가 명확한 경우에만 사용
-   - 비표준 제목이나 제목 없는 섹션은 놓칠 수 있음
+**계획 수립 가이드라인**:
 
-3. 일반 원칙:
-   - Rule 도구 우선, 실패 시 LLM fallback
-   - content_type 파라미터를 명시적으로 전달
-   - 각 Task는 이전 Task 결과 참조 가능 ("depends_on")
+1. **도구 선택 원칙**:
+   - 각 도구의 description과 supported_formats를 확인하여 문서에 적합한 도구를 선택하세요
+   - Rule 기반 도구가 적용 가능하면 우선 사용하고, 필요시 LLM 도구를 fallback으로 지정하세요
+   - [DEPRECATED] 표시된 도구는 가급적 사용하지 마세요 (새 버전이 있다면 그것을 우선)
 
-**Task 타입**:
-- "classify": 섹션 분류 (section_classifier 전용)
-- "search": 정의 섹션/테이블 찾기 (legacy)
-- "extract": 데이터 추출
-- "transform": 데이터 변환 (Cartesian Product 등)
+2. **Task 구성**:
+   - 필요한 만큼의 Task를 정의하세요 (2~5단계 모두 가능)
+   - 각 Task는 명확한 목적을 가져야 하며, 이전 Task 결과에 의존할 수 있습니다
+   - Task 타입: "classify", "search", "extract", "transform" 중 선택
 
-**중요**:
-- 정의 추출 작업에는 **section_classifier + definition_extract_v2를 우선 사용**하세요
-- 단계 수는 유동적 (3단계일 필요 없음)
-- 파라미터에 이전 Task 결과 참조는 "{{{{taskN.field}}}}" 형식
-- Runtime injection 파라미터("$sections" 등)는 정확히 명시된 대로 사용할 것
+3. **파라미터 참조**:
+   - 이전 Task 결과 참조: "{{{{taskN.field}}}}" 형식 사용
+   - Runtime injection: "$sections" (전체 섹션), "$doc" (전체 문서)
+   - 도구 스키마의 parameter 설명을 참고하여 정확히 전달하세요
 
-**예시 출력 (V2 Workflow - RECOMMENDED)**:
+4. **Strategy 지정**:
+   - "rule": Rule 기반 도구
+   - "llm": LLM 기반 도구
+   - "hybrid": Rule + LLM 조합
+   - Fallback: 실패 시 시도할 다른 strategy (예: "rule" → "llm")
+
+---
+
+**출력 형식** (JSON):
+{{
+  "tasks": [
+    {{
+      "task_id": 1,
+      "type": "classify | search | extract | transform",
+      "description": "Task에서 수행할 작업 설명",
+      "strategy": "rule | llm | hybrid",
+      "fallback": "llm | null",
+      "tool_name": "도구 이름",
+      "parameters": {{
+        "param1": "value or {{{{taskN.field}}}} or $runtime_var"
+      }},
+      "depends_on": null | task_id
+    }}
+  ],
+  "reasoning": "이 계획을 선택한 이유 (문서 특성, 도구 선택 근거 등)",
+  "estimated_difficulty": "easy | medium | hard"
+}}
+
+---
+
+**예시 1** (섹션 분류가 필요한 경우):
 {{
   "tasks": [
     {{
       "task_id": 1,
       "type": "classify",
-      "description": "전체 섹션을 4가지 카테고리로 분류",
+      "description": "전체 섹션을 의미 기반으로 분류",
       "strategy": "llm",
       "fallback": null,
       "tool_name": "section_classifier",
@@ -154,7 +179,7 @@ class LLMPlanner:
     {{
       "task_id": 2,
       "type": "extract",
-      "description": "분류된 정의 섹션에서 데이터 추출",
+      "description": "분류된 섹션에서 정의 데이터 추출",
       "strategy": "hybrid",
       "fallback": null,
       "tool_name": "definition_extract_v2",
@@ -168,9 +193,9 @@ class LLMPlanner:
     {{
       "task_id": 3,
       "type": "transform",
-      "description": "Cartesian Product 생성",
+      "description": "정의 조합 생성",
       "strategy": "rule",
-      "fallback": null,
+      "fallback": "llm",
       "tool_name": "rule_cartesian",
       "parameters": {{
         "header": "{{{{task2.header}}}}",
@@ -179,17 +204,17 @@ class LLMPlanner:
       "depends_on": 2
     }}
   ],
-  "reasoning": "section_classifier를 사용하여 100% recall 보장, V2 workflow 적용",
+  "reasoning": "비표준 섹션 제목이 예상되므로 semantic classification 사용, 조합 생성은 rule 기반으로 빠르게 처리",
   "estimated_difficulty": "medium"
 }}
 
-**예시 출력 (Legacy - 표준 구조인 경우만)**:
+**예시 2** (표준 키워드 구조인 경우):
 {{
   "tasks": [
     {{
       "task_id": 1,
       "type": "search",
-      "description": "정의 섹션 찾기",
+      "description": "키워드로 정의 섹션 검색",
       "strategy": "rule",
       "fallback": "llm",
       "tool_name": "rule_search",
@@ -203,7 +228,7 @@ class LLMPlanner:
     {{
       "task_id": 2,
       "type": "extract",
-      "description": "데이터 추출 (형식 자동 감지)",
+      "description": "테이블 데이터 추출",
       "strategy": "rule",
       "fallback": "llm",
       "tool_name": "rule_extract",
@@ -216,7 +241,7 @@ class LLMPlanner:
     {{
       "task_id": 3,
       "type": "transform",
-      "description": "Cartesian Product 생성",
+      "description": "조합 생성",
       "strategy": "rule",
       "fallback": null,
       "tool_name": "rule_cartesian",
@@ -227,7 +252,7 @@ class LLMPlanner:
       "depends_on": 2
     }}
   ],
-  "reasoning": "문서가 표준 구조이며 형식 정보를 활용하여 content_type을 자동 전달",
+  "reasoning": "표준 키워드가 명확하므로 rule_search로 빠른 검색 가능, 모든 단계에서 rule 우선 적용",
   "estimated_difficulty": "easy"
 }}
 
@@ -279,7 +304,7 @@ class LLMPlanner:
 
         # Tool schemas 가져오기
         tool_schemas = get_schema_prompt()
-
+        
         prompt = f"""Task가 실패했습니다. 새로운 전략을 수립하세요.
 
 **실패한 Task**:

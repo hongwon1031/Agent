@@ -5,7 +5,7 @@
       {
         "task_id": 1,
         "type": "classify",
-        "description": "전체 섹션을 4가지 카테고리로 분류",
+        "description": "전체 섹션을 의미 기반으로 분류",
         "strategy": "llm",
         "fallback": null,
         "tool_name": "section_classifier",
@@ -17,7 +17,7 @@
       {
         "task_id": 2,
         "type": "extract",
-        "description": "분류된 정의 섹션에서 데이터 추출",
+        "description": "분류된 섹션에서 정의 데이터 추출",
         "strategy": "hybrid",
         "fallback": null,
         "tool_name": "definition_extract_v2",
@@ -31,9 +31,9 @@
       {
         "task_id": 3,
         "type": "transform",
-        "description": "Cartesian Product 생성",
+        "description": "정의 조합 생성",
         "strategy": "rule",
-        "fallback": null,
+        "fallback": "llm",
         "tool_name": "rule_cartesian",
         "parameters": {
           "header": "{{task2.header}}",
@@ -42,7 +42,7 @@
         "depends_on": 2
       }
     ],
-    "reasoning": "section_classifier를 사용하여 100% recall 보장, V2 workflow 적용",
+    "reasoning": "문서의 섹션이 혼합 형식으로 되어 있어 semantic classification을 통해 정의 섹션을 식별하는 것이 중요합니다. 정의 데이터 추출 후, 조합 생성은 명확한 테이블 구조를 활용하여 rule 기반으로 빠르게 처리할 수 있습니다.",
     "estimated_difficulty": "medium"
   },
   "final_data": {
@@ -126,7 +126,7 @@
   "execution_log": [
     {
       "task_id": 1,
-      "description": "전체 섹션을 4가지 카테고리로 분류",
+      "description": "전체 섹션을 의미 기반으로 분류",
       "attempts": [
         {
           "attempt": 1,
@@ -339,20 +339,21 @@
           "error": null,
           "output": {
             "definition_core": [
-              0,
-              1
+              0
             ],
             "definition_annotation": [],
-            "condition": [],
+            "condition": [
+              1
+            ],
             "other": [],
-            "reasoning": "Section 0과 1은 각각 '보험종목의 명칭'과 '보험기간, 보험료 납입기간, 피보험자 가입나이 및 보험료 납입주기'를 테이블 형태로 정의하고 있으므로 definition_core로 분류됩니다. 두 섹션 모두 텍스트 설명이 없고, 계약 조건이나 기타 섹션에 해당하지 않습니다."
+            "reasoning": "Section 0은 보험종목의 명칭을 다루고 있어 상품/보장 구조를 정의하는 것으로 보아 definition_core로 분류했습니다. Section 1은 보험기간, 보험료 납입기간, 피보험자 가입나이 및 보험료 납입주기를 다루고 있어 가입 조건에 대한 내용을 포함하므로 condition으로 분류했습니다."
           },
           "validation": {
             "is_valid": true,
             "confidence": 0.95,
             "errors": [],
             "suggestions": [],
-            "reasoning": "section_classifier found 2 core, 0 annotation sections"
+            "reasoning": "section_classifier found 1 core, 0 annotation sections"
           }
         }
       ],
@@ -360,7 +361,7 @@
     },
     {
       "task_id": 2,
-      "description": "분류된 정의 섹션에서 데이터 추출",
+      "description": "분류된 섹션에서 정의 데이터 추출",
       "attempts": [
         {
           "attempt": 1,
@@ -569,8 +570,7 @@
               }
             ],
             "core_indices": [
-              0,
-              1
+              0
             ],
             "annotation_indices": []
           },
@@ -612,7 +612,7 @@
     },
     {
       "task_id": 3,
-      "description": "Cartesian Product 생성",
+      "description": "정의 조합 생성",
       "attempts": [
         {
           "attempt": 1,
@@ -795,15 +795,15 @@
             "confidence": 0.7,
             "errors": [
               "보종명 값이 중간에서 끊겨 있음",
-              "중복된 보종명 + 유형 조합이 존재",
-              "유형3의 분리가 잘못됨"
+              "보종명과 해약환급금 미지급형) 값이 혼재되어 있음",
+              "유형 관련 필드의 값이 잘못 분리됨"
             ],
             "suggestions": [
               "보종명 값이 온전하게 포함되도록 수정",
-              "중복된 조합을 제거",
-              "유형3의 주 구분자를 '/'로 설정하여 올바르게 분리"
+              "주 구분자에 따라 올바르게 분리",
+              "중복된 조합 제거"
             ],
-            "reasoning": "검증 결과, 보종명 값이 '[3-100%장해형]재해장해특약(무배당'과 '해약환급금 미지급형)'으로 잘못 분리되어 있으며, 이는 원본 데이터의 명칭이 온전하게 포함되지 않았음을 의미합니다. 또한, 동일한 보종명과 유형 조합이 여러 번 반복되어 중복이 발생했습니다. 유형3의 경우, '/'가 주 구분자로 사용되어야 하지만, 잘못된 분리로 인해 각 유형이 올바르게 분리되지 않았습니다. 이러한 문제로 인해 생성된 Cartesian Product가 올바르지 않다고 판단됩니다.",
+            "reasoning": "보종명 값이 '[3-100%장해형]재해장해특약(무배당'과 '해약환급금 미지급형)'으로 잘못 분리되어 있으며, 이는 원본 데이터의 명칭이 올바르게 반영되지 않았음을 나타냅니다. 또한, 유형 관련 필드의 값이 잘못 분리되어 중복된 조합이 생성되었습니다. 주 구분자에 따라 올바르게 분리되지 않은 것으로 보입니다.",
             "actual_count": 24
           }
         },
@@ -831,7 +831,7 @@
                 "간편심사(315)형\n/간편심사(335)형\n/표준형\n/우량형"
               ]
             ],
-            "instruction": "보종명 값이 온전하게 포함되도록 수정하고, 중복된 조합을 제거하며, 유형3의 주 구분자를 '/'로 설정하여 올바르게 분리"
+            "instruction": "보종명 값이 온전하게 포함되도록 수정하고, 슬래시(/)로 구분된 값을 각각 분리하여 조합하며, 중복된 조합을 제거하세요."
           },
           "success": true,
           "error": null,
@@ -918,7 +918,7 @@
             "confidence": 0.95,
             "errors": [],
             "suggestions": [],
-            "reasoning": "Cartesian Product 생성 결과를 검토한 결과, 모든 정의 항목에 '보종명', '유형1', '유형2', '유형3'이 빠짐없이 존재합니다. 각 컬럼의 주 구분자는 올바르게 판단되어 분리되었습니다. '보험종목_1'과 '보험종목_2'의 경우, '/'가 주 구분자로 사용되어 적절히 분리되었습니다. 생성된 definitions의 개수(12개)는 원본 데이터의 구조와 주 구분자에 따른 분리 결과로부터 기대되는 범위 내에 있습니다. 중복된 조합도 발견되지 않았으며, 보종명 값도 온전하게 유지되었습니다. 따라서, 생성된 Cartesian Product는 유효하다고 판단됩니다.",
+            "reasoning": "Cartesian Product 생성 결과는 주어진 검증 기준을 충족합니다. 각 정의에는 '보종명', '유형1', '유형2', '유형3'이 모두 포함되어 있으며, 원본 데이터의 각 컬럼에서 주 구분자를 올바르게 사용하여 분리되었습니다. '보험종목_1'과 '보험종목_2'의 경우, '/'가 주 구분자로 사용되어 적절히 분리되었습니다. 생성된 definitions의 개수(12개)는 원본 데이터의 구조에 따라 예상되는 범위 내에 있으며, 중복된 조합이 없습니다. 따라서, 결과는 유효하다고 판단됩니다.",
             "actual_count": 12
           }
         }

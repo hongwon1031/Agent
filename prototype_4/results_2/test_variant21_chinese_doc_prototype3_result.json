@@ -1,0 +1,418 @@
+{
+  "success": true,
+  "execution_plan": {
+    "tasks": [
+      {
+        "task_id": 1,
+        "type": "classify",
+        "description": "전체 섹션을 4가지 카테고리로 분류",
+        "strategy": "llm",
+        "fallback": null,
+        "tool_name": "section_classifier",
+        "parameters": {
+          "sections": "$sections"
+        },
+        "depends_on": null
+      },
+      {
+        "task_id": 2,
+        "type": "extract",
+        "description": "분류된 정의 섹션에서 데이터 추출",
+        "strategy": "hybrid",
+        "fallback": null,
+        "tool_name": "definition_extract_v2",
+        "parameters": {
+          "sections": "$sections",
+          "core_indices": "{{task1.definition_core}}",
+          "annotation_indices": "{{task1.definition_annotation}}"
+        },
+        "depends_on": 1
+      },
+      {
+        "task_id": 3,
+        "type": "transform",
+        "description": "Cartesian Product 생성",
+        "strategy": "rule",
+        "fallback": null,
+        "tool_name": "rule_cartesian",
+        "parameters": {
+          "header": "{{task2.header}}",
+          "data": "{{task2.data}}"
+        },
+        "depends_on": 2
+      }
+    ],
+    "reasoning": "section_classifier를 사용하여 100% recall 보장, V2 workflow 적용",
+    "estimated_difficulty": "medium"
+  },
+  "final_data": {
+    "definitions": [
+      {
+        "보종명": "簡易癌症診斷附約（非分紅，解約金不給付）",
+        "유형1": "解約金不給付型",
+        "유형2": "簡易核保型"
+      },
+      {
+        "보종명": "簡易癌症診斷附約（非分紅，解約金不給付）",
+        "유형1": "解約金不給付型",
+        "유형2": "一般核保型"
+      },
+      {
+        "보종명": "簡易癌症診斷附約（非分紅）",
+        "유형1": "一般型",
+        "유형2": "一般核保型"
+      }
+    ],
+    "total_count": 3
+  },
+  "execution_log": [
+    {
+      "task_id": 1,
+      "description": "전체 섹션을 4가지 카테고리로 분류",
+      "attempts": [
+        {
+          "attempt": 1,
+          "tool": "section_classifier",
+          "parameters": {
+            "sections": [
+              {
+                "index": 0,
+                "title": "一、保險種類名稱",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "<table>...</table>",
+                    "table": {
+                      "table_title": "保險種類說明",
+                      "table_elements": [
+                        {
+                          "名稱": "簡易癌症診斷附約（非分紅，解約金不給付）",
+                          "保險種類": "解約金不給付型",
+                          "審核型態": "簡易核保型 / 一般核保型"
+                        },
+                        {
+                          "名稱": "簡易癌症診斷附約（非分紅）",
+                          "保險種類": "一般型",
+                          "審核型態": "一般核保型"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "一、保險種類名稱",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "<table>...</table>",
+                      "table": {
+                        "table_title": "保險種類說明",
+                        "table_elements": [
+                          {
+                            "名稱": "簡易癌症診斷附約（非分紅，解約金不給付）",
+                            "保險種類": "解約金不給付型",
+                            "審核型態": "簡易核保型 / 一般核保型"
+                          },
+                          {
+                            "名稱": "簡易癌症診斷附約（非分紅）",
+                            "保險種類": "一般型",
+                            "審核型態": "一般核保型"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "index": 1,
+                "title": "三、保險期間及保費繳納期間",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "<table>...</table>",
+                    "table": {
+                      "table_title": "投保資格",
+                      "table_elements": [
+                        {
+                          "保險種類": "解約金不給付型",
+                          "保險期間": "20年 / 30年 / 終身",
+                          "繳納期間": "10年 / 20年",
+                          "投保年齡": "15歲至65歲"
+                        },
+                        {
+                          "保險種類": "一般型",
+                          "保險期間": "20年 / 30年",
+                          "繳納期間": "10年 / 20年",
+                          "投保年齡": "15歲至60歲"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "三、保險期間及保費繳納期間",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "<table>...</table>",
+                      "table": {
+                        "table_title": "投保資格",
+                        "table_elements": [
+                          {
+                            "保險種類": "解約金不給付型",
+                            "保險期間": "20年 / 30年 / 終身",
+                            "繳納期間": "10年 / 20年",
+                            "投保年齡": "15歲至65歲"
+                          },
+                          {
+                            "保險種類": "一般型",
+                            "保險期間": "20年 / 30年",
+                            "繳納期間": "10年 / 20年",
+                            "投保年齡": "15歲至60歲"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "success": true,
+          "error": null,
+          "output": {
+            "definition_core": [
+              0
+            ],
+            "definition_annotation": [],
+            "condition": [
+              1
+            ],
+            "other": [],
+            "reasoning": "Section 0은 '保險種類名稱'이라는 제목과 테이블 형태로 보험의 명칭을 정의하고 있으므로 definition_core로 분류됩니다. Section 1은 '保險期間及保費繳納期間'이라는 제목으로 계약 조건에 해당하는 정보를 테이블로 제공하고 있으므로 condition으로 분류됩니다."
+          },
+          "validation": {
+            "is_valid": true,
+            "confidence": 0.95,
+            "errors": [],
+            "suggestions": [],
+            "reasoning": "section_classifier found 1 core, 0 annotation sections"
+          }
+        }
+      ],
+      "final_success": true
+    },
+    {
+      "task_id": 2,
+      "description": "분류된 정의 섹션에서 데이터 추출",
+      "attempts": [
+        {
+          "attempt": 1,
+          "tool": "definition_extract_v2",
+          "parameters": {
+            "sections": [
+              {
+                "index": 0,
+                "title": "一、保險種類名稱",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "<table>...</table>",
+                    "table": {
+                      "table_title": "保險種類說明",
+                      "table_elements": [
+                        {
+                          "名稱": "簡易癌症診斷附約（非分紅，解約金不給付）",
+                          "保險種類": "解約金不給付型",
+                          "審核型態": "簡易核保型 / 一般核保型"
+                        },
+                        {
+                          "名稱": "簡易癌症診斷附約（非分紅）",
+                          "保險種類": "一般型",
+                          "審核型態": "一般核保型"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "一、保險種類名稱",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "<table>...</table>",
+                      "table": {
+                        "table_title": "保險種類說明",
+                        "table_elements": [
+                          {
+                            "名稱": "簡易癌症診斷附約（非分紅，解約金不給付）",
+                            "保險種類": "解約金不給付型",
+                            "審核型態": "簡易核保型 / 一般核保型"
+                          },
+                          {
+                            "名稱": "簡易癌症診斷附約（非分紅）",
+                            "保險種類": "一般型",
+                            "審核型態": "一般核保型"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "index": 1,
+                "title": "三、保險期間及保費繳納期間",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "<table>...</table>",
+                    "table": {
+                      "table_title": "投保資格",
+                      "table_elements": [
+                        {
+                          "保險種類": "解約金不給付型",
+                          "保險期間": "20年 / 30年 / 終身",
+                          "繳納期間": "10年 / 20年",
+                          "投保年齡": "15歲至65歲"
+                        },
+                        {
+                          "保險種類": "一般型",
+                          "保險期間": "20年 / 30年",
+                          "繳納期間": "10年 / 20年",
+                          "投保年齡": "15歲至60歲"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "三、保險期間及保費繳納期間",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "<table>...</table>",
+                      "table": {
+                        "table_title": "投保資格",
+                        "table_elements": [
+                          {
+                            "保險種類": "解約金不給付型",
+                            "保險期間": "20年 / 30年 / 終身",
+                            "繳納期間": "10年 / 20年",
+                            "投保年齡": "15歲至65歲"
+                          },
+                          {
+                            "保險種類": "一般型",
+                            "保險期間": "20年 / 30年",
+                            "繳納期間": "10年 / 20年",
+                            "投保年齡": "15歲至60歲"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "core_indices": [
+              0
+            ],
+            "annotation_indices": []
+          },
+          "success": true,
+          "error": null,
+          "output": {
+            "header": [
+              "名稱",
+              "保險種類",
+              "審核型態"
+            ],
+            "data": [
+              [
+                "簡易癌症診斷附約（非分紅，解約金不給付）",
+                "解約金不給付型",
+                "簡易核保型 / 一般核保型"
+              ],
+              [
+                "簡易癌症診斷附約（非分紅）",
+                "一般型",
+                "一般核保型"
+              ]
+            ],
+            "extraction_method": "v2_classifier_based"
+          },
+          "validation": {
+            "is_valid": true,
+            "confidence": 0.95,
+            "errors": [],
+            "suggestions": [],
+            "reasoning": "definition_extract_v2 extracted table with 3 columns, 2 rows"
+          }
+        }
+      ],
+      "final_success": true
+    },
+    {
+      "task_id": 3,
+      "description": "Cartesian Product 생성",
+      "attempts": [
+        {
+          "attempt": 1,
+          "tool": "rule_cartesian",
+          "parameters": {
+            "header": [
+              "名稱",
+              "保險種類",
+              "審核型態"
+            ],
+            "data": [
+              [
+                "簡易癌症診斷附約（非分紅，解約金不給付）",
+                "解約金不給付型",
+                "簡易核保型 / 一般核保型"
+              ],
+              [
+                "簡易癌症診斷附約（非分紅）",
+                "一般型",
+                "一般核保型"
+              ]
+            ]
+          },
+          "success": true,
+          "error": null,
+          "output": {
+            "definitions": [
+              {
+                "보종명": "簡易癌症診斷附約（非分紅，解約金不給付）",
+                "유형1": "解約金不給付型",
+                "유형2": "簡易核保型"
+              },
+              {
+                "보종명": "簡易癌症診斷附約（非分紅，解約金不給付）",
+                "유형1": "解約金不給付型",
+                "유형2": "一般核保型"
+              },
+              {
+                "보종명": "簡易癌症診斷附約（非分紅）",
+                "유형1": "一般型",
+                "유형2": "一般核保型"
+              }
+            ],
+            "total_count": 3
+          },
+          "validation": {
+            "is_valid": true,
+            "confidence": 0.95,
+            "errors": [],
+            "suggestions": [],
+            "reasoning": "Cartesian Product 생성 결과는 주어진 기준에 부합합니다. 원본 데이터의 각 컬럼에서 주 구분자를 올바르게 파악하여 분리하였고, 각 정의에는 모든 필수 컬럼이 포함되어 있습니다. '審核型態' 컬럼에서 '/'가 주 구분자로 사용되어 '簡易核保型'과 '一般核保型'으로 올바르게 분리되었습니다. 생성된 definitions의 개수도 원본 데이터의 구조로부터 기대되는 범위 내에 있으며, 중복된 조합이 없습니다.",
+            "actual_count": 3
+          }
+        }
+      ],
+      "final_success": true
+    }
+  ],
+  "error": null
+}
