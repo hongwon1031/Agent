@@ -42,7 +42,7 @@
         "depends_on": 2
       }
     ],
-    "reasoning": "문서의 섹션 제목이 비표준적일 가능성이 높아 semantic classification을 통해 정의 섹션을 식별하는 것이 중요합니다. 이후 정의 조합은 명확한 테이블 구조를 기반으로 rule 기반 도구를 사용하여 효율적으로 처리할 수 있습니다.",
+    "reasoning": "문서의 섹션들이 표준화된 형식이 아니므로 semantic classification을 통해 정의 섹션을 식별하는 것이 중요합니다. 정의 데이터 추출은 hybrid 전략을 통해 정확성을 높이고, 조합 생성은 rule 기반으로 빠르게 처리할 수 있습니다.",
     "estimated_difficulty": "medium"
   },
   "final_data": {
@@ -443,7 +443,7 @@
               5,
               6
             ],
-            "reasoning": "Section 0은 강의 패키지 구성을 설명하므로 definition_core로 분류했습니다. Section 2는 수강 기간, 결제 기간, 수강 가능 연령 및 결제 주기를 다루고 있어 condition으로 분류했습니다. 나머지 섹션들은 수강 대상 안내, 결제 제한 조건, 수강료 관련 사항 등으로, 보험 약관의 정의나 조건과 직접적으로 관련되지 않으므로 other로 분류했습니다."
+            "reasoning": "Section 0은 강의 패키지 구성을 설명하므로 definition_core로 분류했습니다. Section 2는 수강 기간, 결제 기간, 수강 가능 연령 및 결제 주기와 관련된 조건을 설명하므로 condition으로 분류했습니다. 나머지 섹션들은 수강 대상 안내, 결제 제한 조건, 수강료 및 할인, 선결제에 관한 사항으로, 보험 약관의 정의나 조건과 직접적으로 관련되지 않으므로 other로 분류했습니다."
           },
           "validation": {
             "is_valid": true,
