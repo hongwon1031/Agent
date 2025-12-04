@@ -7,7 +7,7 @@ Prototype 3 Main Entry Point (Version 2 - Full Implementation)
 import json
 import sys
 from pathlib import Path
-from agent import Prototype3Agent
+from agent import Prototype4_1Agent
 
 
 def load_document(doc_path: str):
@@ -37,10 +37,10 @@ def main():
     input_path = Path(sys.argv[1])
 
     # 결과 디렉터리 고정
-    results_dir = Path(r"C:\Users\NT-165\Desktop\Project\Toy\prototype_4_1\results")
+    results_dir = Path(r"C:\Users\NT-165\Desktop\Project\Toy\prototype_6\results")
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    agent = Prototype3Agent(max_replan_per_task=3)
+    agent = Prototype4_1Agent()
 
     if input_path.is_dir():
         # 디렉터리 모드: 모든 .json 처리
@@ -60,7 +60,7 @@ def main():
 
             result = agent.run(doc)
 
-            output_path = results_dir / f"{doc_path.stem}_prototype4_1_result.json"
+            output_path = results_dir / f"{doc_path.stem}_prototype6_result.json"
             save_result(result, str(output_path))
 
         print("\nAll files processed.")
@@ -74,7 +74,7 @@ def main():
             sys.exit(1)
 
         result = agent.run(doc)
-        output_path = results_dir / f"{doc_path.stem}_prototype4_1_result.json"
+        output_path = results_dir / f"{doc_path.stem}_prototype6_result.json"
         save_result(result, str(output_path))
 
 if __name__ == "__main__":

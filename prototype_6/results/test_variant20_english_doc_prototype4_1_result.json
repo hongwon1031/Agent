@@ -1,0 +1,29 @@
+{
+  "success": true,
+  "final_data": {
+    "definitions": [
+      {
+        "보종명": "Accident Disability Rider (Non-Refund)",
+        "유형1": "Non-Refund",
+        "유형2": "Simplified (315)"
+      },
+      {
+        "보종명": "Accident Disability Rider (Non-Refund)",
+        "유형1": "Non-Refund",
+        "유형2": "Simplified (335)"
+      },
+      {
+        "보종명": "Accident Disability Rider (Non-Refund)",
+        "유형1": "Non-Refund",
+        "유형2": "Standard"
+      },
+      {
+        "보종명": "Accident Disability Rider",
+        "유형1": "Standard",
+        "유형2": "Standard"
+      }
+    ],
+    "total_count": 4
+  },
+  "error": null
+}
