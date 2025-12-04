@@ -1,0 +1,514 @@
+{
+  "success": true,
+  "execution_plan": {
+    "tasks": [
+      {
+        "task_id": 1,
+        "type": "classify",
+        "description": "전체 섹션을 의미 기반으로 분류",
+        "strategy": "llm",
+        "fallback": null,
+        "tool_name": "section_classifier",
+        "parameters": {
+          "sections": "$sections"
+        },
+        "depends_on": null
+      },
+      {
+        "task_id": 2,
+        "type": "extract",
+        "description": "분류된 섹션에서 정의 데이터 추출",
+        "strategy": "hybrid",
+        "fallback": null,
+        "tool_name": "definition_extract_v2",
+        "parameters": {
+          "sections": "$sections",
+          "core_indices": "{{task1.definition_core}}",
+          "annotation_indices": "{{task1.definition_annotation}}"
+        },
+        "depends_on": 1
+      },
+      {
+        "task_id": 3,
+        "type": "transform",
+        "description": "정의 조합 생성",
+        "strategy": "rule",
+        "fallback": "llm",
+        "tool_name": "rule_cartesian",
+        "parameters": {
+          "header": "{{task2.header}}",
+          "data": "{{task2.data}}"
+        },
+        "depends_on": 2
+      }
+    ],
+    "reasoning": "문서의 섹션이 다양한 형식으로 구성되어 있어 semantic classification을 통해 의미 기반으로 분류하고, 정의 데이터 추출 후 조합 생성은 rule 기반으로 빠르게 처리할 수 있습니다.",
+    "estimated_difficulty": "medium"
+  },
+  "final_data": {
+    "definitions": [
+      {
+        "보종명": "유니코드_테스트_상품_😀",
+        "유형1": "기본형",
+        "유형2": "온라인 강의•VOD 다시보기•다운로드 제공"
+      },
+      {
+        "보종명": "ASCII_Only_Product",
+        "유형1": "프리미엄형·VIP형",
+        "유형2": "오프라인 워크숍•VOD 다시보기•다운로드 제공•쿠폰 제공🔥"
+      }
+    ],
+    "total_count": 2
+  },
+  "execution_log": [
+    {
+      "task_id": 1,
+      "description": "전체 섹션을 의미 기반으로 분류",
+      "attempts": [
+        {
+          "attempt": 1,
+          "tool": "section_classifier",
+          "parameters": {
+            "sections": [
+              {
+                "index": 0,
+                "title": "1. 상품 구성",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "",
+                    "table": {
+                      "table_title": "상품 정의 테이블",
+                      "table_elements": [
+                        {
+                          "상품명": "유니코드_테스트_상품_😀",
+                          "상품유형": "기본형",
+                          "상품유형_1": "온라인 강의\n•VOD 다시보기\n•다운로드 제공"
+                        },
+                        {
+                          "상품명": "ASCII_Only_Product",
+                          "상품유형": "프리미엄형·VIP형",
+                          "상품유형_1": "오프라인 워크숍\n•VOD 다시보기\n•다운로드 제공\n•쿠폰 제공🔥"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "content": "※ 이 테이블은 다양한 Unicode(예: Ω, µ, 🚀)와 ASCII 기호(!, #, @)가 포함된 상품 정의 예시입니다.",
+                    "table": {
+                      "table_title": "",
+                      "table_elements": []
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "1. 상품 구성",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "",
+                      "table": {
+                        "table_title": "상품 정의 테이블",
+                        "table_elements": [
+                          {
+                            "상품명": "유니코드_테스트_상품_😀",
+                            "상품유형": "기본형",
+                            "상품유형_1": "온라인 강의\n•VOD 다시보기\n•다운로드 제공"
+                          },
+                          {
+                            "상품명": "ASCII_Only_Product",
+                            "상품유형": "프리미엄형·VIP형",
+                            "상품유형_1": "오프라인 워크숍\n•VOD 다시보기\n•다운로드 제공\n•쿠폰 제공🔥"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "type": "text",
+                      "content": "※ 이 테이블은 다양한 Unicode(예: Ω, µ, 🚀)와 ASCII 기호(!, #, @)가 포함된 상품 정의 예시입니다.",
+                      "table": {
+                        "table_title": "",
+                        "table_elements": []
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "index": 1,
+                "title": "2. 코드 포맷 및 예외 사항",
+                "content": [
+                  {
+                    "type": "text",
+                    "content": "코드 예시:\n- HEX: 0x41, 0x42, 0x43 (ASCII 'A', 'B', 'C')\n- Unicode 코드포인트: U+03A9 (Ω), U+1F680 (🚀), U+1F4A5 (💥)\n- 문자열 내 이스케이프: \"\\u03A9\", \"\\uD83D\\uDE80\"",
+                    "table": {
+                      "table_title": "",
+                      "table_elements": []
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "2. 코드 포맷 및 예외 사항",
+                  "paragraphs": [
+                    {
+                      "type": "text",
+                      "content": "코드 예시:\n- HEX: 0x41, 0x42, 0x43 (ASCII 'A', 'B', 'C')\n- Unicode 코드포인트: U+03A9 (Ω), U+1F680 (🚀), U+1F4A5 (💥)\n- 문자열 내 이스케이프: \"\\u03A9\", \"\\uD83D\\uDE80\"",
+                      "table": {
+                        "table_title": "",
+                        "table_elements": []
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "index": 2,
+                "title": "3. 이용 조건 안내",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "",
+                    "table": {
+                      "table_title": "이용 가능 조건",
+                      "table_elements": [
+                        {
+                          "유형1": "기본형",
+                          "유형2": "온라인",
+                          "이용기간": "3/6/12개월",
+                          "결제기간": "일시납",
+                          "최소연령": "만15세",
+                          "이용시간": "00:00~24:00"
+                        },
+                        {
+                          "유형1": "프리미엄형",
+                          "유형2": "온라인+오프라인",
+                          "이용기간": "6/12개월",
+                          "결제기간": "일시납/3개월 분납",
+                          "최소연령": "만18세",
+                          "이용시간": "06:00~24:00"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "3. 이용 조건 안내",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "",
+                      "table": {
+                        "table_title": "이용 가능 조건",
+                        "table_elements": [
+                          {
+                            "유형1": "기본형",
+                            "유형2": "온라인",
+                            "이용기간": "3/6/12개월",
+                            "결제기간": "일시납",
+                            "최소연령": "만15세",
+                            "이용시간": "00:00~24:00"
+                          },
+                          {
+                            "유형1": "프리미엄형",
+                            "유형2": "온라인+오프라인",
+                            "이용기간": "6/12개월",
+                            "결제기간": "일시납/3개월 분납",
+                            "최소연령": "만18세",
+                            "이용시간": "06:00~24:00"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "success": true,
+          "error": null,
+          "output": {
+            "definition_core": [
+              0
+            ],
+            "definition_annotation": [
+              1
+            ],
+            "condition": [
+              2
+            ],
+            "other": [],
+            "reasoning": "Section 0은 '상품 구성'이라는 제목과 테이블이 있어 상품/보장 구조를 정의하는 것으로 보입니다. Section 1은 '코드 포맷 및 예외 사항'이라는 제목으로, 정의에 대한 예외나 주석을 설명하는 것으로 판단됩니다. Section 2는 '이용 조건 안내'라는 제목으로, 가입 조건이나 이용 조건을 설명하는 것으로 보입니다."
+          },
+          "validation": {
+            "is_valid": true,
+            "confidence": 0.95,
+            "errors": [],
+            "suggestions": [],
+            "reasoning": "분류 결과는 전반적으로 합리적입니다. 'definition_core' 섹션은 상품의 구성과 명칭을 설명하고 있으며, 'definition_annotation' 섹션은 코드 포맷과 예외 사항을 보충 설명하고 있습니다. 'condition' 섹션은 이용 조건에 대한 정보를 제공하고 있어 각 섹션이 적절한 카테고리에 분류되었습니다. 명백한 오분류는 발견되지 않았습니다."
+          }
+        }
+      ],
+      "final_success": true
+    },
+    {
+      "task_id": 2,
+      "description": "분류된 섹션에서 정의 데이터 추출",
+      "attempts": [
+        {
+          "attempt": 1,
+          "tool": "definition_extract_v2",
+          "parameters": {
+            "sections": [
+              {
+                "index": 0,
+                "title": "1. 상품 구성",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "",
+                    "table": {
+                      "table_title": "상품 정의 테이블",
+                      "table_elements": [
+                        {
+                          "상품명": "유니코드_테스트_상품_😀",
+                          "상품유형": "기본형",
+                          "상품유형_1": "온라인 강의\n•VOD 다시보기\n•다운로드 제공"
+                        },
+                        {
+                          "상품명": "ASCII_Only_Product",
+                          "상품유형": "프리미엄형·VIP형",
+                          "상품유형_1": "오프라인 워크숍\n•VOD 다시보기\n•다운로드 제공\n•쿠폰 제공🔥"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "content": "※ 이 테이블은 다양한 Unicode(예: Ω, µ, 🚀)와 ASCII 기호(!, #, @)가 포함된 상품 정의 예시입니다.",
+                    "table": {
+                      "table_title": "",
+                      "table_elements": []
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "1. 상품 구성",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "",
+                      "table": {
+                        "table_title": "상품 정의 테이블",
+                        "table_elements": [
+                          {
+                            "상품명": "유니코드_테스트_상품_😀",
+                            "상품유형": "기본형",
+                            "상품유형_1": "온라인 강의\n•VOD 다시보기\n•다운로드 제공"
+                          },
+                          {
+                            "상품명": "ASCII_Only_Product",
+                            "상품유형": "프리미엄형·VIP형",
+                            "상품유형_1": "오프라인 워크숍\n•VOD 다시보기\n•다운로드 제공\n•쿠폰 제공🔥"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "type": "text",
+                      "content": "※ 이 테이블은 다양한 Unicode(예: Ω, µ, 🚀)와 ASCII 기호(!, #, @)가 포함된 상품 정의 예시입니다.",
+                      "table": {
+                        "table_title": "",
+                        "table_elements": []
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "index": 1,
+                "title": "2. 코드 포맷 및 예외 사항",
+                "content": [
+                  {
+                    "type": "text",
+                    "content": "코드 예시:\n- HEX: 0x41, 0x42, 0x43 (ASCII 'A', 'B', 'C')\n- Unicode 코드포인트: U+03A9 (Ω), U+1F680 (🚀), U+1F4A5 (💥)\n- 문자열 내 이스케이프: \"\\u03A9\", \"\\uD83D\\uDE80\"",
+                    "table": {
+                      "table_title": "",
+                      "table_elements": []
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "2. 코드 포맷 및 예외 사항",
+                  "paragraphs": [
+                    {
+                      "type": "text",
+                      "content": "코드 예시:\n- HEX: 0x41, 0x42, 0x43 (ASCII 'A', 'B', 'C')\n- Unicode 코드포인트: U+03A9 (Ω), U+1F680 (🚀), U+1F4A5 (💥)\n- 문자열 내 이스케이프: \"\\u03A9\", \"\\uD83D\\uDE80\"",
+                      "table": {
+                        "table_title": "",
+                        "table_elements": []
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "index": 2,
+                "title": "3. 이용 조건 안내",
+                "content": [
+                  {
+                    "type": "table",
+                    "content": "",
+                    "table": {
+                      "table_title": "이용 가능 조건",
+                      "table_elements": [
+                        {
+                          "유형1": "기본형",
+                          "유형2": "온라인",
+                          "이용기간": "3/6/12개월",
+                          "결제기간": "일시납",
+                          "최소연령": "만15세",
+                          "이용시간": "00:00~24:00"
+                        },
+                        {
+                          "유형1": "프리미엄형",
+                          "유형2": "온라인+오프라인",
+                          "이용기간": "6/12개월",
+                          "결제기간": "일시납/3개월 분납",
+                          "최소연령": "만18세",
+                          "이용시간": "06:00~24:00"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "raw": {
+                  "title": "3. 이용 조건 안내",
+                  "paragraphs": [
+                    {
+                      "type": "table",
+                      "content": "",
+                      "table": {
+                        "table_title": "이용 가능 조건",
+                        "table_elements": [
+                          {
+                            "유형1": "기본형",
+                            "유형2": "온라인",
+                            "이용기간": "3/6/12개월",
+                            "결제기간": "일시납",
+                            "최소연령": "만15세",
+                            "이용시간": "00:00~24:00"
+                          },
+                          {
+                            "유형1": "프리미엄형",
+                            "유형2": "온라인+오프라인",
+                            "이용기간": "6/12개월",
+                            "결제기간": "일시납/3개월 분납",
+                            "최소연령": "만18세",
+                            "이용시간": "06:00~24:00"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "core_indices": [
+              0
+            ],
+            "annotation_indices": [
+              1
+            ]
+          },
+          "success": true,
+          "error": null,
+          "output": {
+            "header": [
+              "상품명",
+              "상품유형",
+              "상품유형_1"
+            ],
+            "data": [
+              [
+                "유니코드_테스트_상품_😀",
+                "기본형",
+                "온라인 강의\n•VOD 다시보기\n•다운로드 제공"
+              ],
+              [
+                "ASCII_Only_Product",
+                "프리미엄형·VIP형",
+                "오프라인 워크숍\n•VOD 다시보기\n•다운로드 제공\n•쿠폰 제공🔥"
+              ]
+            ],
+            "extraction_method": "v2_classifier_based"
+          },
+          "validation": {
+            "is_valid": true,
+            "confidence": 1.0,
+            "errors": [],
+            "suggestions": [],
+            "reasoning": "추출된 테이블은 원본 정의 섹션의 테이블 내용을 정확하게 반영하고 있습니다. 헤더와 데이터가 모두 비어있지 않으며, 주석 행이 데이터로 잘못 포함되지 않았습니다. 주석/예외 텍스트는 테이블 데이터에 영향을 주지 않는 정보로, 추출된 테이블에 포함되지 않아도 문제가 없습니다. 따라서 추출 품질은 합리적입니다."
+          }
+        }
+      ],
+      "final_success": true
+    },
+    {
+      "task_id": 3,
+      "description": "정의 조합 생성",
+      "attempts": [
+        {
+          "attempt": 1,
+          "tool": "rule_cartesian",
+          "parameters": {
+            "header": [
+              "상품명",
+              "상품유형",
+              "상품유형_1"
+            ],
+            "data": [
+              [
+                "유니코드_테스트_상품_😀",
+                "기본형",
+                "온라인 강의\n•VOD 다시보기\n•다운로드 제공"
+              ],
+              [
+                "ASCII_Only_Product",
+                "프리미엄형·VIP형",
+                "오프라인 워크숍\n•VOD 다시보기\n•다운로드 제공\n•쿠폰 제공🔥"
+              ]
+            ]
+          },
+          "success": true,
+          "error": null,
+          "output": {
+            "definitions": [
+              {
+                "보종명": "유니코드_테스트_상품_😀",
+                "유형1": "기본형",
+                "유형2": "온라인 강의•VOD 다시보기•다운로드 제공"
+              },
+              {
+                "보종명": "ASCII_Only_Product",
+                "유형1": "프리미엄형·VIP형",
+                "유형2": "오프라인 워크숍•VOD 다시보기•다운로드 제공•쿠폰 제공🔥"
+              }
+            ],
+            "total_count": 2
+          },
+          "validation": {
+            "is_valid": true,
+            "confidence": 0.95,
+            "errors": [],
+            "suggestions": [],
+            "reasoning": "Cartesian Product 생성 결과는 원본 데이터의 구조와 일치하며, 각 항목에는 '보종명', '유형1', '유형2'가 빠짐없이 존재합니다. 주 구분자 판단 기준에 따라 '유형2' 컬럼의 줄바꿈 문자는 내용의 일부로 간주되어 올바르게 처리되었습니다. 생성된 definitions의 개수도 원본 데이터의 구조로부터 기대되는 범위 내에 있으며, 중복된 조합이 없습니다. 따라서 결과는 유효합니다.",
+            "actual_count": 2
+          }
+        }
+      ],
+      "final_success": true
+    }
+  ],
+  "error": null
+}
