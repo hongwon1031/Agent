@@ -19,6 +19,8 @@ from tools.hybrid_tools import (
     RuleCartesianTool,
     IntelligentConditionExtractTool, # MODIFIED: Replaced ConditionExtractTool
     DefinitionConditionMergeTool,
+    GroupingLogicExtractorTool,  # NEW: Grouping logic extractor
+    CombinationGeneratorTool,    # NEW: Combination generator
 )
 
 # Initialize tools and core components once
@@ -30,7 +32,9 @@ tools = {
     "rule_cartesian": RuleCartesianTool(),
     "llm_cartesian": LLMCartesianTool(),
     "condition_extract": IntelligentConditionExtractTool(), # MODIFIED: Replaced ConditionExtractTool
-    "definition_condition_merge": DefinitionConditionMergeTool(),
+    "definition_condition_merge": DefinitionConditionMergeTool(),  # Legacy tool
+    "grouping_logic_extractor": GroupingLogicExtractorTool(),      # NEW
+    "combination_generator": CombinationGeneratorTool(),            # NEW
 }
 MAX_REPLAN_COUNT = 5
 
@@ -479,6 +483,282 @@ def merge_definition_condition(state: AgentState) -> Dict[str, Any]:
         "current_instruction": None # Clear instruction after use
     }
 
+
+# ============================================================================
+# NEW NODES: Grouping-based Architecture
+# ============================================================================
+
+def normalize_definitions(state: AgentState) -> Dict[str, Any]:
+    """
+    Node 9 (NEW): Normalize definition table column names without creating combinations.
+
+    Uses rule_cartesian's column mapping logic to normalize column names
+    (first column → "보종명", rest → "유형1", "유형2", ...) but does NOT
+    create Cartesian product. Keeps the raw table structure.
+    """
+    print("\n[NODE] normalize_definitions: Normalizing column names...")
+
+    extraction = state.get('extraction_result')
+    if not extraction or not extraction.get("header") or not extraction.get("data"):
+        return {
+            "validation_feedback": {"is_valid": False, "errors": ["No extraction_result to normalize"]},
+            "last_executed_task": "normalize_def",
+            "execution_log": state.get("execution_log", [])
+        }
+
+    header = extraction.get("header", [])
+    data = extraction.get("data", [])
+
+    # Column mapping logic (from RuleCartesianTool)
+    # First column → "보종명", rest → "유형1", "유형2", ...
+    normalized_header = []
+    if header:
+        normalized_header.append("보종명")  # First column
+        for i in range(1, len(header)):
+            normalized_header.append(f"유형{i}")
+
+    print(f"[OK] Normalized {len(header)} columns: {header} → {normalized_header}")
+    print(f"  - Data rows: {len(data)}")
+
+    # Log execution
+    log = state.get("execution_log") or []
+    log.append({
+        "type": "normalize_def",
+        "tool": "rule_based_column_mapping",
+        "params": {"original_header": header},
+        "output_summary": {
+            "normalized_header": normalized_header,
+            "row_count": len(data)
+        }
+    })
+
+    return {
+        "normalized_definitions": {
+            "header": normalized_header,
+            "data": data  # Keep raw data as-is
+        },
+        "last_executed_task": "normalize_def",
+        "execution_log": log,
+        "current_instruction": None
+    }
+
+
+def normalize_conditions(state: AgentState) -> Dict[str, Any]:
+    """
+    Node 10 (NEW): Normalize condition table column names.
+
+    Condition columns are already normalized by IntelligentConditionExtractTool,
+    so this node just passes through the data. Kept for consistency and
+    future enhancements.
+    """
+    print("\n[NODE] normalize_conditions: Normalizing condition columns...")
+
+    condition_result = state.get('condition_result')
+
+    # If no condition data, return empty
+    if not condition_result or not condition_result.get("header"):
+        print("[INFO] No condition data to normalize.")
+        log = state.get("execution_log") or []
+        log.append({
+            "type": "normalize_cond",
+            "tool": "passthrough",
+            "output_summary": {"status": "no_condition_data"}
+        })
+        return {
+            "normalized_conditions": {"header": [], "data": []},
+            "last_executed_task": "normalize_cond",
+            "execution_log": log
+        }
+
+    header = condition_result.get("header", [])
+    data = condition_result.get("data", [])
+
+    print(f"[OK] Condition columns: {header}")
+    print(f"  - Data rows: {len(data)}")
+
+    # Log execution
+    log = state.get("execution_log") or []
+    log.append({
+        "type": "normalize_cond",
+        "tool": "passthrough",
+        "params": {"header": header},
+        "output_summary": {
+            "header": header,
+            "row_count": len(data)
+        }
+    })
+
+    return {
+        "normalized_conditions": {
+            "header": header,
+            "data": data
+        },
+        "last_executed_task": "normalize_cond",
+        "execution_log": log,
+        "current_instruction": None
+    }
+
+
+def extract_grouping_logic(state: AgentState) -> Dict[str, Any]:
+    """
+    Node 11 (NEW): Extract grouping logic using LLM.
+
+    LLM analyzes Definition and Condition tables to determine which
+    definition rows match with which condition rows. Returns grouping
+    metadata (not actual combinations).
+    """
+    print("\n[NODE] extract_grouping_logic: Executing...")
+    tool = tools["grouping_logic_extractor"]
+
+    normalized_defs = state.get('normalized_definitions', {})
+    normalized_conds = state.get('normalized_conditions', {})
+
+    if not normalized_defs.get("header") or not normalized_defs.get("data"):
+        return {
+            "validation_feedback": {"is_valid": False, "errors": ["No normalized_definitions"]},
+            "last_executed_task": "grouping",
+            "execution_log": state.get("execution_log", [])
+        }
+
+    if not normalized_conds.get("header") or not normalized_conds.get("data"):
+        return {
+            "validation_feedback": {"is_valid": False, "errors": ["No normalized_conditions"]},
+            "last_executed_task": "grouping",
+            "execution_log": state.get("execution_log", [])
+        }
+
+    params = {
+        "definition_header": normalized_defs.get("header", []),
+        "definition_data": normalized_defs.get("data", []),
+        "condition_header": normalized_conds.get("header", []),
+        "condition_data": normalized_conds.get("data", []),
+    }
+
+    instruction = state.get("current_instruction")
+    if instruction:
+        params["instruction"] = instruction
+
+    # Log execution
+    log = state.get("execution_log") or []
+    log_params = {
+        "definition_rows": len(normalized_defs.get("data", [])),
+        "condition_rows": len(normalized_conds.get("data", [])),
+    }
+    if instruction:
+        log_params["instruction"] = instruction
+    log.append({"type": "grouping", "tool": tool.name, "params": log_params})
+
+    # Execute tool
+    result = tool.execute(doc=None, params=params)
+
+    if not result.success:
+        print(f"[FAIL] {result.error}")
+        return {
+            "validation_feedback": {"is_valid": False, "errors": [result.error]},
+            "last_executed_task": "grouping",
+            "execution_log": log
+        }
+
+    grouping_logic = result.data
+    num_groups = len(grouping_logic.get("groups", []))
+    summary = grouping_logic.get("summary", {})
+
+    print(f"[OK] Extracted {num_groups} groups")
+    print(f"  - Coverage: {summary.get('coverage_ratio', 0):.1%}")
+
+    # Add output summary to log
+    try:
+        log[-1]["output_summary"] = {
+            "num_groups": num_groups,
+            "matched_definitions": summary.get("matched_definition_count", 0),
+            "unmatched_definitions": summary.get("unmatched_definition_count", 0),
+            "coverage_ratio": summary.get("coverage_ratio", 0),
+        }
+    except Exception:
+        pass
+
+    return {
+        "grouping_logic": grouping_logic,
+        "last_executed_task": "grouping",
+        "execution_log": log,
+        "current_instruction": None
+    }
+
+
+def generate_final_combinations(state: AgentState) -> Dict[str, Any]:
+    """
+    Node 12 (NEW): Generate final combinations using Python.
+
+    Takes grouping logic from LLM and programmatically generates
+    all definition+condition combinations. This is pure Python logic,
+    no LLM calls, so it can handle unlimited combinations.
+    """
+    print("\n[NODE] generate_final_combinations: Executing...")
+    tool = tools["combination_generator"]
+
+    normalized_defs = state.get('normalized_definitions', {})
+    normalized_conds = state.get('normalized_conditions', {})
+    grouping_logic = state.get('grouping_logic', {})
+
+    if not grouping_logic or "groups" not in grouping_logic:
+        return {
+            "validation_feedback": {"is_valid": False, "errors": ["No grouping_logic"]},
+            "last_executed_task": "generate",
+            "execution_log": state.get("execution_log", [])
+        }
+
+    params = {
+        "definition_header": normalized_defs.get("header", []),
+        "definition_data": normalized_defs.get("data", []),
+        "condition_header": normalized_conds.get("header", []),
+        "condition_data": normalized_conds.get("data", []),
+        "grouping_logic": grouping_logic,
+    }
+
+    # Log execution
+    log = state.get("execution_log") or []
+    log_params = {
+        "definition_rows": len(normalized_defs.get("data", [])),
+        "condition_rows": len(normalized_conds.get("data", [])),
+        "num_groups": len(grouping_logic.get("groups", [])),
+    }
+    log.append({"type": "generate", "tool": tool.name, "params": log_params})
+
+    # Execute tool
+    result = tool.execute(doc=None, params=params)
+
+    if not result.success:
+        print(f"[FAIL] {result.error}")
+        return {
+            "validation_feedback": {"is_valid": False, "errors": [result.error]},
+            "last_executed_task": "generate",
+            "execution_log": log
+        }
+
+    final_result = result.data
+    stats = final_result.get("generation_stats", {})
+
+    print(f"[OK] Generated {final_result.get('total_count', 0)} final definitions")
+    print(f"  - From {stats.get('groups_processed', 0)} groups")
+    print(f"  - Matched: {stats.get('matched_definitions', 0)}, Unmatched: {stats.get('unmatched_definitions', 0)}")
+
+    # Add output summary to log
+    try:
+        log[-1]["output_summary"] = {
+            "total_count": final_result.get("total_count", 0),
+            "generation_stats": stats,
+            "sample": final_result.get("definitions", [])[:3],
+        }
+    except Exception:
+        pass
+
+    return {
+        "final_result": final_result,
+        "last_executed_task": "generate",
+        "execution_log": log
+    }
+
+
 def validate_step(state: AgentState) -> Dict[str, Any]:
     """
     Node 9: Validate the output of the previous step.
@@ -509,6 +789,18 @@ def validate_step(state: AgentState) -> Dict[str, Any]:
     elif last_task == 'merge':
         output_to_validate = state.get('merged_result')
         task_type_for_validator = 'merge'
+    elif last_task == 'normalize_def':
+        output_to_validate = state.get('normalized_definitions')
+        task_type_for_validator = 'normalize_def'
+    elif last_task == 'normalize_cond':
+        output_to_validate = state.get('normalized_conditions')
+        task_type_for_validator = 'normalize_cond'
+    elif last_task == 'grouping':
+        output_to_validate = state.get('grouping_logic')
+        task_type_for_validator = 'grouping'
+    elif last_task == 'generate':
+        output_to_validate = state.get('final_result')
+        task_type_for_validator = 'generate'
     else:
         return {"validation_feedback": {"is_valid": False, "errors": [f"Unknown task to validate: {last_task}"]}}
 
@@ -533,6 +825,13 @@ def validate_step(state: AgentState) -> Dict[str, Any]:
         context["definition_result"] = state.get('combination_result')
         # [MODIFIED] Pass raw condition_result to validator
         context["condition_result"] = state.get('condition_result')
+    elif last_task == 'grouping':
+        # Grouping logic validator needs definition and condition data for index validation
+        normalized_def = state.get('normalized_definitions', {})
+        normalized_cond = state.get('normalized_conditions', {})
+        context["definition_data"] = normalized_def.get('data', [])
+        context["condition_data"] = normalized_cond.get('data', [])
+    # normalize_def, normalize_cond, generate don't need special context
 
     # Run validation
     validation_result = validator.validate(
@@ -612,6 +911,10 @@ def should_continue(state: AgentState) -> str:
     Router: After validation, decide where to go next.
     - If valid, proceed to the next step.
     - If invalid, go to the replan node.
+
+    NEW FLOW (grouping-based):
+    classify → extract → normalize_def → extract_condition → normalize_cond
+           → grouping → generate → end
     """
     if state.get("error"):
         return "end"
@@ -623,14 +926,27 @@ def should_continue(state: AgentState) -> str:
         if last_task == "classify":
             return "extract_definitions"
         elif last_task == "extract":
+            # NEW: Go to normalize_definitions instead of extract_conditions
+            return "normalize_definitions"
+        elif last_task == "normalize_def":
+            # NEW: After normalizing definitions, extract conditions
             return "extract_conditions"
         elif last_task == "extract_condition":
-            return "create_combinations"
+            # NEW: After extracting conditions, normalize them
+            return "normalize_conditions"
+        elif last_task == "normalize_cond":
+            # NEW: After normalizing conditions, extract grouping logic
+            return "extract_grouping_logic"
+        elif last_task == "grouping":
+            # NEW: After grouping logic, generate final combinations
+            return "generate_final_combinations"
+        elif last_task == "generate":
+            # NEW: After generating combinations, we're done
+            return "end"
+        # Legacy paths (for backward compatibility if needed)
         elif last_task == "combine":
-            # [MODIFIED] Go to merge, not combine_condition
             return "merge_definition_condition"
         elif last_task == "merge":
-            # This is the last step, so we are done
             return "end"
         else:
             return "end" # Should not happen
@@ -641,6 +957,8 @@ def should_continue(state: AgentState) -> str:
 def after_replan(state: AgentState) -> str:
     """
     Router: After replanning, decide which node to backtrack to.
+
+    Backtracking strategy: Retry the last failed step.
     """
     if state.get("error"):
         return "end"
@@ -654,8 +972,21 @@ def after_replan(state: AgentState) -> str:
         return "classify_sections"
     elif last_executed_task == "extract":
         return "extract_definitions"
+    elif last_executed_task == "normalize_def":
+        # NEW: Backtrack to normalize_definitions
+        return "normalize_definitions"
     elif last_executed_task == "extract_condition":
         return "extract_conditions"
+    elif last_executed_task == "normalize_cond":
+        # NEW: Backtrack to normalize_conditions
+        return "normalize_conditions"
+    elif last_executed_task == "grouping":
+        # NEW: Backtrack to extract_grouping_logic
+        return "extract_grouping_logic"
+    elif last_executed_task == "generate":
+        # NEW: Backtrack to generate_final_combinations
+        return "generate_final_combinations"
+    # Legacy paths
     elif last_executed_task == "combine":
         return "create_combinations"
     elif last_executed_task == "merge":
@@ -671,6 +1002,25 @@ def after_replan(state: AgentState) -> str:
 def build_graph():
     """
     Builds the LangGraph agent graph.
+
+    NEW FLOW (grouping-based architecture):
+    initialize → plan → classify → validate
+                                    ↓
+                         extract_definitions → validate
+                                    ↓
+                         normalize_definitions → validate
+                                    ↓
+                         extract_conditions → validate
+                                    ↓
+                         normalize_conditions → validate
+                                    ↓
+                         extract_grouping_logic → validate
+                                    ↓
+                         generate_final_combinations → validate
+                                    ↓
+                                   END
+
+    (validate can trigger replan → backtrack to failed node)
     """
     workflow = StateGraph(AgentState)
 
@@ -680,8 +1030,14 @@ def build_graph():
     workflow.add_node("classify_sections", classify_sections)
     workflow.add_node("extract_definitions", extract_definitions)
     workflow.add_node("extract_conditions", extract_conditions)
-    workflow.add_node("create_combinations", create_combinations)
-    workflow.add_node("merge_definition_condition", merge_definition_condition)
+    workflow.add_node("create_combinations", create_combinations)  # Legacy
+    workflow.add_node("merge_definition_condition", merge_definition_condition)  # Legacy
+    # NEW: Grouping-based nodes
+    workflow.add_node("normalize_definitions", normalize_definitions)
+    workflow.add_node("normalize_conditions", normalize_conditions)
+    workflow.add_node("extract_grouping_logic", extract_grouping_logic)
+    workflow.add_node("generate_final_combinations", generate_final_combinations)
+    # Control nodes
     workflow.add_node("validate_step", validate_step)
     workflow.add_node("replan_or_finish", replan_or_finish)
 
@@ -696,8 +1052,13 @@ def build_graph():
     workflow.add_edge("classify_sections", "validate_step")
     workflow.add_edge("extract_definitions", "validate_step")
     workflow.add_edge("extract_conditions", "validate_step")
-    workflow.add_edge("create_combinations", "validate_step")
-    workflow.add_edge("merge_definition_condition", "validate_step")
+    workflow.add_edge("create_combinations", "validate_step")  # Legacy
+    workflow.add_edge("merge_definition_condition", "validate_step")  # Legacy
+    # NEW edges
+    workflow.add_edge("normalize_definitions", "validate_step")
+    workflow.add_edge("normalize_conditions", "validate_step")
+    workflow.add_edge("extract_grouping_logic", "validate_step")
+    workflow.add_edge("generate_final_combinations", "validate_step")
 
     # Conditional edge after validation
     workflow.add_conditional_edges(
@@ -706,8 +1067,13 @@ def build_graph():
         {
             "extract_definitions": "extract_definitions",
             "extract_conditions": "extract_conditions",
-            "create_combinations": "create_combinations",
-            "merge_definition_condition": "merge_definition_condition",
+            "create_combinations": "create_combinations",  # Legacy
+            "merge_definition_condition": "merge_definition_condition",  # Legacy
+            # NEW routes
+            "normalize_definitions": "normalize_definitions",
+            "normalize_conditions": "normalize_conditions",
+            "extract_grouping_logic": "extract_grouping_logic",
+            "generate_final_combinations": "generate_final_combinations",
             "replan_or_finish": "replan_or_finish",
             "end": END,
         },
@@ -721,8 +1087,13 @@ def build_graph():
             "classify_sections": "classify_sections",
             "extract_definitions": "extract_definitions",
             "extract_conditions": "extract_conditions",
-            "create_combinations": "create_combinations",
-            "merge_definition_condition": "merge_definition_condition",
+            "create_combinations": "create_combinations",  # Legacy
+            "merge_definition_condition": "merge_definition_condition",  # Legacy
+            # NEW backtrack routes
+            "normalize_definitions": "normalize_definitions",
+            "normalize_conditions": "normalize_conditions",
+            "extract_grouping_logic": "extract_grouping_logic",
+            "generate_final_combinations": "generate_final_combinations",
             "end": END
         }
     )
@@ -763,8 +1134,13 @@ class Prototype6Agent:
         if final_state.get("error"):
             return {"success": False, "error": final_state["error"], "full_log": full_log}
 
-        # Return merged_result if available, otherwise fall back to combination_result
-        final_data = final_state.get("merged_result") or final_state.get("combination_result")
+        # NEW: Return final_result from grouping-based architecture
+        # Fallback: merged_result or combination_result for legacy
+        final_data = (
+            final_state.get("final_result") or
+            final_state.get("merged_result") or
+            final_state.get("combination_result")
+        )
 
         # execution_log를 기반으로 한 간단한 task 로그 생성
         execution_log = final_state.get("execution_log", [])

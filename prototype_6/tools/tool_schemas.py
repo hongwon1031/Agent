@@ -168,6 +168,88 @@ TOOL_SCHEMAS = {
             "join_stats": "dict - {matched: int, unmatched: int, join_keys: list[str]}",
         },
     },
+    "grouping_logic_extractor": {
+        "description": "Extract grouping logic for definition-condition matching (LLM-based)",
+        "supported_formats": ["table"],
+        "parameters": {
+            "definition_header": {
+                "type": "list[str]",
+                "description": "Normalized definition table header",
+                "required": True,
+                "example": "{{task_normalize_def.header}}",
+            },
+            "definition_data": {
+                "type": "list[list[str]]",
+                "description": "Normalized definition table data (no combinations, raw table)",
+                "required": True,
+                "example": "{{task_normalize_def.data}}",
+            },
+            "condition_header": {
+                "type": "list[str]",
+                "description": "Normalized condition table header",
+                "required": True,
+                "example": "{{task_normalize_cond.header}}",
+            },
+            "condition_data": {
+                "type": "list[list[str]]",
+                "description": "Normalized condition table data (no combinations, raw table)",
+                "required": True,
+                "example": "{{task_normalize_cond.data}}",
+            },
+            "instruction": {
+                "type": "string",
+                "description": "Additional guidance for grouping logic extraction",
+                "required": False,
+            },
+        },
+        "returns": {
+            "column_mapping": "dict - {join_keys: list[str], value_columns: list[str]}",
+            "groups": "list[dict] - Grouping logic with definition_indices, condition_index",
+            "unmatched": "dict - {definition_indices: list[int], condition_indices: list[int]}",
+            "summary": "dict - Statistics summary (total counts, coverage ratio)",
+        },
+    },
+    "combination_generator": {
+        "description": "Generate final combinations based on grouping logic (Python-based, no LLM)",
+        "supported_formats": ["table"],
+        "parameters": {
+            "definition_header": {
+                "type": "list[str]",
+                "description": "Normalized definition table header",
+                "required": True,
+                "example": "{{task_normalize_def.header}}",
+            },
+            "definition_data": {
+                "type": "list[list[str]]",
+                "description": "Normalized definition table data",
+                "required": True,
+                "example": "{{task_normalize_def.data}}",
+            },
+            "condition_header": {
+                "type": "list[str]",
+                "description": "Normalized condition table header",
+                "required": True,
+                "example": "{{task_normalize_cond.header}}",
+            },
+            "condition_data": {
+                "type": "list[list[str]]",
+                "description": "Normalized condition table data",
+                "required": True,
+                "example": "{{task_normalize_cond.data}}",
+            },
+            "grouping_logic": {
+                "type": "dict",
+                "description": "Grouping logic from grouping_logic_extractor",
+                "required": True,
+                "example": "{{task_grouping.grouping_logic}}",
+            },
+        },
+        "returns": {
+            "definitions": "list[dict] - Final merged definitions with condition columns",
+            "total_count": "int - Total number of final definitions",
+            "generation_stats": "dict - {groups_processed, matched_definitions, unmatched_definitions, total_generated}",
+        },
+    },
 }
 
 

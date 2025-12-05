@@ -21,6 +21,7 @@ from core.prompt import (
     build_section_classifier_prompt,
     build_llm_intelligent_merge_prompt,
     build_intelligent_condition_extract_prompt, # NEW IMPORT
+    build_grouping_extraction_prompt, # NEW IMPORT for grouping logic
 )
 
 class ToolResult:
@@ -980,3 +981,374 @@ class DefinitionConditionMergeTool:
                 error=f"DefinitionConditionMergeTool error: {str(e)}",
                 tool_name=self.name
             )
+
+
+# ================================================================================================
+# NEW: Grouping-based Combination Generation Tools
+# ================================================================================================
+
+class GroupingLogicExtractorTool:
+    """
+    LLM 기반 그룹핑 로직 추출 도구
+
+    Definition과 Condition 원시 테이블을 분석하여 매칭 그룹을 추출합니다.
+    LLM은 "어떤 Definition들이 어떤 Condition과 매칭되는지" 논리만 출력하며,
+    실제 조합 생성은 CombinationGeneratorTool이 담당합니다.
+
+    장점:
+    - LLM 출력이 그룹 수에만 비례 (보통 5~20개) → 트렁케이션 불가능
+    - Fuzzy matching, wildcard 처리 등 복잡한 논리를 LLM이 처리
+    - 전체 구조를 한눈에 파악하여 일관된 그룹핑
+    """
+
+    def __init__(self):
+        self.name = "grouping_logic_extractor"
+        load_dotenv(dotenv_path=r"c:\Users\NT-165\Desktop\Project\Toy\.env")
+        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+    def execute(self, doc: Any, params: Dict[str, Any]) -> ToolResult:
+        """
+        Definition-Condition 매칭 그룹 추출
+
+        Args:
+            params:
+                definition_header: list[str] - Definition 테이블 헤더
+                definition_data: list[list[str]] - Definition 테이블 데이터
+                condition_header: list[str] - Condition 테이블 헤더
+                condition_data: list[list[str]] - Condition 테이블 데이터
+                instruction: str (optional) - 추가 지시사항
+
+        Returns:
+            ToolResult with grouping logic data:
+            {
+                "column_mapping": {
+                    "join_keys": ["유형1", "유형2"],
+                    "value_columns": ["보험기간", "납입기간", ...]
+                },
+                "groups": [
+                    {
+                        "id": 0,
+                        "match_condition": {"유형1": "일반형", ...},
+                        "definition_indices": [0, 3, 7],
+                        "condition_index": 0,
+                        "fuzzy_matches": {...},
+                        "reasoning": "..."
+                    }
+                ],
+                "unmatched": {
+                    "definition_indices": [...],
+                    "condition_indices": [...]
+                },
+                "summary": {...}
+            }
+        """
+        try:
+            definition_header = params.get("definition_header", [])
+            definition_data = params.get("definition_data", [])
+            condition_header = params.get("condition_header", [])
+            condition_data = params.get("condition_data", [])
+            instruction = params.get("instruction", "")
+
+            if not definition_header or not definition_data:
+                return ToolResult(
+                    success=False,
+                    error="No definition data provided",
+                    tool_name=self.name
+                )
+
+            if not condition_header or not condition_data:
+                return ToolResult(
+                    success=False,
+                    error="No condition data provided",
+                    tool_name=self.name
+                )
+
+            print(f"\n[GROUPING] Extracting grouping logic...")
+            print(f"  - Definitions: {len(definition_data)} rows")
+            print(f"  - Conditions: {len(condition_data)} rows")
+
+            # Build prompt
+            prompt = build_grouping_extraction_prompt(
+                definition_header=definition_header,
+                definition_data=definition_data,
+                condition_header=condition_header,
+                condition_data=condition_data,
+                instruction=instruction
+            )
+
+            # Call LLM
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+                temperature=0,
+                max_tokens=4000  # 그룹 수만큼만 출력되므로 충분
+            )
+
+            raw = response.choices[0].message.content
+            print("=== GROUPING RAW RESPONSE ===")
+            print(raw[:500] + "..." if len(raw) > 500 else raw)
+
+            grouping_logic = json.loads(raw)
+
+            # Validation
+            if "groups" not in grouping_logic:
+                return ToolResult(
+                    success=False,
+                    error="LLM response missing 'groups' key",
+                    tool_name=self.name
+                )
+
+            if "column_mapping" not in grouping_logic:
+                return ToolResult(
+                    success=False,
+                    error="LLM response missing 'column_mapping' key",
+                    tool_name=self.name
+                )
+
+            # Basic range validation
+            for group in grouping_logic.get("groups", []):
+                for def_idx in group.get("definition_indices", []):
+                    if def_idx < 0 or def_idx >= len(definition_data):
+                        return ToolResult(
+                            success=False,
+                            error=f"Invalid definition_index {def_idx} (out of range 0-{len(definition_data)-1})",
+                            tool_name=self.name
+                        )
+
+                cond_idx = group.get("condition_index")
+                if cond_idx < 0 or cond_idx >= len(condition_data):
+                    return ToolResult(
+                        success=False,
+                        error=f"Invalid condition_index {cond_idx} (out of range 0-{len(condition_data)-1})",
+                        tool_name=self.name
+                    )
+
+            num_groups = len(grouping_logic.get("groups", []))
+            matched_defs = sum(len(g.get("definition_indices", [])) for g in grouping_logic.get("groups", []))
+            coverage = matched_defs / len(definition_data) if definition_data else 0
+
+            print(f"\n[GROUPING] [OK] Extracted {num_groups} groups")
+            print(f"  - Matched definitions: {matched_defs}/{len(definition_data)} ({coverage:.1%})")
+            print(f"  - JOIN keys: {grouping_logic.get('column_mapping', {}).get('join_keys', [])}")
+            print(f"  - Value columns: {grouping_logic.get('column_mapping', {}).get('value_columns', [])}")
+
+            return ToolResult(
+                success=True,
+                data=grouping_logic,
+                tool_name=self.name
+            )
+
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                error=f"GroupingLogicExtractorTool error: {str(e)}",
+                tool_name=self.name
+            )
+
+
+class CombinationGeneratorTool:
+    """
+    Python 기반 조합 생성 도구
+
+    GroupingLogicExtractorTool이 추출한 그룹핑 로직을 바탕으로
+    실제 Definition+Condition 조합을 프로그래매틱하게 생성합니다.
+
+    장점:
+    - LLM 토큰 제한 무관 → 수만 개 조합도 처리 가능
+    - Deterministic → 재현성 보장
+    - 빠름 → 순수 Python 로직
+    """
+
+    def __init__(self):
+        self.name = "combination_generator"
+
+    def execute(self, doc: Any, params: Dict[str, Any]) -> ToolResult:
+        """
+        그룹핑 로직 기반 최종 조합 생성
+
+        Args:
+            params:
+                definition_header: list[str] - Definition 테이블 헤더
+                definition_data: list[list[str]] - Definition 테이블 데이터
+                condition_header: list[str] - Condition 테이블 헤더
+                condition_data: list[list[str]] - Condition 테이블 데이터
+                grouping_logic: dict - 그룹핑 로직 (GroupingLogicExtractorTool 출력)
+
+        Returns:
+            ToolResult with final combinations:
+            {
+                "definitions": [
+                    {
+                        "보종명": "암보험",
+                        "유형1": "일반형",
+                        "유형2": "-",
+                        "보험기간": "10년",
+                        "납입기간": "10년",
+                        ...
+                    },
+                    ...
+                ],
+                "total_count": 1000,
+                "generation_stats": {
+                    "groups_processed": 10,
+                    "matched_definitions": 950,
+                    "unmatched_definitions": 50,
+                    "total_generated": 1000
+                }
+            }
+        """
+        try:
+            definition_header = params.get("definition_header", [])
+            definition_data = params.get("definition_data", [])
+            condition_header = params.get("condition_header", [])
+            condition_data = params.get("condition_data", [])
+            grouping_logic = params.get("grouping_logic", {})
+
+            if not definition_header or not definition_data:
+                return ToolResult(
+                    success=False,
+                    error="No definition data provided",
+                    tool_name=self.name
+                )
+
+            if not grouping_logic or "groups" not in grouping_logic:
+                return ToolResult(
+                    success=False,
+                    error="Invalid grouping_logic (missing 'groups')",
+                    tool_name=self.name
+                )
+
+            print(f"\n[GENERATE] Generating final combinations...")
+
+            # Generate combinations
+            final_definitions = self._generate_combinations(
+                definition_header, definition_data,
+                condition_header, condition_data,
+                grouping_logic
+            )
+
+            # Calculate stats
+            groups = grouping_logic.get("groups", [])
+            matched_def_count = sum(len(g.get("definition_indices", [])) for g in groups)
+            unmatched_def_count = len(grouping_logic.get("unmatched", {}).get("definition_indices", []))
+
+            stats = {
+                "groups_processed": len(groups),
+                "matched_definitions": matched_def_count,
+                "unmatched_definitions": unmatched_def_count,
+                "total_generated": len(final_definitions)
+            }
+
+            print(f"\n[GENERATE] [OK] Generated {len(final_definitions)} final definitions")
+            print(f"  - From {len(groups)} groups")
+            print(f"  - Matched: {matched_def_count}, Unmatched: {unmatched_def_count}")
+
+            return ToolResult(
+                success=True,
+                data={
+                    "definitions": final_definitions,
+                    "total_count": len(final_definitions),
+                    "generation_stats": stats
+                },
+                tool_name=self.name
+            )
+
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                error=f"CombinationGeneratorTool error: {str(e)}",
+                tool_name=self.name
+            )
+
+    def _generate_combinations(
+        self,
+        def_header: List[str],
+        def_data: List[List[str]],
+        cond_header: List[str],
+        cond_data: List[List[str]],
+        grouping_logic: Dict[str, Any]
+    ) -> List[Dict[str, str]]:
+        """
+        그룹핑 로직에 따라 조합 생성
+
+        Args:
+            def_header: Definition 헤더
+            def_data: Definition 데이터
+            cond_header: Condition 헤더
+            cond_data: Condition 데이터
+            grouping_logic: 그룹핑 로직
+
+        Returns:
+            최종 definition 리스트 (dict 형태)
+        """
+        final_definitions = []
+        column_mapping = grouping_logic.get("column_mapping", {})
+        value_columns = column_mapping.get("value_columns", [])
+        groups = grouping_logic.get("groups", [])
+
+        # Process each group
+        for group in groups:
+            definition_indices = group.get("definition_indices", [])
+            condition_index = group.get("condition_index")
+
+            if condition_index is None or condition_index >= len(cond_data):
+                print(f"[WARNING] Group {group.get('id')} has invalid condition_index: {condition_index}")
+                continue
+
+            condition_row = cond_data[condition_index]
+
+            # For each definition in this group
+            for def_idx in definition_indices:
+                if def_idx >= len(def_data):
+                    print(f"[WARNING] Invalid definition_index: {def_idx}")
+                    continue
+
+                definition_row = def_data[def_idx]
+
+                # Create merged definition
+                merged = {}
+
+                # Add all definition columns
+                for i, col in enumerate(def_header):
+                    if i < len(definition_row):
+                        merged[col] = definition_row[i]
+                    else:
+                        merged[col] = None
+
+                # Add condition value columns
+                for col in value_columns:
+                    if col in cond_header:
+                        col_idx = cond_header.index(col)
+                        if col_idx < len(condition_row):
+                            merged[col] = condition_row[col_idx]
+                        else:
+                            merged[col] = None
+                    else:
+                        merged[col] = None
+
+                final_definitions.append(merged)
+
+        # Process unmatched definitions (condition 값은 null)
+        unmatched_def_indices = grouping_logic.get("unmatched", {}).get("definition_indices", [])
+        for def_idx in unmatched_def_indices:
+            if def_idx >= len(def_data):
+                continue
+
+            definition_row = def_data[def_idx]
+            merged = {}
+
+            # Add definition columns
+            for i, col in enumerate(def_header):
+                if i < len(definition_row):
+                    merged[col] = definition_row[i]
+                else:
+                    merged[col] = None
+
+            # Add condition columns as null
+            for col in value_columns:
+                merged[col] = None
+
+            final_definitions.append(merged)
+
+        return final_definitions

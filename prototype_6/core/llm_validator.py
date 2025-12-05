@@ -94,6 +94,50 @@ class LLMValidator:
             return self.validate_transform(task_output, context)
         elif task_type == "merge":
             return self.validate_merge(task_output, context)
+        elif task_type == "normalize_def":
+            # Normalize definitions: just check structural validity (header + data)
+            header = task_output.get("header", [])
+            data = task_output.get("data", [])
+            if not header or not data:
+                return {
+                    "is_valid": False,
+                    "confidence": 0.8,
+                    "errors": ["Normalized definitions missing header or data"],
+                    "suggestions": ["Check normalize_definitions node logic"],
+                    "reasoning": "normalize_definitions produced empty table"
+                }
+            return {
+                "is_valid": True,
+                "confidence": 0.95,
+                "errors": [],
+                "suggestions": [],
+                "reasoning": f"Normalized definitions table valid: {len(data)} rows, {len(header)} columns"
+            }
+        elif task_type == "normalize_cond":
+            # Normalize conditions: just check structural validity (header + data)
+            header = task_output.get("header", [])
+            data = task_output.get("data", [])
+            if not header or not data:
+                return {
+                    "is_valid": False,
+                    "confidence": 0.8,
+                    "errors": ["Normalized conditions missing header or data"],
+                    "suggestions": ["Check normalize_conditions node logic"],
+                    "reasoning": "normalize_conditions produced empty table"
+                }
+            return {
+                "is_valid": True,
+                "confidence": 0.95,
+                "errors": [],
+                "suggestions": [],
+                "reasoning": f"Normalized conditions table valid: {len(data)} rows, {len(header)} columns"
+            }
+        elif task_type == "grouping":
+            # Extract grouping logic: use dedicated validator
+            return self.validate_grouping_logic(task_output, context)
+        elif task_type == "generate":
+            # Generate final combinations: use dedicated validator
+            return self.validate_final_combinations(task_output, context)
         else:
             return {
                 "is_valid": True,
@@ -566,4 +610,231 @@ class LLMValidator:
                 "errors": [f"Validation error: {str(e)}"],
                 "suggestions": ["Check merge tool's output format and keys"],
                 "reasoning": "Merge validation failed due to an exception"
+            }
+
+    def validate_grouping_logic(self, task_output: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        NEW: Validate grouping logic extraction.
+
+        Checks:
+        1. Has required keys (groups, column_mapping)
+        2. Group indices are valid (in range)
+        3. Coverage ratio is acceptable (>= 50%)
+        4. JOIN keys are present
+
+        Args:
+            task_output: Grouping logic from GroupingLogicExtractorTool
+            {
+                "column_mapping": {"join_keys": [...], "value_columns": [...]},
+                "groups": [{id, definition_indices, condition_index, ...}],
+                "unmatched": {...},
+                "summary": {...}
+            }
+            context: {
+                "definition_data": [...],
+                "condition_data": [...]
+            }
+
+        Returns:
+            Dict: Validation result
+        """
+        try:
+            # Extract required data
+            column_mapping = task_output.get("column_mapping", {})
+            groups = task_output.get("groups", [])
+            unmatched = task_output.get("unmatched", {})
+            summary = task_output.get("summary", {})
+
+            definition_data = context.get("definition_data", [])
+            condition_data = context.get("condition_data", [])
+
+            # 1. Check required keys
+            if not groups:
+                return {
+                    "is_valid": False,
+                    "confidence": 1.0,
+                    "errors": ["No groups found in grouping logic"],
+                    "suggestions": ["Check LLM grouping extraction", "Review prompt for clarity"],
+                    "reasoning": "Grouping logic has no groups"
+                }
+
+            if not column_mapping:
+                return {
+                    "is_valid": False,
+                    "confidence": 1.0,
+                    "errors": ["No column_mapping found in grouping logic"],
+                    "suggestions": ["Check LLM output format"],
+                    "reasoning": "Missing column_mapping"
+                }
+
+            # 2. Validate indices
+            for group in groups:
+                definition_indices = group.get("definition_indices", [])
+                condition_index = group.get("condition_index")
+
+                # Check definition indices
+                for def_idx in definition_indices:
+                    if def_idx < 0 or def_idx >= len(definition_data):
+                        return {
+                            "is_valid": False,
+                            "confidence": 0.9,
+                            "errors": [f"Invalid definition_index {def_idx} in group {group.get('id')} (out of range 0-{len(definition_data)-1})"],
+                            "suggestions": ["Review grouping logic for index errors"],
+                            "reasoning": "Definition index out of range"
+                        }
+
+                # Check condition index
+                if condition_index is not None and (condition_index < 0 or condition_index >= len(condition_data)):
+                    return {
+                        "is_valid": False,
+                        "confidence": 0.9,
+                        "errors": [f"Invalid condition_index {condition_index} in group {group.get('id')} (out of range 0-{len(condition_data)-1})"],
+                        "suggestions": ["Review grouping logic for index errors"],
+                        "reasoning": "Condition index out of range"
+                    }
+
+            # 3. Check coverage ratio
+            coverage_ratio = summary.get("coverage_ratio", 0.0)
+            matched_count = summary.get("matched_definition_count", 0)
+            total_defs = summary.get("total_definitions", len(definition_data))
+
+            if coverage_ratio < 0.5:
+                return {
+                    "is_valid": False,
+                    "confidence": 0.7,
+                    "errors": [f"Low coverage: only {matched_count}/{total_defs} definitions matched ({coverage_ratio:.1%})"],
+                    "suggestions": [
+                        "Check if condition data covers all definition types",
+                        "Review fuzzy matching logic in prompt",
+                        "Check wildcard handling"
+                    ],
+                    "reasoning": f"Coverage ratio {coverage_ratio:.1%} below 50% threshold"
+                }
+
+            # 4. Check JOIN keys
+            join_keys = column_mapping.get("join_keys", [])
+            if not join_keys:
+                return {
+                    "is_valid": False,
+                    "confidence": 0.8,
+                    "errors": ["No JOIN keys specified in column_mapping"],
+                    "suggestions": ["Review column_mapping logic", "Ensure common columns are identified"],
+                    "reasoning": "Missing JOIN keys"
+                }
+
+            # All checks passed
+            return {
+                "is_valid": True,
+                "confidence": 0.9,
+                "errors": [],
+                "suggestions": [],
+                "reasoning": f"Grouping logic valid: {len(groups)} groups, {matched_count}/{total_defs} definitions matched ({coverage_ratio:.1%})"
+            }
+
+        except Exception as e:
+            return {
+                "is_valid": False,
+                "confidence": 0.0,
+                "errors": [f"Validation error: {str(e)}"],
+                "suggestions": ["Check grouping logic output format"],
+                "reasoning": "Grouping validation failed due to an exception"
+            }
+
+    def validate_final_combinations(self, task_output: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        NEW: Validate final combination generation.
+
+        Checks:
+        1. Definitions list is not empty
+        2. Has required core column (보종명)
+        3. Match rate is acceptable
+        4. Generation stats are present
+
+        Args:
+            task_output: Final result from CombinationGeneratorTool
+            {
+                "definitions": [...],
+                "total_count": int,
+                "generation_stats": {...}
+            }
+            context: {
+                "grouping_logic": {...}
+            }
+
+        Returns:
+            Dict: Validation result
+        """
+        try:
+            definitions = task_output.get("definitions", [])
+            total_count = task_output.get("total_count", 0)
+            stats = task_output.get("generation_stats", {})
+
+            # 1. Check if definitions exist
+            if not definitions:
+                return {
+                    "is_valid": False,
+                    "confidence": 1.0,
+                    "errors": ["Final combination generation produced no definitions"],
+                    "suggestions": ["Check grouping logic", "Review combination generator logic"],
+                    "reasoning": "No definitions generated"
+                }
+
+            # 2. Check for core column
+            if definitions:
+                sample_def = definitions[0]
+                if "보종명" not in sample_def:
+                    return {
+                        "is_valid": False,
+                        "confidence": 0.9,
+                        "errors": ["Generated definitions missing core column (보종명)"],
+                        "suggestions": ["Check combination generator's column mapping"],
+                        "reasoning": "Missing '보종명' column"
+                    }
+
+            # 3. Check generation stats
+            if not stats:
+                return {
+                    "is_valid": False,
+                    "confidence": 0.8,
+                    "errors": ["Missing generation_stats in output"],
+                    "suggestions": ["Check combination generator output format"],
+                    "reasoning": "No stats available"
+                }
+
+            matched = stats.get("matched_definitions", 0)
+            unmatched = stats.get("unmatched_definitions", 0)
+            total_generated = stats.get("total_generated", total_count)
+
+            # 4. Check match rate
+            if total_generated > 0:
+                match_rate = matched / total_generated
+                if match_rate < 0.5:
+                    return {
+                        "is_valid": False,
+                        "confidence": 0.6,
+                        "errors": [f"Low match rate: {matched}/{total_generated} ({match_rate:.1%})"],
+                        "suggestions": [
+                            "Review grouping logic for accuracy",
+                            "Check if condition data is sufficient",
+                            "Verify matching criteria"
+                        ],
+                        "reasoning": f"Match rate {match_rate:.1%} below 50% threshold"
+                    }
+
+            # All checks passed
+            return {
+                "is_valid": True,
+                "confidence": 0.95,
+                "errors": [],
+                "suggestions": [],
+                "reasoning": f"Final combinations valid: {total_count} definitions generated, match rate {matched}/{total_generated} ({matched/total_generated if total_generated > 0 else 0:.1%})"
+            }
+
+        except Exception as e:
+            return {
+                "is_valid": False,
+                "confidence": 0.0,
+                "errors": [f"Validation error: {str(e)}"],
+                "suggestions": ["Check final combination output format"],
+                "reasoning": "Final combination validation failed due to an exception"
             }
