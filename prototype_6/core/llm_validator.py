@@ -42,7 +42,7 @@ class LLMValidator:
         Task 타입에 맞는 검증 수행
 
         Args:
-            task_type: "search" | "extract" | "transform"
+            task_type: "search" | "extract" | "extract_condition" | "transform" | "merge"
             task_output: 도구 실행 결과
             context: 추가 컨텍스트 (원본 문서 등)
 
@@ -88,8 +88,12 @@ class LLMValidator:
                 }
             # 그 외 extract는 기존 definition-aware validator 사용
             return self.validate_extract_definitions(task_output, context)
+        elif task_type == "extract_condition":
+            return self.validate_condition_extract(task_output, context)
         elif task_type == "transform":
             return self.validate_transform(task_output, context)
+        elif task_type == "merge":
+            return self.validate_merge(task_output, context)
         else:
             return {
                 "is_valid": True,
@@ -387,4 +391,195 @@ class LLMValidator:
                 "errors": [f"Validation error: {str(e)}"],
                 "suggestions": [],
                 "reasoning": "Validation failed"
+            }
+
+    def validate_condition_extract(
+        self,
+        task_output: Dict[str, Any],
+        context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Condition Extract 결과 검증
+
+        Args:
+            task_output: {"header": [...], "data": [[]]}
+            context: {"condition_sections": [...]}
+
+        Returns:
+            Dict: 검증 결과
+        """
+        try:
+            header = task_output.get("header") or []
+            data = task_output.get("data") or []
+
+            # If no condition sections were provided, empty result is valid
+            condition_sections = context.get("condition_sections", [])
+            if not condition_sections:
+                if not header and not data:
+                    return {
+                        "is_valid": True,
+                        "confidence": 1.0,
+                        "errors": [],
+                        "suggestions": [],
+                        "reasoning": "No condition sections provided, empty result is valid"
+                    }
+
+            # If sections exist, we expect some data
+            if not header or not data:
+                return {
+                    "is_valid": False,
+                    "confidence": 0.7,
+                    "errors": ["condition_extract returned empty header or data despite condition sections existing"],
+                    "suggestions": [
+                        "Check if condition sections contain valid tables",
+                        "Review column name normalization logic"
+                    ],
+                    "reasoning": "condition_extract produced empty table"
+                }
+
+            # Check for minimum required columns (at least 2 condition columns beyond JOIN keys)
+            # Common JOIN keys: 유형1, 유형2, 심사형, 보장형
+            join_key_candidates = ["유형1", "유형2", "심사형", "보장형"]
+            condition_columns = [col for col in header if col not in join_key_candidates]
+
+            if len(condition_columns) < 2:
+                return {
+                    "is_valid": False,
+                    "confidence": 0.6,
+                    "errors": [f"Too few condition columns found: {condition_columns}"],
+                    "suggestions": [
+                        "Check if condition table has columns like 보험기간, 납입기간, etc.",
+                        "Review extraction logic"
+                    ],
+                    "reasoning": f"Expected at least 2 condition columns, found {len(condition_columns)}"
+                }
+
+            # Check for JOIN keys (at least one type column)
+            join_keys_found = [col for col in header if col in join_key_candidates]
+            if not join_keys_found:
+                return {
+                    "is_valid": False,
+                    "confidence": 0.7,
+                    "errors": ["No JOIN key columns (유형1, 유형2, etc.) found in condition table"],
+                    "suggestions": [
+                        "Ensure condition table includes type columns for joining",
+                        "Check column name normalization"
+                    ],
+                    "reasoning": "Condition table missing JOIN key columns"
+                }
+
+            # Basic validation passed
+            return {
+                "is_valid": True,
+                "confidence": 0.9,
+                "errors": [],
+                "suggestions": [],
+                "reasoning": f"Condition extract successful: {len(header)} columns, {len(data)} rows, JOIN keys: {join_keys_found}"
+            }
+
+        except Exception as e:
+            return {
+                "is_valid": False,
+                "confidence": 0.0,
+                "errors": [f"Validation error: {str(e)}"],
+                "suggestions": ["Check condition_extract output format"],
+                "reasoning": "Condition extract validation failed"
+            }
+
+    def validate_merge(
+        self,
+        task_output: Dict[str, Any],
+        context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Definition + Condition Merge 결과 검증
+
+        Args:
+            task_output: {"definitions": [...], "total_count": int, "join_stats": {...}}
+            context: {
+                "definition_result": {...},
+                "condition_result": {...}
+            }
+
+        Returns:
+            Dict: 검증 결과
+        """
+        try:
+            definitions = task_output.get("definitions", [])
+            total_count = task_output.get("total_count", 0)
+            join_stats = task_output.get("join_stats", {})
+
+            # If no definitions, merge failed
+            if not definitions:
+                return {
+                    "is_valid": False,
+                    "confidence": 1.0,
+                    "errors": ["Merge produced no definitions"],
+                    "suggestions": ["Check input definition and condition data"],
+                    "reasoning": "Merge result is empty"
+                }
+
+            # Check if definitions have both definition and condition columns
+            if definitions:
+                sample_def = definitions[0]
+                # Definition columns: 보종명, 유형1, 유형2, etc.
+                # Condition columns: 보험기간, 납입기간, etc.
+                has_definition_cols = "보종명" in sample_def
+
+                # Check for typical condition columns
+                condition_col_candidates = ["보험기간", "납입기간", "가입나이_남", "가입나이_여", "납입주기"]
+                has_condition_cols = any(col in sample_def for col in condition_col_candidates)
+
+                if not has_definition_cols:
+                    return {
+                        "is_valid": False,
+                        "confidence": 0.8,
+                        "errors": ["Merged definitions missing core definition column (보종명)"],
+                        "suggestions": ["Check definition input data"],
+                        "reasoning": "Merged result missing definition columns"
+                    }
+
+                # If condition data exists but no condition columns in result, that's suspicious
+                condition_input = context.get("condition_result", {})
+                condition_header = condition_input.get("header", [])
+                if condition_header and not has_condition_cols:
+                    # This might be OK if condition data doesn't have standard columns
+                    # Just warn, don't fail
+                    pass
+
+            # Check unmatched ratio
+            matched = join_stats.get("matched", 0)
+            unmatched = join_stats.get("unmatched", 0)
+
+            if matched + unmatched > 0:
+                unmatched_ratio = unmatched / (matched + unmatched)
+                if unmatched_ratio > 0.5:
+                    return {
+                        "is_valid": False,
+                        "confidence": 0.6,
+                        "errors": [f"Too many unmatched definitions: {unmatched}/{matched + unmatched} ({unmatched_ratio:.1%})"],
+                        "suggestions": [
+                            "Check JOIN key matching logic",
+                            "Review wildcard rules",
+                            "Verify condition data includes matching rows"
+                        ],
+                        "reasoning": f"Unmatched ratio {unmatched_ratio:.1%} exceeds 50% threshold"
+                    }
+
+            # All checks passed
+            return {
+                "is_valid": True,
+                "confidence": 0.9,
+                "errors": [],
+                "suggestions": [],
+                "reasoning": f"Merge successful: {total_count} definitions, {matched} matched, {unmatched} unmatched"
+            }
+
+        except Exception as e:
+            return {
+                "is_valid": False,
+                "confidence": 0.0,
+                "errors": [f"Validation error: {str(e)}"],
+                "suggestions": ["Check merge output format"],
+                "reasoning": "Merge validation failed"
             }

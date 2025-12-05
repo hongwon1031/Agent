@@ -17,6 +17,8 @@ from tools.hybrid_tools import (
     DefinitionExtractToolV2,
     LLMCartesianTool,
     RuleCartesianTool,
+    ConditionExtractTool,
+    DefinitionConditionMergeTool,
 )
 
 # Initialize tools and core components once
@@ -27,6 +29,8 @@ tools = {
     "definition_extract_v2": DefinitionExtractToolV2(),
     "rule_cartesian": RuleCartesianTool(),
     "llm_cartesian": LLMCartesianTool(),
+    "condition_extract": ConditionExtractTool(),
+    "definition_condition_merge": DefinitionConditionMergeTool(),
 }
 MAX_REPLAN_COUNT = 5
 
@@ -156,10 +160,10 @@ def extract_definitions(state: AgentState) -> Dict[str, Any]:
 
 def create_combinations(state: AgentState) -> Dict[str, Any]:
     """
-    Node 5: Create combinations using a Cartesian tool.
+    Node 5: Create combinations using a Cartesian tool (for Definition).
     """
     print("\n[NODE] create_combinations: Executing...")
-    
+
     tool_override = state.get("tool_override")
     if tool_override and tool_override in tools:
         print(f"[INFO] Using tool override: {tool_override}")
@@ -202,23 +206,197 @@ def create_combinations(state: AgentState) -> Dict[str, Any]:
     if not result.success:
         print(f"[FAIL] {result.error}")
         return {
-            "validation_feedback": {"is_valid": False, "errors": [result.error]}, 
+            "validation_feedback": {"is_valid": False, "errors": [result.error]},
             "last_executed_task": "combine",
             "execution_log": log
         }
 
     print(f"[OK] Combinations created using {tool.name}.")
     return {
-        "combination_result": result.data, 
-        "last_executed_task": "combine", 
+        "combination_result": result.data,
+        "last_executed_task": "combine",
         "execution_log": log,
         "current_instruction": None, # Clear instruction after use
         "tool_override": None # Clear override after use
     }
 
+def extract_conditions(state: AgentState) -> Dict[str, Any]:
+    """
+    Node 6: Extract conditions using ConditionExtractTool.
+    """
+    print("\n[NODE] extract_conditions: Executing...")
+    tool = tools["condition_extract"]
+    classification = state['classification_result']
+
+    # Get condition section indices
+    condition_indices = classification.get("condition", [])
+
+    # If no condition sections found, return empty result
+    if not condition_indices:
+        print("[INFO] No condition sections found. Skipping condition extraction.")
+        return {
+            "condition_result": {"header": [], "data": []},
+            "last_executed_task": "extract_condition",
+            "execution_log": state.get("execution_log", [])
+        }
+
+    params = {
+        "sections": state['sections'],
+        "condition_indices": condition_indices,
+    }
+
+    instruction = state.get("current_instruction")
+    if instruction:
+        params["instruction"] = instruction
+
+    # Log execution (sections 제거한 버전만 기록)
+    log = state.get("execution_log") or []
+    log_params = dict(params)
+    log_params.pop("sections", None)
+    log.append({"type": "extract_condition", "tool": tool.name, "params": log_params})
+
+    # 실제 툴 실행은 full params로
+    result = tool.execute(doc=None, params=params)
+
+    if not result.success:
+        print(f"[FAIL] {result.error}")
+        return {
+            "validation_feedback": {"is_valid": False, "errors": [result.error]},
+            "last_executed_task": "extract_condition",
+            "execution_log": log
+        }
+
+    print("[OK] Conditions extracted.")
+    return {
+        "condition_result": result.data,
+        "last_executed_task": "extract_condition",
+        "execution_log": log,
+        "current_instruction": None # Clear instruction after use
+    }
+
+def create_condition_combinations(state: AgentState) -> Dict[str, Any]:
+    """
+    Node 7: Create combinations for Condition using a Cartesian tool.
+    """
+    print("\n[NODE] create_condition_combinations: Executing...")
+
+    condition_data = state.get('condition_result', {})
+
+    # If no condition data, skip this step
+    if not condition_data.get("header") or not condition_data.get("data"):
+        print("[INFO] No condition data to combine. Skipping condition cartesian.")
+        return {
+            "condition_combination_result": {"header": [], "data": []},
+            "last_executed_task": "combine_condition",
+            "execution_log": state.get("execution_log", [])
+        }
+
+    tool_override = state.get("tool_override")
+    if tool_override and tool_override in tools:
+        print(f"[INFO] Using tool override: {tool_override}")
+        tool = tools[tool_override]
+    else:
+        # Default strategy: try rule-based first, then LLM.
+        tool = tools.get("rule_cartesian", tools["llm_cartesian"])
+
+    params = {
+        "header": condition_data.get("header", []),
+        "data": condition_data.get("data", []),
+    }
+    instruction = state.get("current_instruction")
+    if instruction:
+        params["instruction"] = instruction
+
+    # Log execution (sections 제거한 버전만 기록)
+    log = state.get("execution_log") or []
+    log_params = dict(params)
+    log_params.pop("sections", None)
+    log.append({"type": "combine_condition", "tool": tool.name, "params": log_params})
+
+    # 실제 툴 실행은 full params로
+    result = tool.execute(doc=None, params=params)
+
+    # Fallback logic only if no override was used
+    if not tool_override and not result.success and tool.name == "rule_cartesian":
+        print("[INFO] Rule-based condition combination failed. Trying LLM-based...")
+        tool = tools["llm_cartesian"]
+        log.append({"type": "combine_condition", "tool": tool.name, "params": params})
+        result = tool.execute(doc=None, params=params)
+
+    if not result.success:
+        print(f"[FAIL] {result.error}")
+        return {
+            "validation_feedback": {"is_valid": False, "errors": [result.error]},
+            "last_executed_task": "combine_condition",
+            "execution_log": log
+        }
+
+    print(f"[OK] Condition combinations created using {tool.name}.")
+    return {
+        "condition_combination_result": result.data,
+        "last_executed_task": "combine_condition",
+        "execution_log": log,
+        "current_instruction": None, # Clear instruction after use
+        "tool_override": None # Clear override after use
+    }
+
+def merge_definition_condition(state: AgentState) -> Dict[str, Any]:
+    """
+    Node 8: Merge Definition and Condition combinations using LEFT JOIN.
+    """
+    print("\n[NODE] merge_definition_condition: Executing...")
+    tool = tools["definition_condition_merge"]
+
+    definition_result = state.get('combination_result', {})
+    condition_result = state.get('condition_combination_result', {})
+
+    # If no condition data, return definitions as-is
+    if not condition_result.get("header") or not condition_result.get("data"):
+        print("[INFO] No condition data to merge. Returning definitions as-is.")
+        return {
+            "merged_result": definition_result,
+            "last_executed_task": "merge",
+            "execution_log": state.get("execution_log", [])
+        }
+
+    params = {
+        "definitions": definition_result.get("definitions", []),
+        "condition_header": condition_result.get("header", []),
+        "condition_data": condition_result.get("data", []),
+    }
+
+    instruction = state.get("current_instruction")
+    if instruction:
+        params["instruction"] = instruction
+
+    # Log execution
+    log = state.get("execution_log") or []
+    log_params = dict(params)
+    log.append({"type": "merge", "tool": tool.name, "params": log_params})
+
+    # 실제 툴 실행
+    result = tool.execute(doc=None, params=params)
+
+    if not result.success:
+        print(f"[FAIL] {result.error}")
+        return {
+            "validation_feedback": {"is_valid": False, "errors": [result.error]},
+            "last_executed_task": "merge",
+            "execution_log": log
+        }
+
+    print(f"[OK] Definition and Condition merged. Total: {result.data.get('total_count')}, "
+          f"Matched: {result.data.get('join_stats', {}).get('matched', 0)}")
+    return {
+        "merged_result": result.data,
+        "last_executed_task": "merge",
+        "execution_log": log,
+        "current_instruction": None # Clear instruction after use
+    }
+
 def validate_step(state: AgentState) -> Dict[str, Any]:
     """
-    Node 6: Validate the output of the previous step.
+    Node 9: Validate the output of the previous step.
     This is a generic validation node.
     """
     feedback = state.get("validation_feedback") or {}
@@ -237,9 +415,18 @@ def validate_step(state: AgentState) -> Dict[str, Any]:
     elif last_task == 'extract':
         output_to_validate = state.get('extraction_result')
         task_type_for_validator = 'extract'
+    elif last_task == 'extract_condition':
+        output_to_validate = state.get('condition_result')
+        task_type_for_validator = 'extract_condition'
     elif last_task == 'combine':
         output_to_validate = state.get('combination_result')
         task_type_for_validator = 'transform'
+    elif last_task == 'combine_condition':
+        output_to_validate = state.get('condition_combination_result')
+        task_type_for_validator = 'transform'
+    elif last_task == 'merge':
+        output_to_validate = state.get('merged_result')
+        task_type_for_validator = 'merge'
     else:
         return {"validation_feedback": {"is_valid": False, "errors": [f"Unknown task to validate: {last_task}"]}}
 
@@ -254,8 +441,17 @@ def validate_step(state: AgentState) -> Dict[str, Any]:
         context["core_sections"] = [s for s in all_sections if s['index'] in core_indices]
         context["annotation_sections"] = [s for s in all_sections if s['index'] in annotation_indices]
         context["definition_sections"] = [s for s in all_sections if s['index'] in core_indices or s['index'] in annotation_indices]
+    elif last_task == 'extract_condition':
+        condition_indices = state.get("classification_result", {}).get("condition", [])
+        all_sections = state.get('sections', [])
+        context["condition_sections"] = [s for s in all_sections if s['index'] in condition_indices]
     elif last_task == 'combine':
         context["extracted_data"] = state.get('extraction_result')
+    elif last_task == 'combine_condition':
+        context["extracted_data"] = state.get('condition_result')
+    elif last_task == 'merge':
+        context["definition_result"] = state.get('combination_result')
+        context["condition_result"] = state.get('condition_combination_result')
 
     # Run validation
     validation_result = validator.validate(
@@ -263,7 +459,7 @@ def validate_step(state: AgentState) -> Dict[str, Any]:
         task_output=output_to_validate,
         context=context
     )
-    
+
     if validation_result["is_valid"]:
         print(f"[OK] Validation passed for '{last_task}'.")
     else:
@@ -338,7 +534,7 @@ def should_continue(state: AgentState) -> str:
     """
     if state.get("error"):
         return "end"
-        
+
     validation_result = state.get("validation_feedback", {})
     last_task = state['last_executed_task']
 
@@ -346,9 +542,15 @@ def should_continue(state: AgentState) -> str:
         if last_task == "classify":
             return "extract_definitions"
         elif last_task == "extract":
+            return "extract_conditions"
+        elif last_task == "extract_condition":
             return "create_combinations"
         elif last_task == "combine":
-            # This was the last step, so we are done
+            return "create_condition_combinations"
+        elif last_task == "combine_condition":
+            return "merge_definition_condition"
+        elif last_task == "merge":
+            # This is the last step, so we are done
             return "end"
         else:
             return "end" # Should not happen
@@ -362,18 +564,24 @@ def after_replan(state: AgentState) -> str:
     """
     if state.get("error"):
         return "end"
-    
+
     # Advanced: Here, planner.replan() would return the node to go to.
     # Simple version: always retry the last failed step.
     last_executed_task = state['last_executed_task']
     print(f"[ROUTE] Backtracking to '{last_executed_task}'.")
-    
+
     if last_executed_task == "classify":
         return "classify_sections"
     elif last_executed_task == "extract":
         return "extract_definitions"
+    elif last_executed_task == "extract_condition":
+        return "extract_conditions"
     elif last_executed_task == "combine":
         return "create_combinations"
+    elif last_executed_task == "combine_condition":
+        return "create_condition_combinations"
+    elif last_executed_task == "merge":
+        return "merge_definition_condition"
     else:
         return "end"
 
@@ -393,7 +601,10 @@ def build_graph():
     workflow.add_node("plan_initial_strategy", plan_initial_strategy)
     workflow.add_node("classify_sections", classify_sections)
     workflow.add_node("extract_definitions", extract_definitions)
+    workflow.add_node("extract_conditions", extract_conditions)
     workflow.add_node("create_combinations", create_combinations)
+    workflow.add_node("create_condition_combinations", create_condition_combinations)
+    workflow.add_node("merge_definition_condition", merge_definition_condition)
     workflow.add_node("validate_step", validate_step)
     workflow.add_node("replan_or_finish", replan_or_finish)
 
@@ -404,9 +615,13 @@ def build_graph():
     workflow.add_edge("initialize_state", "plan_initial_strategy")
     workflow.add_edge("plan_initial_strategy", "classify_sections")
 
+    # All task nodes go to validation
     workflow.add_edge("classify_sections", "validate_step")
     workflow.add_edge("extract_definitions", "validate_step")
+    workflow.add_edge("extract_conditions", "validate_step")
     workflow.add_edge("create_combinations", "validate_step")
+    workflow.add_edge("create_condition_combinations", "validate_step")
+    workflow.add_edge("merge_definition_condition", "validate_step")
 
     # Conditional edge after validation
     workflow.add_conditional_edges(
@@ -414,7 +629,10 @@ def build_graph():
         should_continue,
         {
             "extract_definitions": "extract_definitions",
+            "extract_conditions": "extract_conditions",
             "create_combinations": "create_combinations",
+            "create_condition_combinations": "create_condition_combinations",
+            "merge_definition_condition": "merge_definition_condition",
             "replan_or_finish": "replan_or_finish",
             "end": END,
         },
@@ -427,7 +645,10 @@ def build_graph():
         {
             "classify_sections": "classify_sections",
             "extract_definitions": "extract_definitions",
+            "extract_conditions": "extract_conditions",
             "create_combinations": "create_combinations",
+            "create_condition_combinations": "create_condition_combinations",
+            "merge_definition_condition": "merge_definition_condition",
             "end": END
         }
     )
@@ -460,10 +681,13 @@ class Prototype6Agent:
 
         if final_state.get("error"):
             return {"success": False, "error": final_state["error"], "full_log": full_log}
-        
+
+        # Return merged_result if available, otherwise fall back to combination_result
+        final_data = final_state.get("merged_result") or final_state.get("combination_result")
+
         return {
             "success": True,
-            "final_data": final_state.get("combination_result"),
+            "final_data": final_data,
             "full_log": full_log,
             "error": None
         }

@@ -107,6 +107,67 @@ TOOL_SCHEMAS = {
             "notes": "string - Optional notes from LLM parsing",
         },
     },
+    "condition_extract": {
+        "description": "Extract condition table from classified condition sections (가입조건 추출)",
+        "supported_formats": ["table", "text", "mixed"],
+        "parameters": {
+            "sections": {
+                "type": "list[dict]",
+                "description": "List of all sections (from DocumentAccessor)",
+                "required": True,
+                "value": "$sections",
+            },
+            "condition_indices": {
+                "type": "list[int]",
+                "description": "Indices of condition sections (from section_classifier)",
+                "required": True,
+                "example": "{{task1.condition}}",
+            },
+            "instruction": {
+                "type": "string",
+                "description": "Additional guidance for extraction",
+                "required": False,
+            },
+        },
+        "returns": {
+            "header": "list[string] - Normalized column names (e.g., 유형1, 유형2, 보험기간, 납입기간)",
+            "data": "list[list[string]] - Condition rows",
+            "extraction_method": "string - Method used (e.g., 'rule_based' or 'llm_based')",
+        },
+    },
+    "definition_condition_merge": {
+        "description": "Merge Definition combinations with Condition combinations using LEFT JOIN",
+        "parameters": {
+            "definitions": {
+                "type": "list[dict]",
+                "description": "Definition combinations from Cartesian step",
+                "required": True,
+                "example": "{{task5.definitions}}",
+            },
+            "condition_header": {
+                "type": "list[string]",
+                "description": "Condition table column names",
+                "required": True,
+                "example": "{{task4.header}}",
+            },
+            "condition_data": {
+                "type": "list[list[string]]",
+                "description": "Condition table rows (after Cartesian)",
+                "required": True,
+                "example": "{{task6.data}}",
+            },
+            "instruction": {
+                "type": "string",
+                "description": "Additional guidance for merge logic",
+                "required": False,
+            },
+        },
+        "returns": {
+            "definitions": "list[dict] - Merged definitions with condition columns",
+            "total_count": "int - Total number of merged definitions",
+            "join_stats": "dict - {matched: int, unmatched: int, join_keys: list[str]}",
+        },
+    },
 }
 
 

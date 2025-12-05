@@ -14,12 +14,11 @@ from typing import Dict, Any, List, Optional
 from itertools import product
 from openai import OpenAI
 from dotenv import load_dotenv
-from core.prompt import(
+from core.prompt import (
     build_llm_extract_prompt,
     build_llm_merge_prompt,
     build_llm_cartesian_prompt,
-    build_section_classifier_prompt
-)
+    build_section_classifier_prompt)
 
 class ToolResult:
     """도구 실행 결과"""
@@ -183,7 +182,6 @@ class DefinitionExtractToolV2:
 
             prompt = build_llm_extract_prompt(content_str, content_type, instruction)
 
-
             response = self.client.chat.completions.create(
                 model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
@@ -209,8 +207,8 @@ class DefinitionExtractToolV2:
         try:
             content_str = json.dumps(content, ensure_ascii=False)
 
+            
             prompt = build_llm_merge_prompt(content_str, instruction)
-
 
             response = self.client.chat.completions.create(
                 model="gpt-4o",
@@ -356,12 +354,8 @@ class DefinitionExtractToolV2:
         if text_fragments:
             combined = "\n\n".join(text_fragments)
 
-            # Combine base instruction with additional instruction
-            base_instruction = "보험 상품의 명칭/보험종목/유형 정보를 표 형태로 추출하세요."
-            final_instruction = f"{base_instruction}\n{instruction}" if instruction else base_instruction
-
             # Use private LLM helper
-            header, rows, _ = self._llm_extract_helper(combined, "text", final_instruction)
+            header, rows, _ = self._llm_extract_helper(combined, "text", instruction)
             if header and rows:
                 return header, rows
 
@@ -543,15 +537,6 @@ class LLMCartesianTool:
             data = params.get("data", [])
             instruction = params.get("instruction", "").strip()
 
-            # Optional extra instruction block, built outside the f-string to
-            # avoid backslashes inside f-string expressions.
-            extra_instruction = ""
-            if instruction:
-                extra_instruction = (
-                    "**추가 지시사항 (이전 시도 에러 기반)**:\n"
-                    f"{instruction}\n\n"
-                )
-
             if not header or not data:
                 return ToolResult(
                     success=False,
@@ -560,8 +545,8 @@ class LLMCartesianTool:
                 )
 
             # Step 1: LLM으로 값 분리
+            
             prompt = build_llm_cartesian_prompt(header, data, instruction)
-
 
             response = self.client.chat.completions.create(
                 model="gpt-4o",
@@ -800,4 +785,424 @@ class SectionClassifierTool:
         Returns:
             str: Classification prompt
         """
+        
         return build_section_classifier_prompt(summaries, instruction)
+
+
+# ============================================================================
+# NEW: CONDITION TOOLS
+# ============================================================================
+
+class ConditionExtractTool:
+    """
+    Extract condition table from classified condition sections
+
+    Similar to DefinitionExtractToolV2 but specialized for condition tables:
+    - Extracts from condition sections (not definition)
+    - Normalizes column names (보험료 납입기간 → 납입기간)
+    - Handles split columns (가입나이 → 가입나이_남, 가입나이_여)
+    """
+
+    def __init__(self):
+        self.name = "condition_extract"
+        load_dotenv(dotenv_path=r"c:\Users\NT-165\Desktop\Project\Toy\.env")
+        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+    def execute(self, doc: Any, params: Dict[str, Any]) -> ToolResult:
+        """
+        Extract condition table from classified sections
+
+        Args:
+            params:
+                sections: list[dict] - All sections
+                condition_indices: list[int] - Indices of condition sections
+                instruction: str (optional) - Additional instruction
+
+        Returns:
+            ToolResult with data:
+                {
+                    "header": list[str],
+                    "data": list[list[str]],
+                    "extraction_method": str
+                }
+        """
+        try:
+            sections = params.get("sections", [])
+            condition_indices = params.get("condition_indices", [])
+            instruction = params.get("instruction", "")
+
+            if not sections:
+                return ToolResult(
+                    success=False,
+                    error="No sections provided",
+                    tool_name=self.name
+                )
+
+            # If no condition sections, return empty (not an error)
+            if not condition_indices:
+                return ToolResult(
+                    success=True,
+                    data={
+                        "header": [],
+                        "data": [],
+                        "extraction_method": "no_condition_sections"
+                    },
+                    tool_name=self.name
+                )
+
+            # Extract condition table
+            header, rows = self._extract_from_condition_sections(
+                sections, condition_indices, instruction
+            )
+
+            if not header or not rows:
+                return ToolResult(
+                    success=True,
+                    data={
+                        "header": [],
+                        "data": [],
+                        "extraction_method": "extraction_failed"
+                    },
+                    tool_name=self.name
+                )
+
+            return ToolResult(
+                success=True,
+                data={
+                    "header": header,
+                    "data": rows,
+                    "extraction_method": "rule_based"
+                },
+                tool_name=self.name
+            )
+
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                error=f"ConditionExtractTool error: {str(e)}",
+                tool_name=self.name
+            )
+
+    def _extract_from_condition_sections(
+        self, sections: List[Dict], condition_indices: List[int], instruction: str = ""
+    ) -> tuple[List[str], List[List[str]]]:
+        """
+        Extract condition table from condition sections
+
+        Returns:
+            (header, rows)
+        """
+        # Try each condition section
+        for idx in condition_indices:
+            if idx < 0 or idx >= len(sections):
+                continue
+
+            section = sections[idx]
+            content = section.get("content", [])
+
+            # Look for table in content
+            for item in content:
+                if not isinstance(item, dict):
+                    continue
+
+                if "table" in item:
+                    table = item["table"]
+
+                    # Try rule-based extraction
+                    header, rows = self._parse_condition_table(table)
+                    if header and rows:
+                        # Normalize column names
+                        header = self._normalize_condition_headers(header)
+                        return header, rows
+
+        return [], []
+
+    def _parse_condition_table(self, table: Dict) -> tuple[List[str], List[List[str]]]:
+        """
+        Parse condition table (reuse DefinitionExtractV2 logic)
+        """
+        try:
+            table_elements = table.get("table_elements", [])
+            if not table_elements:
+                return [], []
+
+            # Dict format
+            if isinstance(table_elements[0], dict) and "cells" not in table_elements[0]:
+                header = list(table_elements[0].keys())
+                data = []
+                for row in table_elements:
+                    data.append([str(row.get(col, "")) for col in header])
+                return header, data
+
+            # Cells format
+            else:
+                rows = []
+                for row in table_elements:
+                    cells = row.get("cells", [])
+                    if not cells:
+                        continue
+
+                    # Filter annotation rows
+                    first_cell = cells[0].get("text", "").strip()
+                    if first_cell.startswith(("※", "주:", "주)", "* ", "- ")):
+                        continue
+
+                    row_data = [cell.get("text", "").strip() for cell in cells]
+                    rows.append(row_data)
+
+                if len(rows) < 2:
+                    return [], []
+
+                header = rows[0]
+                data = rows[1:]
+                return header, data
+
+        except Exception:
+            return [], []
+
+    def _normalize_condition_headers(self, headers: List[str]) -> List[str]:
+        """
+        Normalize condition column names
+
+        Mapping:
+        - "보험기간" → "보험기간"
+        - "보험료 납입기간" → "납입기간"
+        - "가입나이" / "남자나이" / "여자나이" → "가입나이_남", "가입나이_여"
+        - "보험료 납입주기" → "납입주기"
+        - "유형1", "유형2" → keep as is (JOIN keys)
+        """
+        normalized = []
+
+        for h in headers:
+            h_clean = h.strip().replace("\n", "").replace(" ", "")
+
+            # JOIN KEY columns - keep as is
+            if h_clean in ["유형1", "유형2", "심사형", "보장형"]:
+                normalized.append(h_clean)
+
+            # Condition columns - normalize
+            elif "보험기간" in h_clean:
+                normalized.append("보험기간")
+            elif "납입기간" in h_clean or "보험료납입기간" in h_clean:
+                normalized.append("납입기간")
+            elif "남자나이" in h_clean or "남자" in h_clean and "나이" in h_clean:
+                normalized.append("가입나이_남")
+            elif "여자나이" in h_clean or "여자" in h_clean and "나이" in h_clean:
+                normalized.append("가입나이_여")
+            elif "납입주기" in h_clean or "보험료납입주기" in h_clean:
+                normalized.append("납입주기")
+            else:
+                # Unknown column - keep as is
+                normalized.append(h)
+
+        return normalized
+
+
+class DefinitionConditionMergeTool:
+    """
+    Merge Definition combinations with Condition combinations (LEFT JOIN)
+
+    JOIN strategy:
+    - JOIN KEY: 유형1 + 유형2 (auto-detected)
+    - JOIN TYPE: LEFT JOIN (Definition is primary)
+    - Wildcard: 유형2 = "-" matches all Definitions
+    """
+
+    def __init__(self):
+        self.name = "definition_condition_merge"
+
+    def execute(self, doc: Any, params: Dict[str, Any]) -> ToolResult:
+        """
+        Merge Definition and Condition combinations
+
+        Args:
+            params:
+                definitions: list[dict] - Definition Cartesian result
+                condition_definitions: list[dict] - Condition Cartesian result
+                instruction: str (optional)
+
+        Returns:
+            ToolResult with data:
+                {
+                    "definitions": list[dict] - Merged combinations,
+                    "total_count": int,
+                    "join_stats": dict
+                }
+        """
+        try:
+            definitions = params.get("definitions", [])
+            condition_definitions = params.get("condition_definitions", [])
+
+            # If no condition data, return definitions as is
+            if not condition_definitions:
+                return ToolResult(
+                    success=True,
+                    data={
+                        "definitions": definitions,
+                        "total_count": len(definitions),
+                        "join_stats": {"skipped": "no_condition_data"}
+                    },
+                    tool_name=self.name
+                )
+
+            if not definitions:
+                return ToolResult(
+                    success=False,
+                    error="No definitions provided",
+                    tool_name=self.name
+                )
+
+            # Step 1: Determine JOIN keys
+            join_keys = self._determine_join_keys(definitions, condition_definitions)
+
+            # Step 2: Build condition lookup dict
+            condition_lookup = self._build_condition_lookup(
+                condition_definitions, join_keys
+            )
+
+            # Step 3: LEFT JOIN
+            merged = self._perform_left_join(
+                definitions, condition_lookup, join_keys
+            )
+
+            # Step 4: Calculate stats
+            stats = self._calculate_join_stats(definitions, condition_definitions, merged)
+
+            return ToolResult(
+                success=True,
+                data={
+                    "definitions": merged,
+                    "total_count": len(merged),
+                    "join_stats": stats
+                },
+                tool_name=self.name
+            )
+
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                error=f"DefinitionConditionMergeTool error: {str(e)}",
+                tool_name=self.name
+            )
+
+    def _determine_join_keys(
+        self, definitions: List[Dict], conditions: List[Dict]
+    ) -> List[str]:
+        """
+        Auto-detect JOIN keys
+
+        Strategy:
+        - Find common keys between definitions and conditions
+        - Prioritize type-related keys (유형1, 유형2, etc.)
+
+        Returns:
+            list of join key names (e.g., ["유형1", "유형2"])
+        """
+        if not definitions or not conditions:
+            return []
+
+        def_keys = set(definitions[0].keys())
+        cond_keys = set(conditions[0].keys())
+
+        # Find common keys
+        common_keys = def_keys & cond_keys
+
+        # Filter for type-related keys
+        type_keys = [k for k in common_keys if "유형" in k or "형" in k]
+
+        # Prioritize: 유형1 > 유형2 > others
+        priority = ["유형1", "유형2", "심사형", "보장형"]
+        join_keys = [k for k in priority if k in type_keys]
+
+        # Add remaining type keys
+        join_keys.extend([k for k in type_keys if k not in join_keys])
+
+        return join_keys[:2]  # Max 2 keys
+
+    def _build_condition_lookup(
+        self, conditions: List[Dict], join_keys: List[str]
+    ) -> Dict[tuple, Dict]:
+        """
+        Build condition lookup dict for fast JOIN
+
+        Returns:
+            {
+                (유형1값, 유형2값): {보험기간: ..., 납입기간: ...},
+                ("-", "-"): {wildcard condition},
+                ...
+            }
+        """
+        lookup = {}
+
+        # Condition columns (exclude JOIN keys)
+        cond_cols = set(conditions[0].keys()) - set(join_keys) if conditions else set()
+
+        for cond in conditions:
+            # Extract JOIN key values
+            key = tuple(cond.get(k, "") for k in join_keys)
+
+            # Extract condition values
+            cond_values = {k: cond.get(k, "") for k in cond_cols}
+
+            lookup[key] = cond_values
+
+        return lookup
+
+    def _perform_left_join(
+        self, definitions: List[Dict], condition_lookup: Dict[tuple, Dict], join_keys: List[str]
+    ) -> List[Dict]:
+        """
+        LEFT JOIN definitions with conditions
+
+        Strategy:
+        1. For each definition:
+           a. Extract JOIN key values
+           b. Lookup condition (exact match)
+           c. If not found, try wildcard (all keys = "-")
+           d. If still not found, fill with NULL
+        2. Merge definition + condition
+        """
+        merged = []
+        wildcard_key = tuple("-" for _ in join_keys)
+
+        for defn in definitions:
+            # Extract JOIN key values
+            key = tuple(defn.get(k, "") for k in join_keys)
+
+            # Lookup condition (exact match)
+            cond = condition_lookup.get(key)
+
+            # Wildcard fallback
+            if cond is None and wildcard_key in condition_lookup:
+                cond = condition_lookup[wildcard_key]
+
+            # Merge
+            if cond:
+                merged_item = {**defn, **cond}
+            else:
+                # No match - fill with NULL
+                merged_item = defn.copy()
+                # Add NULL for condition columns
+                if condition_lookup:
+                    sample_cond = next(iter(condition_lookup.values()))
+                    for col in sample_cond.keys():
+                        merged_item.setdefault(col, None)
+
+            merged.append(merged_item)
+
+        return merged
+
+    def _calculate_join_stats(
+        self, definitions: List[Dict], conditions: List[Dict], merged: List[Dict]
+    ) -> Dict:
+        """
+        Calculate JOIN statistics
+        """
+        unmatched = len([m for m in merged if any(v is None for v in m.values())])
+
+        return {
+            "definition_count": len(definitions),
+            "condition_count": len(conditions),
+            "merged_count": len(merged),
+            "unmatched_definitions": unmatched
+        }

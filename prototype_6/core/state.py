@@ -39,6 +39,9 @@ class AgentState(TypedDict):
     classification_result: Optional[Dict]
     extraction_result: Optional[Dict]
     combination_result: Optional[Dict]
+    condition_result: Optional[Dict]              # NEW: Condition extraction result
+    condition_combination_result: Optional[Dict]  # NEW: Condition Cartesian result
+    merged_result: Optional[Dict]                 # NEW: Definition+Condition merge result
 
     # Control flow and metadata
     validation_feedback: Optional[Dict]
