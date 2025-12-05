@@ -294,8 +294,13 @@ annotation 해석에 대한 완전한 정답을 강제하기보다는 **명백�
    ### 아키텍처
    ```
    기존: classify → extract_def → cartesian_def → END
-   확장: classify → extract_def → extract_cond → cartesian_def → cartesian_cond → merge → END
+   최종: classify → extract_def → extract_cond → cartesian_def → LLM_intelligent_merge → END
    ```
+
+   **핵심 설계 결정**:
+   - ❌ ~~Condition 데이터에 Cartesian Product 적용~~ (부적절한 조합 생성 문제)
+   - ✅ **LLM 기반 지능형 병합**: Condition 원시 테이블을 그대로 LLM에게 전달하여 의미적 매칭 수행
+   - **장점**: 유연한 JOIN 키 처리, 의미적 매칭, 복잡한 조건 해석 가능
 
    **전체 플로우**:
    ```
@@ -305,11 +310,9 @@ annotation 해석에 대한 완전한 정답을 강제하기보다는 **명백�
                               ↓ (valid)
                        extract_conditions → validate
                               ↓ (valid)
-                       create_combinations (Definition) → validate
+                       create_combinations (Definition만) → validate
                               ↓ (valid)
-                       create_condition_combinations → validate
-                              ↓ (valid)
-                       merge_definition_condition → validate
+                       merge_definition_condition (LLM 기반) → validate
                               ↓ (valid)
                              END
 
@@ -318,7 +321,7 @@ annotation 해석에 대한 완전한 정답을 강제하기보다는 **명백�
 
    ### 핵심 컴포넌트
 
-   #### a. `ConditionExtractTool` (`tools/hybrid_tools.py` Lines 793-995)
+   #### a. `ConditionExtractTool` (`tools/hybrid_tools.py`)
    - **목적**: `condition` 섹션에서 조건 테이블 추출
    - **추출 대상**: `유형1, 유형2, 보험기간, 납입기간, 가입나이_남, 가입나이_여, 납입주기`
    - **로직**:
@@ -328,44 +331,61 @@ annotation 해석에 대한 완전한 정답을 강제하기보다는 **명백�
      - JOIN KEY 컬럼 보존: `유형1, 유형2, 심사형, 보장형`
    - **출력**: `{"header": [...], "data": [[...]], "extraction_method": "rule_based"}`
 
-   #### b. `extract_conditions` 노드 (`agent.py` Lines 223-275)
+   #### b. `extract_conditions` 노드 (`agent.py`)
    - **목적**: ConditionExtractTool을 실행하는 LangGraph 노드
    - **입력**: `classification_result.condition` (condition 섹션 인덱스)
    - **처리**:
      - Condition 섹션이 없으면 빈 결과 반환
      - ConditionExtractTool 실행
      - 실패 시 validation_feedback 설정
-   - **출력**: `condition_result` 업데이트
+   - **출력**: `condition_result` 업데이트 (원시 테이블 형태)
 
-   #### c. `create_condition_combinations` 노드 (`agent.py` Lines 277-341)
-   - **목적**: Condition 테이블에 Cartesian Product 적용
-   - **이유**: Condition도 다중 옵션 가능 (예: "10, 20, 30년만기" → 3개 조합)
-   - **도구**: 기존 `RuleCartesianTool` / `LLMCartesianTool` 재사용
-   - **입력**: `condition_result.header`, `condition_result.data`
-   - **출력**: `condition_combination_result` 업데이트
-   - **Fallback**: Rule-based 실패 시 LLM-based로 자동 전환
+   #### c. `DefinitionConditionMergeTool` - **LLM 기반 지능형 병합** (`tools/hybrid_tools.py`)
+   - **목적**: Definition 조합과 Condition 원시 테이블을 **LLM을 통해 의미적으로 병합**
+   - **입력**:
+     - `definitions`: Definition Cartesian 결과 (확장된 조합 리스트)
+     - `condition_header`, `condition_data`: Condition 원시 테이블 (조합하지 않음)
+   - **LLM 프롬프트** (`core/prompt.py::build_llm_intelligent_merge_prompt`):
+     - Definition 각 행과 Condition 테이블을 비교하여 매칭
+     - 유연한 JOIN 키 처리 (정확히 일치하지 않아도 의미적으로 매칭)
+     - 와일드카드 지원 (`유형2 = "-"` → 모든 Definition에 적용)
+     - 복잡한 조건 해석 (예: "만15세 ~ min{(80 – 년만기), 70}세")
+   - **출력**:
+     ```python
+     {
+       "definitions": [
+         {
+           "보종명": "...",
+           "유형1": "...",
+           "유형2": "...",
+           "보험기간": "...",  # ← Condition에서 병합
+           "납입기간": "...",  # ← Condition에서 병합
+           ...
+         }
+       ],
+       "total_count": int,
+       "join_stats": {
+         "definition_count": int,
+         "unmatched_definition_indices": [list],  # 병합 실패한 Definition 인덱스
+         "reasoning": str  # LLM의 매칭 논리 설명
+       }
+     }
+     ```
+   - **장점**:
+     - 의미적 매칭 가능 (단순 문자열 일치 불필요)
+     - 복잡한 조건 자동 해석
+     - 다양한 컬럼명 변형 자동 처리
+     - Condition 과다 조합 문제 해결
 
-   #### d. `DefinitionConditionMergeTool` (`tools/hybrid_tools.py` Lines 998-1206)
-   - **목적**: Definition 조합과 Condition 조합을 LEFT JOIN
-   - **JOIN KEY 자동 감지**: `유형1 + 유형2` (우선순위: `["유형1", "유형2", "심사형", "보장형"]`)
-   - **와일드카드 지원**: `유형2 = "-"` → 모든 Definition에 매칭
-   - **로직**:
-     1. `_determine_join_keys()`: Definition/Condition 공통 컬럼에서 JOIN KEY 자동 결정
-     2. `_build_condition_lookup()`: Condition 데이터를 JOIN KEY 기준으로 딕셔너리 구축
-     3. `_perform_left_join()`:
-        - Exact match 시도
-        - 실패 시 wildcard fallback (유형2="-" 등)
-        - 여전히 매칭 실패 시 NULL 값으로 채움
-     4. JOIN 통계 수집: `{matched: int, unmatched: int, join_keys: list}`
-   - **출력**: `{"definitions": [...], "total_count": int, "join_stats": {...}}`
-
-   #### e. `merge_definition_condition` 노드 (`agent.py` Lines 343-395)
+   #### d. `merge_definition_condition` 노드 (`agent.py`)
    - **목적**: DefinitionConditionMergeTool을 실행하는 LangGraph 노드
-   - **입력**: `combination_result.definitions`, `condition_combination_result`
+   - **입력**:
+     - `combination_result.definitions` (Definition Cartesian 결과)
+     - `condition_result` (Condition 원시 테이블, **조합 전 상태**)
    - **처리**:
      - Condition 데이터 없으면 Definition 그대로 반환
-     - DefinitionConditionMergeTool 실행
-     - JOIN 통계 로그 출력
+     - LLM 기반 DefinitionConditionMergeTool 실행
+     - JOIN 통계 로그 출력 (unmatched 비율 표시)
    - **출력**: `merged_result` 업데이트
 
    ### 최종 스키마
@@ -382,14 +402,14 @@ annotation 해석에 대한 완전한 정답을 강제하기보다는 **명백�
    }
    ```
 
-   ### State 확장 (`core/state.py` Lines 38-44)
-   - `condition_result: Optional[Dict]`: Condition 추출 결과
-   - `condition_combination_result: Optional[Dict]`: Condition Cartesian 결과
-   - `merged_result: Optional[Dict]`: Definition+Condition JOIN 결과
+   ### State 확장 (`core/state.py`)
+   - `condition_result: Optional[Dict]`: Condition 추출 결과 (원시 테이블)
+   - ~~`condition_combination_result`~~: **제거됨** (Condition 조합 단계 삭제)
+   - `merged_result: Optional[Dict]`: Definition+Condition LLM 병합 결과
 
    ### Validator 확장 (`core/llm_validator.py`)
 
-   #### `validate_condition_extract` (Lines 396-487)
+   #### `validate_condition_extract`
    - **검증 항목**:
      - Condition 섹션 없으면 빈 결과 허용
      - 섹션 있으면 header/data 필수
@@ -397,38 +417,41 @@ annotation 해석에 대한 완전한 정답을 강제하기보다는 **명백�
      - 최소 1개 이상의 JOIN KEY (유형1, 유형2 등)
    - **에러**: 컬럼 부족, JOIN KEY 누락 시 is_valid=False
 
-   #### `validate_merge` (Lines 489-585)
+   #### `validate_merge` - **LLM 병합 결과 검증**
    - **검증 항목**:
      - 병합 결과 비어있지 않음
      - 필수 Definition 컬럼 존재 (보종명)
-     - Unmatched 비율 < 50% (threshold)
+     - **Unmatched 비율 < 50%**: `len(unmatched_definition_indices) / definition_count < 0.5`
+     - LLM의 reasoning 필드 존재 확인
    - **에러**: 빈 결과, 필수 컬럼 누락, Unmatched 과다 시 is_valid=False
+   - **개선점**: Rule-based JOIN 대신 LLM 출력 검증 (더 유연한 매칭 허용)
 
    ### Graph/Router 수정 (`agent.py`)
 
-   #### `should_continue` (Lines 529-559)
-   - 새로운 라우팅 로직 추가:
+   #### `should_continue`
+   - **변경된 라우팅 로직**:
      - `classify` → `extract_definitions`
      - `extract` → `extract_conditions`
-     - `extract_condition` → `create_combinations`
-     - `combine` → `create_condition_combinations`
-     - `combine_condition` → `merge_definition_condition`
+     - `extract_condition` → `create_combinations` (Definition만)
+     - `combine` → ~~`create_condition_combinations`~~ → **`merge_definition_condition`** (직행)
      - `merge` → `end`
+   - **제거**: `combine_condition` 라우팅 (Condition 조합 단계 삭제)
 
-   #### `after_replan` (Lines 561-586)
-   - 백트래킹 로직에 새 노드 추가:
+   #### `after_replan`
+   - 백트래킹 로직:
      - `extract_condition` → `extract_conditions`
-     - `combine_condition` → `create_condition_combinations`
+     - ~~`combine_condition`~~: **제거됨**
      - `merge` → `merge_definition_condition`
 
-   #### `build_graph` (Lines 593-658)
-   - 노드 추가: `extract_conditions`, `create_condition_combinations`, `merge_definition_condition`
-   - 엣지 추가: 모든 새 노드 → `validate_step`
-   - 조건부 엣지 업데이트: 새 노드들 라우팅 추가
+   #### `build_graph`
+   - **노드 추가**: `extract_conditions`, `merge_definition_condition`
+   - **노드 제거**: ~~`create_condition_combinations`~~ (불필요)
+   - 엣지: 모든 task 노드 → `validate_step`
+   - 조건부 엣지: 새 라우팅 로직 반영
 
    ### Tool Schemas 추가 (`tools/tool_schemas.py`)
 
-   #### `condition_extract` (Lines 110-137)
+   #### `condition_extract`
    ```python
    {
      "description": "Extract condition table from classified condition sections (가입조건 추출)",
@@ -439,51 +462,58 @@ annotation 해석에 대한 완전한 정답을 강제하기보다는 **명백�
      },
      "returns": {
        "header": "list[string] - Normalized column names",
-       "data": "list[list[string]] - Condition rows",
+       "data": "list[list[string]] - Condition rows (원시 테이블)",
        "extraction_method": "string - Method used"
      }
    }
    ```
 
-   #### `definition_condition_merge` (Lines 138-170)
+   #### `definition_condition_merge` - **LLM 기반**
    ```python
    {
-     "description": "Merge Definition combinations with Condition combinations using LEFT JOIN",
+     "description": "Merge Definition combinations with Condition table using LLM-based intelligent matching",
      "parameters": {
-       "definitions": {"type": "list[dict]", "required": True, "example": "{{task5.definitions}}"},
-       "condition_header": {"type": "list[string]", "required": True, "example": "{{task4.header}}"},
-       "condition_data": {"type": "list[list[string]]", "required": True, "example": "{{task6.data}}"},
+       "definitions": {"type": "list[dict]", "required": True, "example": "{{task3.definitions}}"},
+       "condition_header": {"type": "list[string]", "required": True, "example": "{{task2.header}}"},
+       "condition_data": {"type": "list[list[string]]", "required": True, "example": "{{task2.data}}"},  # 원시 데이터
        "instruction": {"type": "string", "required": False}
      },
      "returns": {
-       "definitions": "list[dict] - Merged definitions",
-       "total_count": "int - Total count",
-       "join_stats": "dict - {matched, unmatched, join_keys}"
+       "definitions": "list[dict] - Merged definitions with condition columns",
+       "total_count": "int - Total number of merged definitions",
+       "join_stats": {
+         "definition_count": "int - Input definition count",
+         "unmatched_definition_indices": "list[int] - Unmatched indices",
+         "reasoning": "string - LLM's matching logic explanation"
+       }
      }
    }
    ```
 
-   ### Edge Cases
-   1. **Condition 섹션 없음**: `extract_conditions`에서 빈 결과 반환 → 이후 노드들 skip
-   2. **와일드카드 행**: `유형2 = "-"` → 모든 Definition에 매칭
-   3. **JOIN 실패**: NULL로 채우고 Validator가 unmatched 비율 체크 → replan
-   4. **컬럼명 변형**: 정규화 로직으로 통일 ("보험료 납입기간" → "납입기간")
-   5. **Split 컬럼**: "남/여" 분리 → "가입나이_남", "가입나이_여"
+   ### Edge Cases 및 LLM 처리
+   1. **Condition 섹션 없음**: `extract_conditions`에서 빈 결과 반환 → merge 시 Definition만 반환
+   2. **와일드카드 행**: LLM이 `유형2 = "-"` 를 "모든 Definition에 적용" 으로 해석
+   3. **복잡한 조건식**: LLM이 자동 해석 (예: "만15세 ~ min{(80 – 년만기), 70}세")
+   4. **컬럼명 변형**: Extraction 단계에서 정규화 + LLM이 의미적으로 매칭
+   5. **Split 컬럼**: "남/여" → "가입나이_남", "가입나이_여" (Extraction에서 처리)
+   6. **매칭 실패**: LLM이 unmatched_definition_indices에 기록 → Validator 체크 → replan
 
    ### 구현 파일 요약
-   - `core/state.py`: State 확장 (3개 필드 추가)
+   - `core/state.py`: State 확장 (condition_result, merged_result)
+   - `core/prompt.py`: **NEW** `build_llm_intelligent_merge_prompt` 추가
    - `tools/hybrid_tools.py`:
-     - `ConditionExtractTool` (Lines 793-995)
-     - `DefinitionConditionMergeTool` (Lines 998-1206)
+     - `ConditionExtractTool`: Rule-based 테이블 추출
+     - `DefinitionConditionMergeTool`: **완전 재설계** - LLM 기반 병합 로직
    - `agent.py`:
-     - 노드 추가 (Lines 223-395)
-     - Router 수정 (Lines 529-586)
-     - Graph 빌더 수정 (Lines 593-658)
-     - run() 메서드 수정 (merged_result 반환)
+     - 노드 추가: `extract_conditions`, `merge_definition_condition`
+     - 노드 제거: ~~`create_condition_combinations`~~
+     - Router 수정: `combine` → `merge` 직행
+     - Graph 빌더: 새 플로우 반영
+     - run() 메서드: `merged_result` 반환
    - `core/llm_validator.py`:
-     - `validate_condition_extract` (Lines 396-487)
-     - `validate_merge` (Lines 489-585)
-   - `tools/tool_schemas.py`: 스키마 2개 추가 (Lines 110-170)
+     - `validate_condition_extract`: 원시 테이블 검증
+     - `validate_merge`: **업데이트** - LLM 출력 구조 검증 (unmatched_definition_indices 체크)
+   - `tools/tool_schemas.py`: 스키마 2개 추가/수정
 
 
 ---
