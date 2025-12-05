@@ -365,7 +365,7 @@ def build_validate_definition_extract_v2_llm(
 ) -> str:
     base = f"""당신은 데이터 추출 품질을 검토하는 전문가입니다.
 
-**임무**: 
+**임무**:
 - DefinitionExtractV2 도구가 원본 섹션에서 테이블을 **올바르게 추출**했는지 확인하세요.
 - 정의 관련 섹션들(테이블 + 텍스트)를 보고, DefinitinoExtractV2가 추출한 테이블이 이 섹션들의 정의 + 주석/예외를 대체로 잘 반영했는지 확인하세요
 
@@ -495,7 +495,7 @@ Data 전체:
 
 4. **값 잘림 여부**
    - 보종명(명칭) 값이 중간에서 끊기지 않고 온전히 유지되어야 합니다.
-   - 줄바꿈(`\\n`)이 공백으로 바뀌는 것은 허용되지만, 텍스트 일부가 사라지면 안 됩니다.
+   - 줄바꿈(`\n`)이 공백으로 바뀌는 것은 허용되지만, 텍스트 일부가 사라지면 안 됩니다.
 
 5. **유형 컬럼 정합성**
    - "보험종목", "보험종목_1", "유형1", "유형2" 등 유형 관련 값들이 서로 섞여 있지 않고,
@@ -565,7 +565,7 @@ def build_llm_extract_prompt(content_str: str, content_type: str, instruction: s
     extra = f"\n**최우선 지시사항(있는 경우 절대적으로 우선 적용)**: {instruction}\n" if instruction else ""
     tail = """
     다음 JSON 형식으로 반환:
-    {
+    {{
       "header": ["컬럼1", "컬럼2", ...],
       "data": [
         ["값1", "값2", ...],
@@ -615,14 +615,14 @@ def build_llm_merge_prompt(content_str: str, instruction: str = "") -> str:
         - 컬럼 개수와 이름을 정확히 보존하세요
     2. 주석 행 제외 (※, 주:, 주), *, - 로 시작하는 설명)
     3. Header와 Data rows로 구분
-    4. 셀 내용은 정리하되, 줄바꿈(\\n)은 공백으로 변환
+    4. 셀 내용은 정리하되, 줄바꿈(\n)은 공백으로 변환
     5. 데이터 손실 없이 모든 셀의 값을 추출"""
 
     extra = f"\n**최우선 지시사항(있는 경우 절대적으로 우선 적용)**: {instruction}\n" if instruction else ""
     
     tail = """
     **출력 형식 (JSON)**:
-    {
+    {{
       "header": ["최종 컬럼1", "최종 컬럼2", ...],
       "data": [
         ["최종 값1", "최종 값2", ...],
@@ -678,7 +678,7 @@ Data:
      → 주 구분자: `/`
      → 분리 결과: ["간편심사(315)형", "간편심사(335)형", "간편심사(355)형"]
 
-2. 줄바꿈(\\n)과 공백은 strip하되, 보종명(첫 번째 컬럼)은 줄바꿈 유지
+2. 줄바꿈(\n)과 공백은 strip하되, 보종명(첫 번째 컬럼)은 줄바꿈 유지
 
 3. 각 행은 독립적으로 처리
 
@@ -771,7 +771,7 @@ def build_section_classifier_prompt(
      - 명칭/표기법 설명: "상품명 앞에 '(간편)'을 붙인다"
      - 정의값에 대한 보충: "N은 1, 3, 5를 의미한다"
      - 정의에 대한 예외/주의: "단, 일부 채널에서는 OO라는 명칭을 사용"
-     - 각주, "※", "참고", "주)" 로 시작하는 문장 등
+     - 각주, "※", "참고", "주)", 로 시작하는 문장 등
    - 특징:
      - definition_core에서 정의한 값들을 수정/보완/해석하는 텍스트
      - 가입조건(보험기간, 가입나이, 납입기간 등)을 새로 정의하는 것은 아님
@@ -861,7 +861,7 @@ Preview: [Table: 명칭, 보험종목, 보험종목_1 | [3-100%장해형]재해�
     prompt += """
 **출력 형식** (JSON):
 
-{
+{{
   "definition_core": [섹션 인덱스들],
   "definition_annotation": [섹션 인덱스들],
   "condition": [섹션 인덱스들],
@@ -870,7 +870,7 @@ Preview: [Table: 명칭, 보험종목, 보험종목_1 | [3-100%장해형]재해�
 }
 
 **예시**:
-{
+{{
   "definition_core": [0, 2],
   "definition_annotation": [1, 3],
   "condition": [4],
@@ -879,5 +879,267 @@ Preview: [Table: 명칭, 보험종목, 보험종목_1 | [3-100%장해형]재해�
 }
 
 이제 위 섹션들을 분류해주세요:
+"""
+    return prompt
+
+def build_llm_intelligent_merge_prompt(
+    definitions: List[Dict[str, Any]],
+    condition_header: List[str],
+    condition_data: List[List[str]],
+    instruction: str = ""
+) -> str:
+    definitions_json = json.dumps(definitions, ensure_ascii=False, indent=2)
+    condition_header_json = json.dumps(condition_header, ensure_ascii=False)
+    condition_data_json = json.dumps(condition_data, ensure_ascii=False, indent=2)
+
+    extra_instruction = ""
+    if instruction:
+        extra_instruction = (
+            "**최우선 지시사항 (있는 경우 절대적으로 우선 적용)**:\n"
+            f"{instruction}\n\n"
+        )
+
+    prompt = f"""
+{extra_instruction}
+
+당신은 두 개의 다른 데이터셋을 지능적으로 병합하는 데이터 전문가입니다.
+
+**입력 데이터**:
+
+1. `definitions`: 모든 상품/유형 조합이 생성된 리스트입니다.
+{definitions_json}
+
+2. `conditions`: 각 상품/유형에 대한 가입 조건 테이블 원본입니다.
+   - Header: {condition_header_json}
+   - Data:
+{condition_data_json}
+
+---
+
+**병합 목표**:
+`definitions` 리스트의 각 항목에 가장 적합한 `conditions` 테이블의 **단일 행**을 찾아 `LEFT JOIN` 하세요.
+
+---
+
+**★★★★★ 중요 병합 규칙 ★★★★★**
+
+1.  **Join Key는 유동적입니다**:
+    - `definitions`의 `보종명`, `유형1`, `유형2`... 와 `conditions`의 `유형1`, `유형2`... 사이의 관계는 고정되어 있지 않습니다.
+    - 예시: `definitions`의 `보종명`이 `conditions`의 `유형1`과 대응될 수도 있고, `definitions`의 `유형1`이 `conditions`의 `유형1`과 대응될 수도 있습니다.
+    - 문맥을 파악하여 **가장 논리적인 Join Key 조합**을 스스로 판단해야 합니다.
+
+2.  **의미 기반 매칭 (Fuzzy Matching)**:
+    - 이름이 문자 그대로 똑같지 않아도 의미적으로 같다면 매칭해야 합니다.
+    - 예: `definitions`의 `유형1` 값이 "간편심사(315)형"이고 `conditions`의 `유형1` 값이 "간편심사형"이라면, 이 둘은 **같은 그룹으로 취급하여 매칭**해야 합니다.
+
+3.  **와일드카드 매칭**:
+    - `conditions` 테이블의 `유형` 관련 컬럼 값이 `"-"` 나 `""` (빈 문자열)일 경우, 이는 **모든 `definitions` 항목에 적용될 수 있는 기본(default) 조건**을 의미합니다.
+    - 정확히 일치하는 조건이 없을 때 이 와일드카드 조건을 적용해야 합니다.
+
+4.  **매칭 우선순위**:
+    1.  **가장 구체적인 매칭**을 최우선으로 합니다 (e.g., "유형1", "유형2" 모두 일치).
+    2.  구체적인 매칭이 없으면, **의미 기반 매칭**을 시도합니다.
+    3.  그래도 없으면, **와일드카드 매칭**을 적용합니다.
+    4.  모든 매칭에 실패하면, `conditions`에서 온 컬럼들은 `null`로 채워져야 합니다.
+
+---
+
+**출력 형식 (JSON)**:
+
+- 최종 병합된 `definitions` 리스트와 `join_stats`를 포함한 JSON 객체로 반환하세요.
+- `join_stats`에는 매칭되지 않은 `definitions`와 `conditions`의 **인덱스**를 기록해야 합니다.
+
+```json
+{{
+  "definitions": [
+    {{
+      "보종명": "...",
+      "유형1": "...",
+      "유형2": "...",
+      "보험기간": "...",
+      "납입기간": "...",
+      "가입나이_남": "...",
+      "가입나이_여": "...",
+      "납입주기": "..."
+    }}
+  ],
+  "join_stats": {{
+    "definition_count": 4,
+    "condition_count": 3,
+    "merged_count": 4,
+    "unmatched_definition_indices": [정의 인덱스],
+    "unmatched_condition_indices": [조건 인덱스]
+  }},
+  "reasoning": "어떤 Join Key를 사용했고, 매칭을 어떻게 수행했는지에 대한 설명"
+}}
+```
+
+**예시**:
+
+**Input `definitions`**:
+```json
+[
+  {{ "보종명": "A상품", "유형1": "간편심사(315)형" }},
+  {{ "보종명": "A상품", "유형1": "간편심사(335)형" }},
+  {{ "보종명": "B상품", "유형1": "일반형" }}
+]
+```
+
+**Input `conditions`**:
+Header: `["유형1", "보험기간"]`
+Data:
+```json
+[
+  ["간편심사형", "10년"],
+  ["-", "20년"]
+]
+```
+
+**Correct Output**:
+```json
+{{
+  "definitions": [
+    {{
+      "보종명": "A상품",
+      "유형1": "간편심사(315)형",
+      "보험기간": "10년"
+    }},
+    {{
+      "보종명": "A상품",
+      "유형1": "간편심사(335)형",
+      "보험기간": "10년"
+    }},
+    {{
+      "보종명": "B상품",
+      "유형1": "일반형",
+      "보험기간": "20년"
+    }}
+  ],
+  "join_stats": {{
+    "definition_count": 3,
+    "condition_count": 2,
+    "merged_count": 3,
+    "unmatched_definition_indices": [],
+    "unmatched_condition_indices": []
+  }},
+  "reasoning": "definitions의 '유형1'과 conditions의 '유형1'을 join key로 사용했습니다. '간편심사(315)형'과 '간편심사(335)형'은 '간편심사형'과 의미적으로 매칭했습니다. '일반형'은 매칭되는 조건이 없어 와일드카드('-') 조건을 적용했습니다."
+}}
+```
+
+이제 위 규칙에 따라 병합을 수행하고 결과를 JSON으로 반환하세요.
+"""
+    return prompt
+
+def build_intelligent_condition_extract_prompt(
+    condition_sections: List[Dict[str, Any]],
+    instruction: str = ""
+) -> str:
+    sections_json = json.dumps(condition_sections, ensure_ascii=False, indent=2)
+
+    extra_instruction = ""
+    if instruction:
+        extra_instruction = (
+            "**최우선 지시사항 (있는 경우 절대적으로 우선 적용)**:\n"
+            f"{instruction}\n\n"
+        )
+
+    prompt = f"""
+{extra_instruction}
+
+당신은 보험 문서에서 가입 조건 정보를 추출하고 재구성하는 전문가입니다.
+
+**입력 데이터**:
+- `condition`으로 분류된 섹션들의 전체 내용입니다.
+- 각 섹션은 `title`과 `table` 같은 다양한 `type`의 content item을 포함합니다.
+{sections_json}
+
+---
+
+**임무**:
+주어진 `condition` 섹션들에서 최종적으로 사용할 **'가입 가능 조건'** 테이블을 추출하고, 문맥 정보를 활용하여 데이터를 보강하세요.
+
+---
+
+**★★★★★ 중요 처리 규칙 ★★★★★**
+
+1.  **'가입 가능 조건' 테이블 식별**:
+    - 섹션 내용 전체를 보고 '가입 가능 조건'에 해당하는 핵심 테이블을 찾아야 합니다.
+    - 테이블의 제목(`table_title`)이나 바로 앞 `title` content에 "가입 가능" 또는 유사한 문구가 있는지 확인하세요.
+    - 만약 "가입 불가 조건" 테이블이 있다면, 그 데이터는 **절대 포함해서는 안 됩니다.**
+
+2.  **계층적 유형 정보(Contextual Types) 추가**:
+    - '가입 가능 조건' 테이블 바로 앞에 있는 `title` 타입의 content들을 분석하세요.
+    - `가. 주계약`, `나. 특약`, `① 해약환급금 미지급형`과 같은 제목들은 **상위 계층의 유형 정보**입니다.
+    - 이 제목들의 값을 추출하여, '가입 가능 조건' 테이블의 **모든 행 앞부분에 새로운 컬럼으로 추가**해야 합니다.
+    - 예: `나. 특약` → `유형0: 특약`, `① 해약환급금 미지급형` → `유형1: 해약환급금 미지급형` 과 같이 새로운 `유형` 컬럼을 생성합니다. 테이블에 이미 `유형1`이 있다면, `유형2`, `유형3` 등으로 순서를 조정하세요.
+
+3.  **컬럼명 정규화**:
+    - 추출된 테이블의 헤더(컬럼명)를 다음 규칙에 따라 표준화하세요.
+      - "보험료 납입기간" 또는 "납입기간" → "납입기간"
+      - "보험기간" → "보험기간"
+      - "가입나이" 또는 "남자나이", "여자나이" → "가입나이_남", "가입나이_여" (필요시 분리)
+      - "보험료 납입주기" 또는 "납입주기" → "납입주기"
+    - `유형1`, `유형2` 등 이미 존재하는 유형 컬럼은 그대로 유지합니다.
+
+4.  **데이터 정리**:
+    - 테이블 데이터에서 불필요한 줄바꿈(`\n`)이나 공백을 제거하여 값을 정제합니다.
+
+---
+
+**출력 형식 (JSON)**:
+
+- 최종적으로 재구성된 `header`와 `data`를 JSON 형식으로 반환하세요.
+- `header`에는 계층 정보로 인해 새로 추가된 유형 컬럼들이 포함되어야 합니다.
+
+```json
+{{
+  "header": ["새로운 유형 컬럼1", "새로운 유형 컬럼2", "기존 유형1", "보험기간", ...],
+  "data": [
+    ["특약", "해약환급금 미지급형", "-", "10, 20년만기", ...],
+    ["특약", "해약환급금 미지급형", "-", "60, 70세만기", ...]
+  ],
+  "reasoning": "어떤 테이블을 '가입 가능 조건'으로 선택했고, 어떤 title에서 계층 정보를 추출하여 새로운 컬럼으로 추가했는지 설명합니다."
+}}
+```
+
+**예시**:
+
+**Input `condition_sections`**:
+```json
+[
+  {{
+    "index": 5,
+    "title": "3. 보험기간, 보험료 납입기간...",
+    "content": [
+      {{ "type": "title", "content": "나. 특약" }},
+      {{ "type": "title", "content": "① 해약환급금 미지급형" }},
+      {{
+        "type": "table",
+        "table": {{
+          "table_title": "가입가능 조건",
+          "table_elements": [
+            {{ "유형1": "해약환급금 미지급형", "보험기간": "10, 20년만기", ... }},
+            {{ "유형1": "해약환급금 미지급형", "보험기간": "60, 70세만기", ... }}
+          ]
+        }}
+      }}
+    ]
+  }}
+]
+```
+
+**Correct Output**:
+```json
+{{
+  "header": ["유형0", "유형1", "유형2", "보험기간", ...],
+  "data": [
+    ["특약", "해약환급금 미지급형", "-", "10, 20년만기", ...],
+    ["특약", "해약환급금 미지급형", "-", "60, 70세만기", ...]
+  ],
+  "reasoning": "'가입가능 조건' 테이블을 선택했습니다. 테이블 앞의 title '나. 특약'과 '① 해약환급금 미지급형'에서 계층 정보를 추출하여 각각 '유형0'과 '유형1' 컬럼으로 추가했습니다. 테이블 내 기존 '유형1'은 '유형2'로 조정했습니다."
+}}
+```
+
+이제 위 규칙에 따라 조건 테이블을 추출하고 재구성하여 결과를 JSON으로 반환하세요.
 """
     return prompt

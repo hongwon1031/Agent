@@ -18,7 +18,10 @@ from core.prompt import (
     build_llm_extract_prompt,
     build_llm_merge_prompt,
     build_llm_cartesian_prompt,
-    build_section_classifier_prompt)
+    build_section_classifier_prompt,
+    build_llm_intelligent_merge_prompt,
+    build_intelligent_condition_extract_prompt, # NEW IMPORT
+)
 
 class ToolResult:
     """도구 실행 결과"""
@@ -362,7 +365,7 @@ class DefinitionExtractToolV2:
         return [], []
 
     def _merge_with_annotations(
-        self,
+        self, 
         sections: List[Dict],
         annotation_indices: List[int],
         base_header: List[str],
@@ -438,7 +441,7 @@ class RuleCartesianTool:
 
         Args:
             doc: 문서
-            params: {"header": [...], "data": [[...], ...]}
+            params: {"header": [...], "data": [[...], ...]},
 
         Returns:
             ToolResult with data = {
@@ -527,7 +530,7 @@ class LLMCartesianTool:
 
         Args:
             doc: 문서
-            params: {"header": [...], "data": [[...], ...]}
+            params: {"header": [...], "data": [[...], ...]},
 
         Returns:
             ToolResult
@@ -793,288 +796,181 @@ class SectionClassifierTool:
 # NEW: CONDITION TOOLS
 # ============================================================================
 
-class ConditionExtractTool:
+class IntelligentConditionExtractTool:
     """
-    Extract condition table from classified condition sections
+    Extracts and enriches the insurable condition table from classified sections using an LLM.
 
-    Similar to DefinitionExtractToolV2 but specialized for condition tables:
-    - Extracts from condition sections (not definition)
-    - Normalizes column names (보험료 납입기간 → 납입기간)
-    - Handles split columns (가입나이 → 가입나이_남, 가입나이_여)
+    - Identifies the specific "insurable conditions" table.
+    - Ignores "uninsurable conditions" tables.
+    - Analyzes preceding titles to extract hierarchical context (e.g., "Rider", "Non-cancellable type").
+    - Adds the hierarchical context as new columns to the table.
+    - Normalizes column names.
     """
 
     def __init__(self):
-        self.name = "condition_extract"
+        self.name = "intelligent_condition_extract"
         load_dotenv(dotenv_path=r"c:\Users\NT-165\Desktop\Project\Toy\.env")
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     def execute(self, doc: Any, params: Dict[str, Any]) -> ToolResult:
         """
-        Extract condition table from classified sections
+        Extracts and enriches the insurable condition table using an LLM.
 
         Args:
             params:
-                sections: list[dict] - All sections
-                condition_indices: list[int] - Indices of condition sections
-                instruction: str (optional) - Additional instruction
+                sections: list[dict] - All sections from DocumentAccessor.
+                condition_indices: list[int] - Indices of sections classified as 'condition'.
+                instruction: str (optional) - Additional instruction for the LLM.
 
         Returns:
-            ToolResult with data:
-                {
-                    "header": list[str],
-                    "data": list[list[str]],
-                    "extraction_method": str
-                }
+            ToolResult with the enriched header and data.
         """
         try:
-            sections = params.get("sections", [])
+            all_sections = params.get("sections", [])
             condition_indices = params.get("condition_indices", [])
             instruction = params.get("instruction", "")
 
-            if not sections:
-                return ToolResult(
-                    success=False,
-                    error="No sections provided",
-                    tool_name=self.name
-                )
+            if not all_sections:
+                return ToolResult(success=False, error="No sections provided", tool_name=self.name)
 
-            # If no condition sections, return empty (not an error)
             if not condition_indices:
                 return ToolResult(
                     success=True,
-                    data={
-                        "header": [],
-                        "data": [],
-                        "extraction_method": "no_condition_sections"
-                    },
+                    data={"header": [], "data": [], "reasoning": "No condition sections found."},
                     tool_name=self.name
                 )
 
-            # Extract condition table
-            header, rows = self._extract_from_condition_sections(
-                sections, condition_indices, instruction
+            # Filter for condition sections
+            condition_sections = [s for s in all_sections if s.get("index") in condition_indices]
+
+            if not condition_sections:
+                 return ToolResult(
+                    success=True,
+                    data={"header": [], "data": [], "reasoning": "Condition indices provided, but no matching sections found."}, 
+                    tool_name=self.name
+                )
+
+            # Build the prompt for the LLM
+            prompt = build_intelligent_condition_extract_prompt(
+                condition_sections=condition_sections,
+                instruction=instruction
             )
 
-            if not header or not rows:
+            # Call the LLM
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+                temperature=0,
+                max_tokens=4095
+            )
+
+            result_data = json.loads(response.choices[0].message.content)
+
+            # Basic validation of the LLM response
+            if "header" not in result_data or "data" not in result_data:
                 return ToolResult(
-                    success=True,
-                    data={
-                        "header": [],
-                        "data": [],
-                        "extraction_method": "extraction_failed"
-                    },
+                    success=False,
+                    error="LLM response is missing required keys: 'header' or 'data'.",
                     tool_name=self.name
                 )
-
+            
             return ToolResult(
                 success=True,
-                data={
-                    "header": header,
-                    "data": rows,
-                    "extraction_method": "rule_based"
-                },
+                data=result_data,
                 tool_name=self.name
             )
 
         except Exception as e:
             return ToolResult(
                 success=False,
-                error=f"ConditionExtractTool error: {str(e)}",
+                error=f"IntelligentConditionExtractTool error: {str(e)}",
                 tool_name=self.name
             )
-
-    def _extract_from_condition_sections(
-        self, sections: List[Dict], condition_indices: List[int], instruction: str = ""
-    ) -> tuple[List[str], List[List[str]]]:
-        """
-        Extract condition table from condition sections
-
-        Returns:
-            (header, rows)
-        """
-        # Try each condition section
-        for idx in condition_indices:
-            if idx < 0 or idx >= len(sections):
-                continue
-
-            section = sections[idx]
-            content = section.get("content", [])
-
-            # Look for table in content
-            for item in content:
-                if not isinstance(item, dict):
-                    continue
-
-                if "table" in item:
-                    table = item["table"]
-
-                    # Try rule-based extraction
-                    header, rows = self._parse_condition_table(table)
-                    if header and rows:
-                        # Normalize column names
-                        header = self._normalize_condition_headers(header)
-                        return header, rows
-
-        return [], []
-
-    def _parse_condition_table(self, table: Dict) -> tuple[List[str], List[List[str]]]:
-        """
-        Parse condition table (reuse DefinitionExtractV2 logic)
-        """
-        try:
-            table_elements = table.get("table_elements", [])
-            if not table_elements:
-                return [], []
-
-            # Dict format
-            if isinstance(table_elements[0], dict) and "cells" not in table_elements[0]:
-                header = list(table_elements[0].keys())
-                data = []
-                for row in table_elements:
-                    data.append([str(row.get(col, "")) for col in header])
-                return header, data
-
-            # Cells format
-            else:
-                rows = []
-                for row in table_elements:
-                    cells = row.get("cells", [])
-                    if not cells:
-                        continue
-
-                    # Filter annotation rows
-                    first_cell = cells[0].get("text", "").strip()
-                    if first_cell.startswith(("※", "주:", "주)", "* ", "- ")):
-                        continue
-
-                    row_data = [cell.get("text", "").strip() for cell in cells]
-                    rows.append(row_data)
-
-                if len(rows) < 2:
-                    return [], []
-
-                header = rows[0]
-                data = rows[1:]
-                return header, data
-
-        except Exception:
-            return [], []
-
-    def _normalize_condition_headers(self, headers: List[str]) -> List[str]:
-        """
-        Normalize condition column names
-
-        Mapping:
-        - "보험기간" → "보험기간"
-        - "보험료 납입기간" → "납입기간"
-        - "가입나이" / "남자나이" / "여자나이" → "가입나이_남", "가입나이_여"
-        - "보험료 납입주기" → "납입주기"
-        - "유형1", "유형2" → keep as is (JOIN keys)
-        """
-        normalized = []
-
-        for h in headers:
-            h_clean = h.strip().replace("\n", "").replace(" ", "")
-
-            # JOIN KEY columns - keep as is
-            if h_clean in ["유형1", "유형2", "심사형", "보장형"]:
-                normalized.append(h_clean)
-
-            # Condition columns - normalize
-            elif "보험기간" in h_clean:
-                normalized.append("보험기간")
-            elif "납입기간" in h_clean or "보험료납입기간" in h_clean:
-                normalized.append("납입기간")
-            elif "남자나이" in h_clean or "남자" in h_clean and "나이" in h_clean:
-                normalized.append("가입나이_남")
-            elif "여자나이" in h_clean or "여자" in h_clean and "나이" in h_clean:
-                normalized.append("가입나이_여")
-            elif "납입주기" in h_clean or "보험료납입주기" in h_clean:
-                normalized.append("납입주기")
-            else:
-                # Unknown column - keep as is
-                normalized.append(h)
-
-        return normalized
 
 
 class DefinitionConditionMergeTool:
     """
-    Merge Definition combinations with Condition combinations (LEFT JOIN)
-
-    JOIN strategy:
-    - JOIN KEY: 유형1 + 유형2 (auto-detected)
-    - JOIN TYPE: LEFT JOIN (Definition is primary)
-    - Wildcard: 유형2 = "-" matches all Definitions
+    LLM-based Intelligent Merge Tool.
+    Merges definition combinations with raw condition data using flexible,
+    semantic matching powered by an LLM.
     """
 
     def __init__(self):
         self.name = "definition_condition_merge"
+        load_dotenv(dotenv_path=r"c:\Users\NT-165\Desktop\Project\Toy\.env")
+        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     def execute(self, doc: Any, params: Dict[str, Any]) -> ToolResult:
         """
-        Merge Definition and Condition combinations
+        Merges definition combinations with raw condition data using an LLM.
 
         Args:
             params:
-                definitions: list[dict] - Definition Cartesian result
-                condition_definitions: list[dict] - Condition Cartesian result
-                instruction: str (optional)
+                definitions: list[dict] - Expanded definition combinations.
+                condition_header: list[str] - Header of the raw condition table.
+                condition_data: list[list[str]] - Data of the raw condition table.
+                instruction: str (optional) - Additional instruction for the merge.
 
         Returns:
-            ToolResult with data:
-                {
-                    "definitions": list[dict] - Merged combinations,
-                    "total_count": int,
-                    "join_stats": dict
-                }
+            ToolResult with data from the LLM, including the merged definitions
+            and join statistics.
         """
         try:
             definitions = params.get("definitions", [])
-            condition_definitions = params.get("condition_definitions", [])
+            condition_header = params.get("condition_header", [])
+            condition_data = params.get("condition_data", [])
+            instruction = params.get("instruction", "")
 
-            # If no condition data, return definitions as is
-            if not condition_definitions:
+            if not definitions:
+                return ToolResult(
+                    success=False, error="No definitions provided", tool_name=self.name
+                )
+            
+            # If no condition data, return definitions as is.
+            if not condition_header or not condition_data:
                 return ToolResult(
                     success=True,
                     data={
                         "definitions": definitions,
                         "total_count": len(definitions),
-                        "join_stats": {"skipped": "no_condition_data"}
+                        "join_stats": {"status": "skipped", "reason": "no_condition_data"}
                     },
                     tool_name=self.name
                 )
 
-            if not definitions:
+            # Build the intelligent merge prompt
+            prompt = build_llm_intelligent_merge_prompt(
+                definitions=definitions,
+                condition_header=condition_header,
+                condition_data=condition_data,
+                instruction=instruction,
+            )
+
+            # Call the LLM
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+                temperature=0,
+                max_tokens=12000
+            )
+            raw = response.choices[0].message.content
+            print("=== MERGE RAW RESPONSE ===")
+            print(raw)
+            result_data = json.loads(response.choices[0].message.content)
+
+            # Basic validation of the LLM response
+            if "definitions" not in result_data or "join_stats" not in result_data:
                 return ToolResult(
                     success=False,
-                    error="No definitions provided",
+                    error="LLM response is missing required keys: 'definitions' or 'join_stats'.",
                     tool_name=self.name
                 )
 
-            # Step 1: Determine JOIN keys
-            join_keys = self._determine_join_keys(definitions, condition_definitions)
-
-            # Step 2: Build condition lookup dict
-            condition_lookup = self._build_condition_lookup(
-                condition_definitions, join_keys
-            )
-
-            # Step 3: LEFT JOIN
-            merged = self._perform_left_join(
-                definitions, condition_lookup, join_keys
-            )
-
-            # Step 4: Calculate stats
-            stats = self._calculate_join_stats(definitions, condition_definitions, merged)
-
             return ToolResult(
                 success=True,
-                data={
-                    "definitions": merged,
-                    "total_count": len(merged),
-                    "join_stats": stats
-                },
+                data=result_data,
                 tool_name=self.name
             )
 
@@ -1084,125 +980,3 @@ class DefinitionConditionMergeTool:
                 error=f"DefinitionConditionMergeTool error: {str(e)}",
                 tool_name=self.name
             )
-
-    def _determine_join_keys(
-        self, definitions: List[Dict], conditions: List[Dict]
-    ) -> List[str]:
-        """
-        Auto-detect JOIN keys
-
-        Strategy:
-        - Find common keys between definitions and conditions
-        - Prioritize type-related keys (유형1, 유형2, etc.)
-
-        Returns:
-            list of join key names (e.g., ["유형1", "유형2"])
-        """
-        if not definitions or not conditions:
-            return []
-
-        def_keys = set(definitions[0].keys())
-        cond_keys = set(conditions[0].keys())
-
-        # Find common keys
-        common_keys = def_keys & cond_keys
-
-        # Filter for type-related keys
-        type_keys = [k for k in common_keys if "유형" in k or "형" in k]
-
-        # Prioritize: 유형1 > 유형2 > others
-        priority = ["유형1", "유형2", "심사형", "보장형"]
-        join_keys = [k for k in priority if k in type_keys]
-
-        # Add remaining type keys
-        join_keys.extend([k for k in type_keys if k not in join_keys])
-
-        return join_keys[:2]  # Max 2 keys
-
-    def _build_condition_lookup(
-        self, conditions: List[Dict], join_keys: List[str]
-    ) -> Dict[tuple, Dict]:
-        """
-        Build condition lookup dict for fast JOIN
-
-        Returns:
-            {
-                (유형1값, 유형2값): {보험기간: ..., 납입기간: ...},
-                ("-", "-"): {wildcard condition},
-                ...
-            }
-        """
-        lookup = {}
-
-        # Condition columns (exclude JOIN keys)
-        cond_cols = set(conditions[0].keys()) - set(join_keys) if conditions else set()
-
-        for cond in conditions:
-            # Extract JOIN key values
-            key = tuple(cond.get(k, "") for k in join_keys)
-
-            # Extract condition values
-            cond_values = {k: cond.get(k, "") for k in cond_cols}
-
-            lookup[key] = cond_values
-
-        return lookup
-
-    def _perform_left_join(
-        self, definitions: List[Dict], condition_lookup: Dict[tuple, Dict], join_keys: List[str]
-    ) -> List[Dict]:
-        """
-        LEFT JOIN definitions with conditions
-
-        Strategy:
-        1. For each definition:
-           a. Extract JOIN key values
-           b. Lookup condition (exact match)
-           c. If not found, try wildcard (all keys = "-")
-           d. If still not found, fill with NULL
-        2. Merge definition + condition
-        """
-        merged = []
-        wildcard_key = tuple("-" for _ in join_keys)
-
-        for defn in definitions:
-            # Extract JOIN key values
-            key = tuple(defn.get(k, "") for k in join_keys)
-
-            # Lookup condition (exact match)
-            cond = condition_lookup.get(key)
-
-            # Wildcard fallback
-            if cond is None and wildcard_key in condition_lookup:
-                cond = condition_lookup[wildcard_key]
-
-            # Merge
-            if cond:
-                merged_item = {**defn, **cond}
-            else:
-                # No match - fill with NULL
-                merged_item = defn.copy()
-                # Add NULL for condition columns
-                if condition_lookup:
-                    sample_cond = next(iter(condition_lookup.values()))
-                    for col in sample_cond.keys():
-                        merged_item.setdefault(col, None)
-
-            merged.append(merged_item)
-
-        return merged
-
-    def _calculate_join_stats(
-        self, definitions: List[Dict], conditions: List[Dict], merged: List[Dict]
-    ) -> Dict:
-        """
-        Calculate JOIN statistics
-        """
-        unmatched = len([m for m in merged if any(v is None for v in m.values())])
-
-        return {
-            "definition_count": len(definitions),
-            "condition_count": len(conditions),
-            "merged_count": len(merged),
-            "unmatched_definitions": unmatched
-        }

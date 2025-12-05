@@ -1,4 +1,35 @@
-{"index": 1,
+"""
+Simple script to call the OpenAI Chat Completions API.
+
+Usage:
+    python test.py "질문 내용"
+"""
+
+import os
+import sys
+
+from dotenv import load_dotenv
+from openai import OpenAI
+
+
+def main() -> None:
+    # Load API key from the shared .env
+    # (경로는 기존 프로젝트에서 사용하던 것과 동일하게 맞춤)
+    load_dotenv(r"c:\Users\NT-165\Desktop\Project\Toy\.env")
+    schemas = """
+    {
+        "유형1": 
+        "유형2": 
+        "보험기간": 
+        "보험료 납입기간": 
+        "남자나이":
+        "여자나이":
+        "보험료 납입주기":
+
+        }
+"""
+    input_json = {
+            "index": 1,
             "title": "2. 보험기간, 보험료 납입기간, 피보험자 가입나이 및 보험료 납입주기",
             "content": [
               {
@@ -292,3 +323,76 @@
               }
             ]
           }
+    input = [
+                {
+                "type": "title",
+                "content": "일반형",
+                "table": []
+                },
+                {
+                "type": "table",
+                "content": "",
+                "table_title": "가입가능 조건",
+                  "table_elements": [
+                    {
+                      "유형1": "해약환급금 지급형",
+                      "유형2": "-",
+                      "보험기간": "10, 20, 30년만기",
+                      "보험료\n납입기간": "10, 20년납, 전기납",
+                      "남자나이": "만15세 ~ min{(80 - 년만기), 70}세",
+                      "여자나이": "만15세 ~ min{(80 - 년만기), 70}세",
+                      "보험료\n납입주기": "월납"
+                    }]
+                }
+            ]
+    output = {
+                    "유형1": "일반형",
+                    "유형2": "해약환급금 지급형",
+                    "보험기간": "10, 20, 30년만기",
+                    "보험료\n납입기간": "10, 20년납, 전기납",
+                    "남자나이": "만15세 ~ min{(80 - 년만기), 70}세",
+                    "여자나이": "만15세 ~ min{(80 - 년만기), 70}세",
+                    "보험료\n납입주기": "월납"
+                }
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY not found in environment/.env")
+
+    client = OpenAI(api_key=api_key)
+
+    user_prompt = f"""
+    당신은 문서를 정리하는 전문가입니다.
+    주어진 json 형태의 데이터에서 **가입가능조건**에 대한 데이터만 주어진 schema 구조에 맞게 정리해주세요
+    ** schema ** : {schemas}
+    ** data ** : 
+    {input_json}
+
+    **주의사항**
+    - table에 있는 data만 사용하는 것이 아닌 주어진 json 데이터의 전체 구조를 보고 정리하세요
+    - 유형값은 더 추가될 수 있습니다
+    - content 안에 있는 다른 값들도 유형값에 들어갈 수 있습니다
+        e.g.) 
+        input :
+        {input}
+                
+        output :
+        {output}
+                
+
+
+    """
+
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0,
+    )
+
+    print(response.choices[0].message.content)
+
+
+if __name__ == "__main__":
+    main()
+

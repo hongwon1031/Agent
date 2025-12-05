@@ -37,7 +37,7 @@ def main():
     input_path = Path(sys.argv[1])
 
     # 결과 디렉터리 고정
-    results_dir = Path(r"C:\Users\NT-165\Desktop\Project\Toy\prototype_6\results")
+    results_dir = Path(r"C:\Users\NT-165\Desktop\Project\Toy\prototype_6\new_results")
     results_dir.mkdir(parents=True, exist_ok=True)
 
     agent = Prototype6Agent()
@@ -60,7 +60,7 @@ def main():
 
             result = agent.run(doc)
 
-            output_path = results_dir / f"{doc_path.stem}_prototype6_result.json"
+            output_path = results_dir / f"{doc_path.stem}_new_result.json"
             save_result(result, str(output_path))
 
         print("\nAll files processed.")
@@ -74,7 +74,7 @@ def main():
             sys.exit(1)
 
         result = agent.run(doc)
-        output_path = results_dir / f"{doc_path.stem}_prototype6_result.json"
+        output_path = results_dir / f"{doc_path.stem}_new_result.json"
         save_result(result, str(output_path))
 
 if __name__ == "__main__":

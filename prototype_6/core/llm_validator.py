@@ -492,7 +492,7 @@ class LLMValidator:
         context: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        Definition + Condition Merge 결과 검증
+        Definition + Condition Merge 결과 검증 (for new LLM-based tool)
 
         Args:
             task_output: {"definitions": [...], "total_count": int, "join_stats": {...}}
@@ -515,53 +515,37 @@ class LLMValidator:
                     "is_valid": False,
                     "confidence": 1.0,
                     "errors": ["Merge produced no definitions"],
-                    "suggestions": ["Check input definition and condition data"],
+                    "suggestions": ["Check input definition and condition data", "Review merge prompt"],
                     "reasoning": "Merge result is empty"
                 }
 
-            # Check if definitions have both definition and condition columns
+            # Check if definitions have the core definition column
             if definitions:
                 sample_def = definitions[0]
-                # Definition columns: 보종명, 유형1, 유형2, etc.
-                # Condition columns: 보험기간, 납입기간, etc.
-                has_definition_cols = "보종명" in sample_def
-
-                # Check for typical condition columns
-                condition_col_candidates = ["보험기간", "납입기간", "가입나이_남", "가입나이_여", "납입주기"]
-                has_condition_cols = any(col in sample_def for col in condition_col_candidates)
-
-                if not has_definition_cols:
+                if "보종명" not in sample_def:
                     return {
                         "is_valid": False,
-                        "confidence": 0.8,
+                        "confidence": 0.9,
                         "errors": ["Merged definitions missing core definition column (보종명)"],
-                        "suggestions": ["Check definition input data"],
-                        "reasoning": "Merged result missing definition columns"
+                        "suggestions": ["Check merge tool's output formatting"],
+                        "reasoning": "Merged result missing '보종명' column"
                     }
 
-                # If condition data exists but no condition columns in result, that's suspicious
-                condition_input = context.get("condition_result", {})
-                condition_header = condition_input.get("header", [])
-                if condition_header and not has_condition_cols:
-                    # This might be OK if condition data doesn't have standard columns
-                    # Just warn, don't fail
-                    pass
+            # Check unmatched ratio from the new join_stats structure
+            definition_count = join_stats.get("definition_count", 0)
+            unmatched_indices = join_stats.get("unmatched_definition_indices", [])
 
-            # Check unmatched ratio
-            matched = join_stats.get("matched", 0)
-            unmatched = join_stats.get("unmatched", 0)
-
-            if matched + unmatched > 0:
-                unmatched_ratio = unmatched / (matched + unmatched)
+            if definition_count > 0:
+                unmatched_ratio = len(unmatched_indices) / definition_count
                 if unmatched_ratio > 0.5:
                     return {
                         "is_valid": False,
                         "confidence": 0.6,
-                        "errors": [f"Too many unmatched definitions: {unmatched}/{matched + unmatched} ({unmatched_ratio:.1%})"],
+                        "errors": [f"Too many unmatched definitions: {len(unmatched_indices)}/{definition_count} ({unmatched_ratio:.1%})"],
                         "suggestions": [
-                            "Check JOIN key matching logic",
-                            "Review wildcard rules",
-                            "Verify condition data includes matching rows"
+                            "Check JOIN key matching logic in the LLM prompt",
+                            "Review wildcard and semantic matching rules",
+                            "Verify condition data includes matching rows for all definition types"
                         ],
                         "reasoning": f"Unmatched ratio {unmatched_ratio:.1%} exceeds 50% threshold"
                     }
@@ -572,7 +556,7 @@ class LLMValidator:
                 "confidence": 0.9,
                 "errors": [],
                 "suggestions": [],
-                "reasoning": f"Merge successful: {total_count} definitions, {matched} matched, {unmatched} unmatched"
+                "reasoning": f"Merge successful: {total_count} definitions generated. Unmatched: {len(unmatched_indices)}/{definition_count}."
             }
 
         except Exception as e:
@@ -580,6 +564,6 @@ class LLMValidator:
                 "is_valid": False,
                 "confidence": 0.0,
                 "errors": [f"Validation error: {str(e)}"],
-                "suggestions": ["Check merge output format"],
-                "reasoning": "Merge validation failed"
+                "suggestions": ["Check merge tool's output format and keys"],
+                "reasoning": "Merge validation failed due to an exception"
             }

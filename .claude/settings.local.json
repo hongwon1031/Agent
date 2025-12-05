@@ -3,7 +3,9 @@
     "allow": [
       "Bash(python main.py:*)",
       "Bash(python:*)",
-      "Bash(git rev-parse:*)"
+      "Bash(git rev-parse:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)"
     ],
     "deny": [],
     "ask": []

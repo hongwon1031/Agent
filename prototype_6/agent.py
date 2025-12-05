@@ -17,7 +17,7 @@ from tools.hybrid_tools import (
     DefinitionExtractToolV2,
     LLMCartesianTool,
     RuleCartesianTool,
-    ConditionExtractTool,
+    IntelligentConditionExtractTool, # MODIFIED: Replaced ConditionExtractTool
     DefinitionConditionMergeTool,
 )
 
@@ -29,7 +29,7 @@ tools = {
     "definition_extract_v2": DefinitionExtractToolV2(),
     "rule_cartesian": RuleCartesianTool(),
     "llm_cartesian": LLMCartesianTool(),
-    "condition_extract": ConditionExtractTool(),
+    "condition_extract": IntelligentConditionExtractTool(), # MODIFIED: Replaced ConditionExtractTool
     "definition_condition_merge": DefinitionConditionMergeTool(),
 }
 MAX_REPLAN_COUNT = 5
@@ -104,7 +104,20 @@ def classify_sections(state: AgentState) -> Dict[str, Any]:
             "last_executed_task": "classify",
             "execution_log": log
         }
-    
+    # 실행 결과 요약 ======================
+    try:
+        data = result.data or {}
+        output_summary = {
+            "definition_core": data.get("definition_core", []),
+            "definition_annotation": data.get("definition_annotation", []),
+            "condition": data.get("condition", []),
+            "other": data.get("other", []),
+        }
+        log[-1]["output_summary"] = output_summary
+    except Exception:
+        pass
+    # ==================================
+
     print("[OK] Sections classified.")
     return {
         "classification_result": result.data, 
@@ -151,6 +164,22 @@ def extract_definitions(state: AgentState) -> Dict[str, Any]:
         }
 
     print("[OK] Definitions extracted.")
+    # 결과 요약 =====================
+    try:
+        data = result.data or {}
+        header = data.get("header", [])
+        rows = data.get("data", [])
+        output_summary = {
+            "header": header,
+            #"row_count": len(rows),
+            "data": rows,
+            "extraction_method": data.get("extraction_method", ""),
+        }
+        log[-1]["output_summary"] = output_summary
+    except Exception:
+        pass
+    # 결과 요약 =====================
+
     return {
         "extraction_result": result.data, 
         "last_executed_task": "extract", 
@@ -212,6 +241,21 @@ def create_combinations(state: AgentState) -> Dict[str, Any]:
         }
 
     print(f"[OK] Combinations created using {tool.name}.")
+    
+    # 결과 요약 ==============
+    try:
+        data = result.data or {}
+        defs = data.get("definitions", []) or data.get("rows", [])
+        output_summary = {
+            "total_count": data.get("total_count", len(defs)),
+            "sample": defs[:3],  # 처음 3개만 로그에
+        }
+        log[-1]["output_summary"] = output_summary
+    except Exception:
+        pass
+    
+    # 결과 요약 ==============
+
     return {
         "combination_result": result.data,
         "last_executed_task": "combine",
@@ -267,6 +311,20 @@ def extract_conditions(state: AgentState) -> Dict[str, Any]:
         }
 
     print("[OK] Conditions extracted.")
+    # 결과 요약을 execution_log 마지막 항목에 추가
+    try:
+        data = result.data or {}
+        header = data.get("header", [])
+        rows = data.get("data", [])
+        output_summary = {
+            "header": header,
+            #"row_count": len(rows),
+            "data": rows,
+        }
+        log[-1]["output_summary"] = output_summary
+    except Exception:
+        pass
+
     return {
         "condition_result": result.data,
         "last_executed_task": "extract_condition",
@@ -332,6 +390,19 @@ def create_condition_combinations(state: AgentState) -> Dict[str, Any]:
         }
 
     print(f"[OK] Condition combinations created using {tool.name}.")
+
+    # 결과 요약을 execution_log 마지막 항목에 추가
+    try:
+        data = result.data or {}
+        defs = data.get("definitions", []) or data.get("rows", [])
+        output_summary = {
+            "total_count": data.get("total_count", len(defs)),
+            "sample": defs[:3],
+        }
+        log[-1]["output_summary"] = output_summary
+    except Exception:
+        pass
+
     return {
         "condition_combination_result": result.data,
         "last_executed_task": "combine_condition",
@@ -348,7 +419,8 @@ def merge_definition_condition(state: AgentState) -> Dict[str, Any]:
     tool = tools["definition_condition_merge"]
 
     definition_result = state.get('combination_result', {})
-    condition_result = state.get('condition_combination_result', {})
+    # [MODIFIED] Use raw condition_result, not condition_combination_result
+    condition_result = state.get('condition_result', {})
 
     # If no condition data, return definitions as-is
     if not condition_result.get("header") or not condition_result.get("data"):
@@ -387,6 +459,19 @@ def merge_definition_condition(state: AgentState) -> Dict[str, Any]:
 
     print(f"[OK] Definition and Condition merged. Total: {result.data.get('total_count')}, "
           f"Matched: {result.data.get('join_stats', {}).get('matched', 0)}")
+
+    # 결과 요약을 execution_log 마지막 항목에 추가
+    try:
+        data = result.data or {}
+        output_summary = {
+            "total_count": data.get("total_count"),
+            "join_stats": data.get("join_stats", {}),
+            "sample": data.get("definitions", [])[:3],
+        }
+        log[-1]["output_summary"] = output_summary
+    except Exception:
+        pass
+
     return {
         "merged_result": result.data,
         "last_executed_task": "merge",
@@ -421,9 +506,6 @@ def validate_step(state: AgentState) -> Dict[str, Any]:
     elif last_task == 'combine':
         output_to_validate = state.get('combination_result')
         task_type_for_validator = 'transform'
-    elif last_task == 'combine_condition':
-        output_to_validate = state.get('condition_combination_result')
-        task_type_for_validator = 'transform'
     elif last_task == 'merge':
         output_to_validate = state.get('merged_result')
         task_type_for_validator = 'merge'
@@ -447,11 +529,10 @@ def validate_step(state: AgentState) -> Dict[str, Any]:
         context["condition_sections"] = [s for s in all_sections if s['index'] in condition_indices]
     elif last_task == 'combine':
         context["extracted_data"] = state.get('extraction_result')
-    elif last_task == 'combine_condition':
-        context["extracted_data"] = state.get('condition_result')
     elif last_task == 'merge':
         context["definition_result"] = state.get('combination_result')
-        context["condition_result"] = state.get('condition_combination_result')
+        # [MODIFIED] Pass raw condition_result to validator
+        context["condition_result"] = state.get('condition_result')
 
     # Run validation
     validation_result = validator.validate(
@@ -546,8 +627,7 @@ def should_continue(state: AgentState) -> str:
         elif last_task == "extract_condition":
             return "create_combinations"
         elif last_task == "combine":
-            return "create_condition_combinations"
-        elif last_task == "combine_condition":
+            # [MODIFIED] Go to merge, not combine_condition
             return "merge_definition_condition"
         elif last_task == "merge":
             # This is the last step, so we are done
@@ -578,8 +658,6 @@ def after_replan(state: AgentState) -> str:
         return "extract_conditions"
     elif last_executed_task == "combine":
         return "create_combinations"
-    elif last_executed_task == "combine_condition":
-        return "create_condition_combinations"
     elif last_executed_task == "merge":
         return "merge_definition_condition"
     else:
@@ -603,7 +681,6 @@ def build_graph():
     workflow.add_node("extract_definitions", extract_definitions)
     workflow.add_node("extract_conditions", extract_conditions)
     workflow.add_node("create_combinations", create_combinations)
-    workflow.add_node("create_condition_combinations", create_condition_combinations)
     workflow.add_node("merge_definition_condition", merge_definition_condition)
     workflow.add_node("validate_step", validate_step)
     workflow.add_node("replan_or_finish", replan_or_finish)
@@ -620,7 +697,6 @@ def build_graph():
     workflow.add_edge("extract_definitions", "validate_step")
     workflow.add_edge("extract_conditions", "validate_step")
     workflow.add_edge("create_combinations", "validate_step")
-    workflow.add_edge("create_condition_combinations", "validate_step")
     workflow.add_edge("merge_definition_condition", "validate_step")
 
     # Conditional edge after validation
@@ -631,7 +707,6 @@ def build_graph():
             "extract_definitions": "extract_definitions",
             "extract_conditions": "extract_conditions",
             "create_combinations": "create_combinations",
-            "create_condition_combinations": "create_condition_combinations",
             "merge_definition_condition": "merge_definition_condition",
             "replan_or_finish": "replan_or_finish",
             "end": END,
@@ -647,7 +722,6 @@ def build_graph():
             "extract_definitions": "extract_definitions",
             "extract_conditions": "extract_conditions",
             "create_combinations": "create_combinations",
-            "create_condition_combinations": "create_condition_combinations",
             "merge_definition_condition": "merge_definition_condition",
             "end": END
         }
@@ -673,21 +747,42 @@ class Prototype6Agent:
         full_log = []
         final_state = {}
 
-        for step in self.graph.stream(inputs):
+        # LangGraph 기본 recursion_limit(25)을 넘지 않도록 여유를 둔다.
+        # replan 루프가 여러 번 돌 수 있으므로 recursion_limit을 넉넉하게 올려준다.
+        for step in self.graph.stream(inputs, config={"recursion_limit": 100}):
             full_log.append(step)
-            # The last key in the dictionary is the node that just ran
             last_node = list(step.keys())[-1]
-            final_state.update(step[last_node])
+            node_state = step[last_node]
 
+            # END 노드 / None 등은 건너뛰기
+            if not isinstance(node_state, dict):
+                continue
+
+            final_state.update(node_state)
+            
         if final_state.get("error"):
             return {"success": False, "error": final_state["error"], "full_log": full_log}
 
         # Return merged_result if available, otherwise fall back to combination_result
         final_data = final_state.get("merged_result") or final_state.get("combination_result")
 
+        # execution_log를 기반으로 한 간단한 task 로그 생성
+        execution_log = final_state.get("execution_log", [])
+        task_log = []
+        for idx, entry in enumerate(execution_log, start=1):
+            task_log.append({
+                "step": idx,
+                "type": entry.get("type"),
+                "tool": entry.get("tool"),
+                "input": entry.get("params"),
+                # output_summary는 없을 수도 있으니 기본값 None
+                "output": entry.get("output_summary"),
+            })
+
         return {
             "success": True,
             "final_data": final_data,
+            "task_log": task_log,
             "full_log": full_log,
             "error": None
         }
