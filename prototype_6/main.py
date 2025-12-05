@@ -7,7 +7,7 @@ Prototype 3 Main Entry Point (Version 2 - Full Implementation)
 import json
 import sys
 from pathlib import Path
-from agent import Prototype4_1Agent
+from agent import Prototype6Agent
 
 
 def load_document(doc_path: str):
@@ -40,7 +40,7 @@ def main():
     results_dir = Path(r"C:\Users\NT-165\Desktop\Project\Toy\prototype_6\results")
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    agent = Prototype4_1Agent()
+    agent = Prototype6Agent()
 
     if input_path.is_dir():
         # 디렉터리 모드: 모든 .json 처리

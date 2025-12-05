@@ -1,9 +1,9 @@
-# Prototype 4.1: LangGraph-based Definition Extraction Agent
+# Prototype 6: LangGraph-based Definition Extraction Agent
 
 보험 약관/상품 설명서 JSON에서 **보종명/유형 계층 정의를 안정적으로 추출하고, 모든 조합을 생성**하기 위한
 LangGraph 기반 Multi-Agent 파이프라인입니다.
 
-Prototype 4.1은 기존 `prototype_4`의 선형 파이프라인을 **상태(State)를 공유하는 LangGraph 워크플로우**로
+Prototype 6은 기존 `prototype_4`의 선형 파이프라인을 **상태(State)를 공유하는 LangGraph 워크플로우**로
 재구성한 버전입니다.
 
 ---
@@ -61,7 +61,7 @@ Prototype 4.1은 기존 `prototype_4`의 선형 파이프라인을 **상태(Stat
   - `execution_log: Optional[List]` – 각 노드 실행 기록 (tool, params 등)
 
 - 최종 결과
-  - `final_data: Optional[Any]` – 최종 결과 (Prototype4_1Agent.run에서는 `combination_result`를 반환)
+  - `final_data: Optional[Any]` – 최종 결과 (Prototype6Agent.run에서는 `combination_result`를 반환)
   - `error: Optional[str]` – 치명적 에러 메시지
 
 ---
@@ -175,7 +175,7 @@ Prototype 4.1은 기존 `prototype_4`의 선형 파이프라인을 **상태(Stat
   - `validate_step` → `should_continue` 로 결정 (다음 단계 또는 `replan_or_finish` 또는 `END`)
   - `replan_or_finish` → `after_replan` 로 결정 (백트래킹 또는 `END`)
 
-- `Prototype4_1Agent.run(doc)`:
+- `Prototype6Agent.run(doc)`:
   - 입력: `{"original_doc": doc}`
   - `graph.stream(inputs)`로 전체 실행과 intermediate state 로그(`full_log`) 수집
   - 최종 상태의 `combination_result`를 `final_data`로 반환
@@ -273,7 +273,7 @@ annotation 해석에 대한 완전한 정답을 강제하기보다는 **명백�
      - 언어/도메인 변경이 훨씬 관리하기 쉬워집니다.
 
 3. **LangGraph Checkpointer 도입**
-   - 현재 `Prototype4_1Agent.run`은 `graph.stream` 결과만 `full_log`로 반환합니다.
+   - 현재 `Prototype6Agent.run`은 `graph.stream` 결과만 `full_log`로 반환합니다.
    - LangGraph의 checkpointer(예: `MemorySaver`, `SqliteSaver`)를 붙이면
      - 노드별 state를 run_id 단위로 저장/재현할 수 있어
      - 디버깅/리그레션 테스트가 쉬워집니다.
@@ -289,18 +289,35 @@ annotation 해석에 대한 완전한 정답을 강제하기보다는 **명백�
      - Extract는 “원본 + annotation을 반영한 테이블”
      - Cartesian/Transform는 “조합/계층 구조 확장” 역할에 집중할 수 있습니다.
 
+6. **Definition + Condition 통합 파이프라인 확장**
+   - Condition 섹션용 `ConditionExtractTool(V2)` 추가  
+     - `condition` 섹션에서 `유형1/유형2/보험기간/납입기간/가입나이/납입주기` 등 조건 테이블을 추출
+   - Definition 테이블과 Condition 테이블을 조합하는 Transform 툴 설계  
+     - 예: `DefinitionConditionMergeTool`  
+     - 정의 쪽 보종명/유형1/유형2와, 조건 쪽 유형 컬럼(유형1/유형2/심사형 등)을 join key로 사용
+   - 유형 축 매핑 규칙 정의  
+     - 헤더 문자열 규칙(“보험종목”, “유형1”, “심사형” 등)으로 1차 매핑  
+     - 애매한 경우 LLM으로 definition/condition 헤더를 정렬(column alignment)
+   - 최종 스키마 구조 확정  
+     - 한 행이 “정의 + 조건”이 합쳐진 완전한 상품 조합이 되도록  
+     - 예: `보종명, 유형1, 유형2, 보험기간, 납입기간, 가입나이_남, 가입나이_여, 납입주기, ...`
+   - Validator 확장 (`validate_transform`)  
+     - 정의×조건 join 시 보종명/유형/조건 축 누락·중복·잘린 값 검증  
+     - 정의 조합 개수 대비 조건 매핑 개수가 비정상적으로 적거나 많은 경우 에러로 보고하여 replan 유도
+
+
 ---
 
 ## 7. 실행 방법 요약
 
 ```bash
-cd Toy/prototype_4_1
+cd Toy/prototype_6
 python main.py path/to/input.json
 
 # 또는 디렉터리 전체 처리
 python main.py path/to/input_dir
 ```
 
-결과는 `results/<원본파일명>_prototype4_1_result.json`으로 저장됩니다.  
+결과는 `results/<원본파일명>_prototype6_result.json`으로 저장됩니다.  
 파일에는 `success`, `final_data`(definitions), `full_log`(LangGraph 실행 로그) 등이 포함됩니다.
 

@@ -436,7 +436,7 @@ def build_graph():
     app = workflow.compile()
     return app
 
-class Prototype4_1Agent:
+class Prototype6Agent:
     """
     The new LangGraph-based agent.
     The `run` method is now a simple call to the compiled graph.

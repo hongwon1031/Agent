@@ -14,7 +14,12 @@ from typing import Dict, Any, List, Optional
 from itertools import product
 from openai import OpenAI
 from dotenv import load_dotenv
-
+from core.prompt import(
+    build_llm_extract_prompt,
+    build_llm_merge_prompt,
+    build_llm_cartesian_prompt,
+    build_section_classifier_prompt
+)
 
 class ToolResult:
     """도구 실행 결과"""
@@ -176,35 +181,8 @@ class DefinitionExtractToolV2:
             else:
                 content_str = json.dumps(content, ensure_ascii=False)
 
-            prompt = f"""다음은 보험 문서의 콘텐츠입니다 (형식: {content_type}).
+            prompt = build_llm_extract_prompt(content_str, content_type, instruction)
 
-콘텐츠:
-{content_str}
-
-**추출 목표**: 보험 상품의 명칭과 유형 정보
-
-**형식별 처리**:
-- 테이블 형식: 행과 열을 파싱
-- 텍스트 형식: 번호/들여쓰기 구조를 파싱하여 구조화
-
-**요구사항**:
-1. 주석 행 제외 (※, 주:, 주), *, - 로 시작하는 설명)
-2. Header와 Data rows로 구분
-3. 텍스트 형식인 경우, 계층 구조를 평면화하여 표 형태로 변환
-4. 특수문자 정규화
-
-{f"**추가 지시사항**: {instruction}" if instruction else ""}
-
-다음 JSON 형식으로 반환:
-{{
-  "header": ["컬럼1", "컬럼2", ...],
-  "data": [
-    ["값1", "값2", ...],
-    ...
-  ],
-  "extraction_method": "table" or "text",
-  "notes": "처리 내용"
-}}"""
 
             response = self.client.chat.completions.create(
                 model="gpt-4o",
@@ -231,54 +209,8 @@ class DefinitionExtractToolV2:
         try:
             content_str = json.dumps(content, ensure_ascii=False)
 
-            prompt = f"""당신은 테이블과 텍스트 주석을 병합하는 전문가입니다.
+            prompt = build_llm_merge_prompt(content_str, instruction)
 
-**입력**:
-{content_str}
-
-**임무**: `base_table`에 `annotations`의 내용을 분석하고 적용하여 최종 테이블을 만드세요.
-
-## 기본 원칙
-Annotations는 base_table에 대한 **수정 지시사항**입니다. 각 annotation 문장의 **의도**를 파악하고, 테이블을 그에 맞게 변경하세요:
-
-1. **통합/동일 취급 지시**: 여러 값을 하나로 합치라는 의미 (예: "A와 B는 동일하게 취급")
-   → **행동**: 둘 중 하나를 선택하거나, "A/B" 형태로 병합하여 행을 합칩니다.
-
-2. **제외/삭제 지시**: 특정 값을 제거하라는 의미 (예: "X를 제외")
-   → **행동**: 해당 값이 포함된 행을 삭제합니다.
-
-3. **대체/변경 지시**: 값이나 명칭을 바꾸라는 의미 (예: "A를 B로 변경")
-   → **행동**: 테이블에서 'A'를 찾아 'B'로 교체합니다.
-
-4. **조건부 적용**: 특정 조건에서만 값이 달라지는 경우 (예: "2024년 이후 X형 추가")
-   → **행동**: 맥락 판단 후 적절히 반영 (행 추가/수정).
-
-5. **단순 설명**: 테이블 변경이 필요 없는 정보성 텍스트
-   → **행동**: 테이블을 그대로 유지합니다.
-
-  **중요 원칙**:
-  1. ⚠️ **원본 컬럼 구조를 절대 변경하지 마세요**
-     - 컬럼명이 비슷해도 절대 합치지 마세요
-     - 모든 컬럼을 원본 그대로 유지하세요
-     - 컬럼 개수와 이름을 정확히 보존하세요
-  2. 주석 행 제외 (※, 주:, 주), *, - 로 시작하는 설명)
-  3. Header와 Data rows로 구분
-  4. 셀 내용은 정리하되, 줄바꿈(\\n)은 공백으로 변환
-  5. 데이터 손실 없이 모든 셀의 값을 추출
-
-{f"**추가 지시사항**: {instruction}" if instruction else ""}
-
-
-
-**출력 형식 (JSON)**:
-{{
-  "header": ["최종 컬럼1", "최종 컬럼2", ...],
-  "data": [
-    ["최종 값1", "최종 값2", ...],
-    ...
-  ],
-  "notes": "병합 과정에 대한 설명"
-}}"""
 
             response = self.client.chat.completions.create(
                 model="gpt-4o",
@@ -628,90 +560,8 @@ class LLMCartesianTool:
                 )
 
             # Step 1: LLM으로 값 분리
-            prompt = f"""다음 데이터의 각 셀 값을 문맥을 고려하여 독립된 옵션들로 분리하고, JSON 형식으로 반환하세요.
+            prompt = build_llm_cartesian_prompt(header, data, instruction)
 
-Header: {json.dumps(header, ensure_ascii=False)}
-Data:
-{json.dumps(data, ensure_ascii=False, indent=2)}
-
-{extra_instruction}
-
-**중요 규칙**:
-1. **컬럼별 주 구분자(primary delimiter) 파악**:
-   각 셀의 값을 분리하기 전에, **해당 셀이 속한 컬럼 전체**를 관찰하세요:
-
-   - 컬럼에서 `/`와 `,` 중 **어느 것이 더 자주** 등장하는지 확인
-   - **더 자주 등장하는 구분자**를 실제 구분자로 사용
-   - **덜 등장하는 구분자**는 내용의 일부로 취급 (분리하지 않음)
-
-   **예시**:
-   - 컬럼 값: "두경부암(전이포함),위암(전이포함),남성/여성생식기암(전이포함)"
-     → `,`가 여러 번, `/`는 한 번만 등장
-     → 주 구분자: `,`
-     → 분리 결과: ["두경부암(전이포함)", "위암(전이포함)", "남성/여성생식기암(전이포함)"]
-     → "남성/여성생식기암"은 분리하지 않음 (/ is not primary delimiter)
-
-   - 컬럼 값: "간편심사(315)형/간편심사(335)형/간편심사(355)형"
-     → `/`가 여러 번, `,` 없음
-     → 주 구분자: `/`
-     → 분리 결과: ["간편심사(315)형", "간편심사(335)형", "간편심사(355)형"]
-
-2. 줄바꿈(\\n)과 공백은 strip하되, 보종명(첫 번째 컬럼)은 줄바꿈 유지
-
-3. 각 행은 독립적으로 처리
-
-**출력 형식 (중요!)**:
-각 행을 셀 단위로 분리하고, 각 셀은 옵션 리스트로 표현.
-
-{{
-  "parsed_rows": [
-    [
-      ["보종명1"],
-      ["유형값1"],
-      ["옵션A", "옵션B", "옵션C"],
-      ["암종류1", "암종류2", ...]
-    ],
-    [...]
-  ]
-}}
-
-**예시 1**:
-Input:
-Header: ["명칭", "유형", "보험종목"]
-Data: [["특약A", "일반형", "간편심사(315)형/간편심사(335)형"]]
-
-Output:
-{{
-  "parsed_rows": [
-    [
-      ["특약A"],
-      ["일반형"],
-      ["간편심사(315)형", "간편심사(335)형"]
-    ]
-  ]
-}}
-
-**예시 2**:
-Input:
-Header: ["명칭", "유형", "보험종목", "보장계약"]
-Data: [["특약B", "해약환급금미지급형", "간편심사(315)형/간편심사(335)형", "두경부암(전이포함),위암(전이포함),남성/여성생식기암(전이포함)"]]
-
-Output:
-{{
-  "parsed_rows": [
-    [
-      ["특약B"],
-      ["해약환급금미지급형"],
-      ["간편심사(315)형", "간편심사(335)형"],
-      ["두경부암(전이포함)", "위암(전이포함)", "남성/여성생식기암(전이포함)"]
-    ]
-  ]
-}}
-
-주의:
-- 위 예시 2에서 "보장계약" 컬럼은 `,`가 주 구분자이므로 `/`는 내용의 일부입니다!
-- 각 셀은 header 개수와 동일하게 맞춰야 함!
-"""
 
             response = self.client.chat.completions.create(
                 model="gpt-4o",
@@ -950,140 +800,4 @@ class SectionClassifierTool:
         Returns:
             str: Classification prompt
         """
-        prompt = """당신은 보험 약관 문서의 섹션을 분류하는 전문가입니다.
-
-**임무**: 주어진 모든 섹션을 4가지 카테고리로 분류하세요.
-
-### 카테고리 정의 (의미 기준)
-
-1. **definition_core** (핵심 정의 섹션)
-
-   - 질문: 이 문서에서 정의하는 **상품/특약/보장계약이 무엇이며, 어떤 종류/조합으로 구성되어 있는가?**
-   - 예:
-     - 상품/특약의 명칭과 버전(해약환급금 미지급형 vs 일반형)
-     - 1종/2종, 주계약/특약, 보장계약 타입 등
-     - 각 버전이 어떤 축(유형1/유형2/심사형/보장계약 등)으로 나뉘는지
-   - 특징:
-     - "무엇으로 구성되어 있는지"를 설명하는 정적인 구조 정의
-     - 표(table)인 경우가 많지만, 텍스트만으로 정의하는 경우도 있음
-     - 기간, 가입나이, 납입기간, 납입주기 등 **숫자 기반 가입조건은 핵심이 아님**
-
-2. **definition_annotation** (정의 주석/보충 섹션)
-
-   - 질문: 위에서 정의한 구조에 대해 **어떤 예외/변경/추가 설명**이 있는가?
-   - 예:
-     - 명칭/표기법 설명: "상품명 앞에 '(간편)'을 붙인다"
-     - 정의값에 대한 보충: "N은 1, 3, 5를 의미한다"
-     - 정의에 대한 예외/주의: "단, 일부 채널에서는 OO라는 명칭을 사용"
-     - 각주, "※", "참고", "주)" 로 시작하는 문장 등
-   - 특징:
-     - definition_core에서 정의한 값들을 수정/보완/해석하는 텍스트
-     - 가입조건(보험기간, 가입나이, 납입기간 등)을 새로 정의하는 것은 아님
-
-3. **condition** (계약/가입 조건 섹션)
-
-   - 질문: 각 종류(유형/종/보장형)를 **어떤 조건으로 가입/유지할 수 있는가?**
-   - 예:
-     - 보험기간: 10/20/30년, 60/70/80세, 종신
-     - 보험료 납입기간: 10/15/20/25/30년납, 전기납
-     - 가입나이: "만15세 ~ min(세만기 - 년납, 70세)"
-     - 보험료 납입주기: 월납/연납 등
-   - 특징:
-     - "언제까지, 얼마 동안, 몇 살부터 몇 살까지, 어떻게 내야 하는지" 같은
-       기간/연령/납입 조건을 수치/범위로 표현
-     - 표 제목이 "가입가능 조건", "보험기간/보험료 납입기간/가입나이/납입주기" 등인 경우가 많음
-     - 정의(상품 구조)를 새로 소개하기보다는, 이미 정의된 유형에 대한 조건을 설명
-
-4. **other** (기타 섹션)
-
-   - 위 3가지에 해당하지 않는 모든 섹션
-   - 예: 목차, 서문, 일반 설명, 부록, 클레임/면책조항 등
-
-### 중요 규칙
-
-- 제목이 비표준이어도(예: "상품 구성", 숫자만 있는 제목 등) 내용상
-  상품/보장 구조를 정의하면 **definition_core**로 분류하세요.
-- 기간/가입나이/납입기간/납입주기에 대한 수치/범위가 중심이면 **condition**으로 분류하세요.
-- "※", "참고", "주)", "단," 등으로 시작하는 정의 관련 설명은
-  구조 정의가 아니면 **definition_annotation**으로 분류하세요.
-- 제목이 없더라도 내용(preview)을 보고 판단하세요.
-- 표/텍스트 형식은 보조 정보일 뿐, 의미(정의 vs 조건)를 우선적으로 고려하세요.
-- 모든 섹션은 정확히 한 카테고리에만 속해야 합니다.
-
-### 예시로 배우기 (Few-shot Learning)
-
-**입력 예시 1**:
-```
-[Section 5]
-Title: 3. 보험기간, 보험료 납입기간, 피보험자 가입나이 및 보험료 납입주기
-Has Table: true
-Has Text: true
-Preview: [Table: 유형1, 유형2, 보험기간 | 간편심사형, -, 80/90/100세]
----
-```
-**판단 과정**:
-1.  **제목**: "보험기간", "납입기간", "가입나이" 등 명백한 '조건' 키워드가 포함됨.
-2.  **내용**: Preview를 보니 테이블에 '보험기간' 같은 조건 컬럼이 있음. '유형' 컬럼이 있긴 하지만, 이 섹션의 핵심 목적은 상품 구조 정의가 아니라 가입 '조건'을 나열하는 것임.
-3.  **결론**: `condition`으로 분류하는 것이 가장 적절함.
-
-**입력 예시 2**:
-```
-[Section 1]
-Title: 1. 보험종목의 명칭
-Has Table: true
-Has Text: false
-Preview: [Table: 명칭, 보험종목, 보험종목_1 | [3-100%장해형]재해장해특약, 해약환급금 미지급형, 간편심사(315)형]
----
-```
-**판단 과정**:
-1.  **제목**: "보험종목의 명칭"은 상품의 구조를 정의하는 핵심 키워드임.
-2.  **내용**: 테이블에 '명칭', '보험종목' 등 정의 관련 컬럼이 명확하게 있음.
-3.  **결론**: `definition_core`로 분류하는 것이 가장 적절함.
-
-"""
-
-        # Add additional instruction if provided
-        if instruction:
-            prompt += f"""
-**추가 지시사항** (중요 - 반드시 따를 것):
-{instruction}
-
-"""
-
-        prompt += """**입력 섹션**:
-
-"""
-
-        # Add section summaries
-        for i, s in enumerate(summaries):
-            prompt += f"\n[Section {s['index']}]\n"
-            prompt += f"Title: {s['title'] or '(no title)'}\n"
-            prompt += f"Has Table: {s['has_table']}\n"
-            prompt += f"Has Text: {s['has_text']}\n"
-            prompt += f"Preview: {s['preview'][:200]}\n"
-            prompt += "---\n"
-
-        prompt += """
-
-**출력 형식** (JSON):
-
-{
-    "definition_core": [섹션 인덱스들],
-    "definition_annotation": [섹션 인덱스들],
-    "condition": [섹션 인덱스들],
-    "other": [섹션 인덱스들],
-    "reasoning": "분류 근거에 대한 간단한 설명"
-}
-
-**예시**:
-{
-    "definition_core": [0, 2],
-    "definition_annotation": [1, 3],
-    "condition": [4],
-    "other": [5, 6],
-    "reasoning": "Section 0과 2는 보험종목/명칭 테이블, Section 1과 3은 정의에 대한 주석, Section 4는 가입조건, 나머지는 목차/서문"
-}
-
-이제 위 섹션들을 분류해주세요:"""
-
-        return prompt
+        return build_section_classifier_prompt(summaries, instruction)
