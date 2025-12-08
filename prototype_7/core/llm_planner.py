@@ -21,7 +21,7 @@ tools_path = Path(__file__).parent.parent / "tools"
 sys.path.insert(0, str(tools_path))
 
 from tool_schemas import get_schema_prompt
-from core.prompt import build_planner_prompt, build_replan_prompt, build_dynamic_planning_prompt_v7
+from core.prompt import build_planner_prompt, build_replan_prompt, build_dynamic_planning_prompt_v7, build_next_task_prompt
 from core.state import TaskDefinition, TaskResult
 
 
@@ -30,7 +30,7 @@ class LLMPlanner:
     LLM 기반 동적 계획 수립기
 
     역할:
-        - 문서와 구조 분석 결과를 보고 최적의 계획 수립
+        - 문서 구조 분석 결과를 보고 최적의 계획 수립
         - 각 Task의 도구 선택 (rule vs llm)
         - Fallback 전략 포함
         - 파라미터 생성
@@ -44,17 +44,14 @@ class LLMPlanner:
     def create_plan(
         self,
         doc: Any,
-        goal: str = """
-        - 보험 상품 정의(보종명,유형계층)의 모든 조합 추출
-        - 조건(보험기간/납입기간 등)에 대한 Task는 이번 계획에 포함하지 말 것
-        """
+        instruction: Optional[str] = "",
+        goal: str = "보험 상품 약관 문서에서, '정의'와 '조건' 섹션을 모두 식별하고, 각 섹션에서 데이터를 추출한 뒤, 이 둘을 정규화하고 그룹핑하여 최종 보험 상품 목록을 생성하세요."
     ) -> Dict[str, Any]:
         """
         문서에 맞는 동적 계획 수립
 
         Args:
             doc: 원본 문서
-            # structure_analysis: [DEPRECATED] LLMDocumentAnalyzer의 분석 결과
             goal: 최종 목표
 
         Returns:
@@ -62,62 +59,46 @@ class LLMPlanner:
                 {
                     "tasks": [
                         {
-                            "task_id": int,
-                            "type": "search" | "extract" | "transform",
-                            "description": str,
-                            "strategy": "rule" | "llm",
-                            "fallback": "llm" | null,
+                            "task_id": str,
+                            "task_type": str,
                             "tool_name": str,
+                            "fallback_tool": str | null,
                             "parameters": Dict,
-                            "depends_on": int | null
+                            "dependencies": List[str],
+                            "output_key": str
                         },
                         ...
                     ],
                     "reasoning": str,
-                    "estimated_difficulty": "easy" | "medium" | "hard"
+                    "estimated_difficulty": "easy" | "medium" | "hard",
+                    "total_tasks": int
                 }
         """
-        # 문서 샘플
         doc_sample = json.dumps(doc, ensure_ascii=False)
-
-        # Tool schemas 가져오기
         tool_schemas = get_schema_prompt()
-        
-        # DocumentAccessor로 형식 정보 가져오기
         from core.document_accessor import DocumentAccessor
         accessor = DocumentAccessor(doc)
         doc_summary = accessor.get_summary()
 
-        prompt = build_planner_prompt(
+        prompt = build_dynamic_planning_prompt_v7(
             doc_summary=doc_summary,
             doc_sample=doc_sample,
             goal=goal,
             tool_schemas=tool_schemas,
+            instruction=instruction,
         )
         try:
             response = self.client.chat.completions.create(
                 model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"},
-                temperature=0.3  # 약간의 창의성
+                temperature=0.3
             )
-
             plan = json.loads(response.choices[0].message.content)
-
-            # PROTOTYPE 7: Validate plan structure if it has Prototype 7 format
-            if "total_tasks" in plan and "tasks" in plan:
-                if not self._validate_plan_structure(plan):
-                    return {
-                        "error": "Invalid plan structure (failed validation)",
-                        "original_plan": plan
-                    }
-
             return plan
 
         except Exception as e:
-            return {
-                "error": f"Planning failed: {str(e)}"
-            }
+            return {"error": f"Planning failed: {str(e)}"}
 
     def replan(
         self,
@@ -147,81 +128,34 @@ class LLMPlanner:
         if previous_attempts is None:
             previous_attempts = []
 
-        # Tool schemas 가져오기
         tool_schemas = get_schema_prompt()
         
         prompt = build_replan_prompt(
-        failed_task=failed_task,
-        error_message=error_message,
-        validation_result=validation_result,
-        previous_attempts=previous_attempts,
-        tool_schemas=tool_schemas,
-    )
-
+            failed_task=failed_task,
+            error_message=error_message,
+            validation_result=validation_result,
+            previous_attempts=previous_attempts,
+            tool_schemas=tool_schemas,
+        )
 
         try:
             response = self.client.chat.completions.create(
                 model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"},
-                temperature=0.5  # 더 높은 창의성
+                temperature=0.5
             )
 
             new_plan = json.loads(response.choices[0].message.content)
             return new_plan
 
         except Exception as e:
-            return {
-                "error": f"Replanning failed: {str(e)}"
-            }
+            return {"error": f"Replanning failed: {str(e)}"}
 
     # ========== PROTOTYPE 7: New Methods ==========
 
-    def _validate_plan_structure(self, plan: Dict[str, Any]) -> bool:
-        """
-        Validate plan structure for Prototype 7 dynamic execution.
-
-        Checks:
-        - Required fields exist (total_tasks, tasks, reasoning)
-        - Each task has required fields
-        - Dependencies only reference earlier tasks (no circular deps)
-        - Task IDs are sequential
-
-        Args:
-            plan: Plan dict from LLM
-
-        Returns:
-            True if valid, False otherwise
-        """
-        # Check top-level keys
-        required_keys = ["total_tasks", "tasks", "reasoning"]
-        if not all(k in plan for k in required_keys):
-            return False
-
-        tasks = plan.get("tasks", [])
-        if len(tasks) != plan.get("total_tasks", 0):
-            return False
-
-        # Check each task definition
-        required_task_fields = ["task_id", "task_type", "tool_name", "parameters", "dependencies", "output_key"]
-        for i, task in enumerate(tasks):
-            # Check required fields
-            if not all(k in task for k in required_task_fields):
-                return False
-
-            # Check task_id is sequential
-            expected_id = f"task{i}"
-            if task.get("task_id") != expected_id:
-                return False
-
-            # Check dependencies only reference earlier tasks
-            for dep in task.get("dependencies", []):
-                dep_idx = int(dep.replace("task", ""))
-                if dep_idx >= i:
-                    # Circular or forward dependency!
-                    return False
-
-        return True
+    # _validate_plan_structure 메소드는 Pydantic으로 대체되었으므로 삭제 또는 더 이상 사용되지 않음
+    # Pydantic 모델에 이미 검증 로직이 포함되어 있음
 
     def suggest_replan(
         self,
@@ -231,18 +165,18 @@ class LLMPlanner:
         task_results: List[TaskResult]
     ) -> Dict[str, Any]:
         """
-        Suggest how to adjust plan after task failure (Prototype 7).
+        Task 실패 후 계획 조정 방법을 제안 (Prototype 7).
 
-        Returns one of three replan types:
-        1. adjust_parameters: Modify current task params
-        2. insert_task: Add new task before current
-        3. full_replan: Generate completely new plan
+        세 가지 재계획 유형 중 하나를 반환:
+        1. adjust_parameters: 현재 Task 파라미터 수정
+        2. insert_task: 현재 Task 앞에 새 Task 삽입
+        3. full_replan: 완전히 새로운 계획 생성
 
         Args:
-            current_plan: Current plan dict
-            failed_task: The TaskDefinition that failed
-            validation_feedback: Validation result with errors/suggestions
-            task_results: List of completed task results
+            current_plan: 현재 계획 딕셔너리
+            failed_task: 실패한 TaskDefinition
+            validation_feedback: 에러/제안이 포함된 검증 결과
+            task_results: 완료된 Task 결과 목록
 
         Returns:
             Dict with replan action:
@@ -253,12 +187,10 @@ class LLMPlanner:
               "new_instruction": "..."  # if full_replan
             }
         """
-        # Prepare context for LLM
         failed_task_json = json.dumps(failed_task, ensure_ascii=False, indent=2)
         validation_json = json.dumps(validation_feedback, ensure_ascii=False, indent=2)
         plan_json = json.dumps(current_plan, ensure_ascii=False, indent=2)
 
-        # Simplified task results (only show success/failure)
         results_summary = [
             {
                 "task_id": r["task_id"],
@@ -269,70 +201,67 @@ class LLMPlanner:
         ]
         results_json = json.dumps(results_summary, ensure_ascii=False, indent=2)
 
-        # Build prompt (will add to prompt.py in Phase 1.4)
-        # For now, use inline prompt
-        prompt = f"""
-당신은 실행 계획을 수정하는 전문가입니다.
+        prompt = build_replan_prompt(
+            failed_task=failed_task_json,
+            error_message=validation_feedback.get('errors', ['Unknown error'])[0],
+            validation_result=validation_json,
+            previous_attempts=results_json, # 이전 시도 내역
+            tool_schemas=get_schema_prompt(),
+        )
 
-## 현재 계획
-{plan_json}
+        try:
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+                temperature=0.3
+            )
+            replan_action = json.loads(response.choices[0].message.content)
+            return replan_action
 
-## 실패한 작업
-{failed_task_json}
+        except Exception as e:
+            return {
+                "type": "adjust_parameters", # Fallback to simply re-adjusting parameters
+                "new_parameters": failed_task.get("parameters", {}),
+                "reasoning": f"Fallback due to error in replanning: {str(e)}"
+            }
 
-## 검증 피드백
-{validation_json}
+    def generate_next_task(
+        self,
+        doc: Any,
+        task_results: List[Dict[str, Any]],
+        goal: str = "보험 상품 약관 문서에서, '정의'와 '조건' 섹션을 모두 식별하고, 각 섹션에서 데이터를 추출한 뒤, 이 둘을 정규화하고 그룹핑하여 최종 보험 상품 목록을 생성하세요."
+    ) -> Dict[str, Any]:
+        """
+        PROTOTYPE 7 v2: 완료된 Task 이력을 기반으로 다음 단일 Task를 생성합니다.
 
-## 이전 작업 결과들
-{results_json}
+        Args:
+            doc: 원본 문서
+            task_results: 완료된 Task 결과 목록
+            goal: 최종 목표 설명
 
-## 목표
-실패를 해결하기 위한 최소한의 계획 수정을 제안하세요.
+        Returns:
+            Dict with either:
+            - {"action": "next_task", "task": TaskDefinition}
+            - {"action": "end", "reasoning": "..."}
+        """
+        from core.document_accessor import DocumentAccessor
+        accessor = DocumentAccessor(doc)
+        doc_summary = accessor.get_summary()
+        tool_schemas = get_schema_prompt()
 
-## 수정 유형
+        instruction_for_next_task = (
+            "조건 추출, 그룹핑, 최종 조합 단계 중 미수행된 단계가 있다면 절대 `END` 하지 마세요."
+            "최종 결과까지 모든 단계가 완료되어야 합니다."
+        )
 
-### 1. adjust_parameters (파라미터 조정)
-- 언제: 작업 로직은 맞지만 파라미터가 잘못됨
-- 예시: 페이지 범위 조정, threshold 값 변경
-- 출력:
-{{
-  "type": "adjust_parameters",
-  "new_parameters": {{"pages": "3-8", "threshold": 0.7}},
-  "reasoning": "조정 이유 설명"
-}}
-
-### 2. insert_task (작업 삽입)
-- 언제: 현재 작업 전에 전처리가 필요함
-- 예시: 섹션 분류를 안 했는데 필요함
-- 출력:
-{{
-  "type": "insert_task",
-  "new_task": {{
-    "task_id": "taskN_new",
-    "task_type": "classify_sections",
-    "description": "섹션 분류 추가",
-    "tool_name": "section_classifier",
-    "fallback_tool": null,
-    "parameters": {{"sections": "$sections"}},
-    "dependencies": ["taskN-1"],
-    "output_key": "section_info"
-  }},
-  "reasoning": "삽입 이유 설명"
-}}
-
-### 3. full_replan (전면 재계획)
-- 언제: 근본적인 전략 변경 필요
-- 예시: 문서 구조를 완전히 잘못 이해함
-- 출력:
-{{
-  "type": "full_replan",
-  "new_instruction": "문서가 단일 테이블이 아니라 여러 섹션으로 나뉨. 섹션 분류부터 시작.",
-  "reasoning": "재계획 이유 설명"
-}}
-
-위 3가지 유형 중 하나를 선택하여 JSON으로 출력하세요.
-특히 validation_feedback의 errors와 suggestions를 반영하세요.
-"""
+        prompt = build_next_task_prompt(
+            doc_summary=doc_summary,
+            goal=goal,
+            task_results=task_results,
+            tool_schemas=tool_schemas,
+            instruction=instruction_for_next_task # instruction 인자 추가
+        )
 
         try:
             response = self.client.chat.completions.create(
@@ -342,13 +271,24 @@ class LLMPlanner:
                 temperature=0.3
             )
 
-            replan_action = json.loads(response.choices[0].message.content)
-            return replan_action
+            result = json.loads(response.choices[0].message.content)
+
+            action = result.get("action")
+            if action == "end":
+                return {"action": "end", "reasoning": result.get("reasoning", "All tasks completed")}
+            elif action == "next_task":
+                task = result.get("task")
+                if not task:
+                    return {"error": "LLM returned next_task but no task object"}
+
+                required_fields = ["task_id", "task_type", "tool_name", "parameters", "dependencies", "output_key"]
+                missing = [f for f in required_fields if f not in task]
+                if missing:
+                    return {"error": f"Task missing required fields: {missing}"}
+
+                return {"action": "next_task", "task": task, "reasoning": result.get("reasoning", "")}
+            else:
+                return {"error": f"Unknown action from LLM: {action}"}
 
         except Exception as e:
-            # Fallback: adjust_parameters
-            return {
-                "type": "adjust_parameters",
-                "new_parameters": failed_task.get("parameters", {}),
-                "reasoning": f"Fallback due to error: {str(e)}"
-            }
+            return {"error": f"Next task generation failed: {str(e)}"}

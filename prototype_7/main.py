@@ -69,9 +69,13 @@ def main():
                 continue
 
             result = agent.run(doc)
-
+            # 필요 시 task_results를 포함시킴
+            if "task_results" not in result and hasattr(agent, "task_results"):
+                result["task_results"] = getattr(agent, "task_results", [])
+                result["debug_logs"] = agent.debug_logs  # 필요하다면
             output_path = results_dir / f"{doc_path.stem}_new_result.json"
             save_result(result, str(output_path))
+
 
         print("\nAll files processed.")
     else:
@@ -84,8 +88,14 @@ def main():
             sys.exit(1)
 
         result = agent.run(doc)
-        output_path = results_dir / f"{doc_path.stem}_new_result.json"
+
+        # 필요하면 task_results를 result에 넣어줌 (이미 포함돼 있으면 생략)
+        if "task_results" not in result and hasattr(agent, "task_results"):
+            result["task_results"] = getattr(agent, "task_results", [])
+            result["debug_logs"] = agent.debug_logs  # 필요하다면
+        output_path = results_dir / f"{doc_path.stem}_prototype4_1_copy_result.json"
         save_result(result, str(output_path))
+
 
 if __name__ == "__main__":
     main()

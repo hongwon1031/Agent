@@ -5,7 +5,9 @@
       "Bash(python:*)",
       "Bash(git rev-parse:*)",
       "Bash(cat:*)",
-      "Bash(head:*)"
+      "Bash(head:*)",
+      "Bash(wc:*)",
+      "Bash(ls -la \"C:\\Users\\NT-165\\Desktop\\Project\\Toy\\prototype_6\\core\"\" | grep \".py \")"
     ],
     "deny": [],
     "ask": []

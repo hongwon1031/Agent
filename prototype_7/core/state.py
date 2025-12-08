@@ -92,14 +92,17 @@ class AgentState(TypedDict):
     current_instruction: Optional[str]
     tool_override: Optional[str]
 
-    # ===== PROTOTYPE 7: Dynamic Execution State =====
-    plan: Optional[Dict]                          # Full plan from LLMPlanner
-    current_task_index: int                       # Current task index (0-based)
+    # ===== PROTOTYPE 7 v2: 1-Task-at-a-Time Dynamic Execution =====
     task_results: List[TaskResult]                # All completed task results
     current_task: Optional[TaskDefinition]        # Current task being executed
     current_task_output: Optional[Any]            # Raw output from current task
-    max_replans: int                              # Maximum replans allowed
-    backtrack_to_task_id: Optional[str]           # Backtrack target task_id
+    is_complete: bool                             # All tasks done (planner returned END)
+
+    # DEPRECATED (kept for backward compatibility, not used in v2)
+    plan: Optional[Dict]                          # [DEPRECATED] Not used in 1-task-at-a-time
+    current_task_index: int                       # [DEPRECATED] Not used in 1-task-at-a-time
+    max_replans: int                              # [DEPRECATED] Not used in 1-task-at-a-time
+    backtrack_to_task_id: Optional[str]           # [DEPRECATED] Not used in 1-task-at-a-time
 
     # ===== LEGACY: Prototype 6 Intermediate Results =====
     classification_result: Optional[Dict]

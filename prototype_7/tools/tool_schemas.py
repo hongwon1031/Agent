@@ -44,14 +44,15 @@ TOOL_SCHEMAS = {
                 "type": "list[int]",
                 "description": "Indices of definition_core sections (from section_classifier)",
                 "required": True,
-                "example": "{{task1.definition_core}}",
+                "example": "{{task0.data.definition_core}}",
             },
             "annotation_indices": {
                 "type": "list[int]",
                 "description": "Indices of definition_annotation sections (optional)",
                 "required": False,
-                "example": "{{task1.definition_annotation}}",
+                "example": "{{task0.data.definition_annotation}}",
             },
+
         },
         "returns": {
             "header": "list[string] - Table headers",
@@ -121,7 +122,7 @@ TOOL_SCHEMAS = {
                 "type": "list[int]",
                 "description": "Indices of condition sections (from section_classifier)",
                 "required": True,
-                "example": "{{task1.condition}}",
+                "example": "{{task0.data.condition}}",
             },
             "instruction": {
                 "type": "string",
@@ -135,39 +136,7 @@ TOOL_SCHEMAS = {
             "extraction_method": "string - Method used (e.g., 'rule_based' or 'llm_based')",
         },
     },
-    "definition_condition_merge": {
-        "description": "Merge Definition combinations with Condition combinations using LEFT JOIN",
-        "parameters": {
-            "definitions": {
-                "type": "list[dict]",
-                "description": "Definition combinations from Cartesian step",
-                "required": True,
-                "example": "{{task5.definitions}}",
-            },
-            "condition_header": {
-                "type": "list[string]",
-                "description": "Condition table column names",
-                "required": True,
-                "example": "{{task4.header}}",
-            },
-            "condition_data": {
-                "type": "list[list[string]]",
-                "description": "Condition table rows (after Cartesian)",
-                "required": True,
-                "example": "{{task6.data}}",
-            },
-            "instruction": {
-                "type": "string",
-                "description": "Additional guidance for merge logic",
-                "required": False,
-            },
-        },
-        "returns": {
-            "definitions": "list[dict] - Merged definitions with condition columns",
-            "total_count": "int - Total number of merged definitions",
-            "join_stats": "dict - {matched: int, unmatched: int, join_keys: list[str]}",
-        },
-    },
+
     "grouping_logic_extractor": {
         "description": "Extract grouping logic for definition-condition matching (LLM-based)",
         "supported_formats": ["table"],
@@ -176,25 +145,25 @@ TOOL_SCHEMAS = {
                 "type": "list[str]",
                 "description": "Normalized definition table header",
                 "required": True,
-                "example": "{{task_normalize_def.header}}",
+                "example": "{{task2.data.header}}",
             },
             "definition_data": {
                 "type": "list[list[str]]",
                 "description": "Normalized definition table data (no combinations, raw table)",
                 "required": True,
-                "example": "{{task_normalize_def.data}}",
+                "example": "{{task2.data.data}}",
             },
             "condition_header": {
                 "type": "list[str]",
                 "description": "Normalized condition table header",
                 "required": True,
-                "example": "{{task_normalize_cond.header}}",
+                "example": "{{task4.data.header}}",
             },
             "condition_data": {
                 "type": "list[list[str]]",
                 "description": "Normalized condition table data (no combinations, raw table)",
                 "required": True,
-                "example": "{{task_normalize_cond.data}}",
+                "example": "{{task4.data.data}}",
             },
             "instruction": {
                 "type": "string",
@@ -217,31 +186,31 @@ TOOL_SCHEMAS = {
                 "type": "list[str]",
                 "description": "Normalized definition table header",
                 "required": True,
-                "example": "{{task_normalize_def.header}}",
+                "example": "{{task2.data.header}}",
             },
             "definition_data": {
                 "type": "list[list[str]]",
                 "description": "Normalized definition table data",
                 "required": True,
-                "example": "{{task_normalize_def.data}}",
+                "example": "{{task2.data.data}}",
             },
             "condition_header": {
                 "type": "list[str]",
                 "description": "Normalized condition table header",
                 "required": True,
-                "example": "{{task_normalize_cond.header}}",
+                "example": "{{task4.data.header}}",
             },
             "condition_data": {
                 "type": "list[list[str]]",
                 "description": "Normalized condition table data",
                 "required": True,
-                "example": "{{task_normalize_cond.data}}",
+                "example": "{{task4.data.data}}",
             },
             "grouping_logic": {
                 "type": "dict",
                 "description": "Grouping logic from grouping_logic_extractor",
                 "required": True,
-                "example": "{{task_grouping.grouping_logic}}",
+                "example": "{{task5.data}}",
             },
         },
         "returns": {
@@ -308,4 +277,5 @@ def validate_tool_parameters(tool_name: str, parameters: dict) -> tuple[bool, st
                 return False, f"Missing required parameter: {param_name}"
 
     return True, ""
+
 

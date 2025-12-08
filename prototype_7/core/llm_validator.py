@@ -966,3 +966,4 @@ class LLMValidator:
         except Exception as e:
             # If analysis fails, return None (no root cause identified)
             return None
+

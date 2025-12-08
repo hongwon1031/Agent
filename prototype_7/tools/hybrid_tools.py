@@ -195,7 +195,7 @@ class DefinitionExtractToolV2:
             )
 
             result = json.loads(response.choices[0].message.content)
-
+            print(f'❗result : {result}')
             if not result.get("header") or not result.get("data"):
                 return [], [], ""
 
@@ -257,10 +257,23 @@ class DefinitionExtractToolV2:
             annotation_indices = params.get("annotation_indices", [])
             instruction = params.get("instruction", "")
 
-            if not sections:
+            if not isinstance(sections, list) or not sections:
                 return ToolResult(
                     success=False,
-                    error="No sections provided",
+                    error=f"No sections provided or wrong type (expected list, got {type(sections).__name__})",
+                    tool_name=self.name
+                )
+            if not all(isinstance(section, dict) for section in sections):
+                return ToolResult(
+                    success=False,
+                    error="Sections must be a list of dict objects",
+                    tool_name=self.name
+                )
+
+            if isinstance(core_indices, str):
+                return ToolResult(
+                    success=False,
+                    error="core_indices not resolved (string received, template likely unresolved)",
                     tool_name=self.name
                 )
 
@@ -647,10 +660,17 @@ class SectionClassifierTool:
             sections = params.get("sections", [])
             instruction = params.get("instruction", "")
 
-            if not sections:
+            if not isinstance(sections, list) or not sections:
                 return ToolResult(
                     success=False,
-                    error="No sections provided",
+                    error=f"No sections provided or wrong type (expected list, got {type(sections).__name__})",
+                    tool_name=self.name
+                )
+
+            if not all(isinstance(section, dict) for section in sections):
+                return ToolResult(
+                    success=False,
+                    error="Sections must be a list of dict objects",
                     tool_name=self.name
                 )
 
@@ -890,97 +910,97 @@ class IntelligentConditionExtractTool:
             )
 
 
-class DefinitionConditionMergeTool:
-    """
-    LLM-based Intelligent Merge Tool.
-    Merges definition combinations with raw condition data using flexible,
-    semantic matching powered by an LLM.
-    """
+# class DefinitionConditionMergeTool:
+#     """
+#     LLM-based Intelligent Merge Tool.
+#     Merges definition combinations with raw condition data using flexible,
+#     semantic matching powered by an LLM.
+#     """
 
-    def __init__(self):
-        self.name = "definition_condition_merge"
-        load_dotenv(dotenv_path=r"c:\Users\NT-165\Desktop\Project\Toy\.env")
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+#     def __init__(self):
+#         self.name = "definition_condition_merge"
+#         load_dotenv(dotenv_path=r"c:\Users\NT-165\Desktop\Project\Toy\.env")
+#         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-    def execute(self, doc: Any, params: Dict[str, Any]) -> ToolResult:
-        """
-        Merges definition combinations with raw condition data using an LLM.
+#     def execute(self, doc: Any, params: Dict[str, Any]) -> ToolResult:
+#         """
+#         Merges definition combinations with raw condition data using an LLM.
 
-        Args:
-            params:
-                definitions: list[dict] - Expanded definition combinations.
-                condition_header: list[str] - Header of the raw condition table.
-                condition_data: list[list[str]] - Data of the raw condition table.
-                instruction: str (optional) - Additional instruction for the merge.
+#         Args:
+#             params:
+#                 definitions: list[dict] - Expanded definition combinations.
+#                 condition_header: list[str] - Header of the raw condition table.
+#                 condition_data: list[list[str]] - Data of the raw condition table.
+#                 instruction: str (optional) - Additional instruction for the merge.
 
-        Returns:
-            ToolResult with data from the LLM, including the merged definitions
-            and join statistics.
-        """
-        try:
-            definitions = params.get("definitions", [])
-            condition_header = params.get("condition_header", [])
-            condition_data = params.get("condition_data", [])
-            instruction = params.get("instruction", "")
+#         Returns:
+#             ToolResult with data from the LLM, including the merged definitions
+#             and join statistics.
+#         """
+#         try:
+#             definitions = params.get("definitions", [])
+#             condition_header = params.get("condition_header", [])
+#             condition_data = params.get("condition_data", [])
+#             instruction = params.get("instruction", "")
 
-            if not definitions:
-                return ToolResult(
-                    success=False, error="No definitions provided", tool_name=self.name
-                )
+#             if not definitions:
+#                 return ToolResult(
+#                     success=False, error="No definitions provided", tool_name=self.name
+#                 )
             
-            # If no condition data, return definitions as is.
-            if not condition_header or not condition_data:
-                return ToolResult(
-                    success=True,
-                    data={
-                        "definitions": definitions,
-                        "total_count": len(definitions),
-                        "join_stats": {"status": "skipped", "reason": "no_condition_data"}
-                    },
-                    tool_name=self.name
-                )
+#             # If no condition data, return definitions as is.
+#             if not condition_header or not condition_data:
+#                 return ToolResult(
+#                     success=True,
+#                     data={
+#                         "definitions": definitions,
+#                         "total_count": len(definitions),
+#                         "join_stats": {"status": "skipped", "reason": "no_condition_data"}
+#                     },
+#                     tool_name=self.name
+#                 )
 
-            # Build the intelligent merge prompt
-            prompt = build_llm_intelligent_merge_prompt(
-                definitions=definitions,
-                condition_header=condition_header,
-                condition_data=condition_data,
-                instruction=instruction,
-            )
+#             # Build the intelligent merge prompt
+#             prompt = build_llm_intelligent_merge_prompt(
+#                 definitions=definitions,
+#                 condition_header=condition_header,
+#                 condition_data=condition_data,
+#                 instruction=instruction,
+#             )
 
-            # Call the LLM
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[{"role": "user", "content": prompt}],
-                response_format={"type": "json_object"},
-                temperature=0,
-                max_tokens=12000
-            )
-            raw = response.choices[0].message.content
-            print("=== MERGE RAW RESPONSE ===")
-            print(raw)
-            result_data = json.loads(response.choices[0].message.content)
+#             # Call the LLM
+#             response = self.client.chat.completions.create(
+#                 model="gpt-4o",
+#                 messages=[{"role": "user", "content": prompt}],
+#                 response_format={"type": "json_object"},
+#                 temperature=0,
+#                 max_tokens=12000
+#             )
+#             raw = response.choices[0].message.content
+#             print("=== MERGE RAW RESPONSE ===")
+#             print(raw)
+#             result_data = json.loads(response.choices[0].message.content)
 
-            # Basic validation of the LLM response
-            if "definitions" not in result_data or "join_stats" not in result_data:
-                return ToolResult(
-                    success=False,
-                    error="LLM response is missing required keys: 'definitions' or 'join_stats'.",
-                    tool_name=self.name
-                )
+#             # Basic validation of the LLM response
+#             if "definitions" not in result_data or "join_stats" not in result_data:
+#                 return ToolResult(
+#                     success=False,
+#                     error="LLM response is missing required keys: 'definitions' or 'join_stats'.",
+#                     tool_name=self.name
+#                 )
 
-            return ToolResult(
-                success=True,
-                data=result_data,
-                tool_name=self.name
-            )
+#             return ToolResult(
+#                 success=True,
+#                 data=result_data,
+#                 tool_name=self.name
+#             )
 
-        except Exception as e:
-            return ToolResult(
-                success=False,
-                error=f"DefinitionConditionMergeTool error: {str(e)}",
-                tool_name=self.name
-            )
+#         except Exception as e:
+#             return ToolResult(
+#                 success=False,
+#                 error=f"DefinitionConditionMergeTool error: {str(e)}",
+#                 tool_name=self.name
+#             )
 
 
 # ================================================================================================
