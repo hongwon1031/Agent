@@ -842,39 +842,6 @@ class LLMValidator:
                         "reasoning": f"Match rate {match_rate:.1%} below 50% threshold"
                     }
 
-            # 5. Check required value columns are present and not all null
-            required_value_cols = ["보험기간", "납입기간", "가입나이_남", "가입나이_여", "납입주기"]
-            missing_cols = [col for col in required_value_cols if col not in definitions[0]]
-            if missing_cols:
-                return {
-                    "is_valid": False,
-                    "confidence": 0.8,
-                    "errors": [f"Missing required columns: {missing_cols}"],
-                    "suggestions": ["Ensure combination_generator merges condition columns correctly"],
-                    "reasoning": "Required condition columns absent in final output"
-                }
-
-            # If every required value column is null/empty for all rows, treat as failure
-            def is_null(val):
-                return val is None or (isinstance(val, str) and val.strip() == "")
-
-            all_null = all(
-                all(is_null(d.get(col)) for col in required_value_cols)
-                for d in definitions
-            )
-            if all_null:
-                return {
-                    "is_valid": False,
-                    "confidence": 0.7,
-                    "errors": ["All condition columns are null in final combinations"],
-                    "suggestions": [
-                        "Check condition_extract output",
-                        "Verify grouping_logic value_columns",
-                        "Ensure combination_generator receives condition_header/data"
-                    ],
-                    "reasoning": "Value columns are all null"
-                }
-
             # All checks passed
             return {
                 "is_valid": True,

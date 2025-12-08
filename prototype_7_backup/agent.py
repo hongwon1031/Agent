@@ -244,38 +244,11 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
     doc = state.get('original_doc')
     task_results = state.get('task_results', [])
 
-    # Handle backtracking: drop results after target task to re-run from there
-    backtrack_to = state.get("backtrack_to_task_id")
-    if backtrack_to:
-        ids = [r.get("task_id") for r in task_results]
-        if backtrack_to in ids:
-            idx = ids.index(backtrack_to)
-            task_results = task_results[:idx]  # remove the failing task as well
-            print(f"[P7 NODE] Backtracking to {backtrack_to}: trimming results to {len(task_results)} entries")
-        else:
-            print(f"[P7 NODE] Backtrack target {backtrack_to} not found in results; ignoring.")
-        # clear backtrack flag
-        backtrack_to = None
-
     num_completed = len(task_results)
     print(f"\n[P7 NODE] plan_node: Generating next task (completed: {num_completed})...")
 
     # Call LLM to get next task or end signal
-    # Build extra instruction from last validation feedback (if any)
-    extra_instruction = ""
-    last_feedback = state.get("last_validation_feedback") or {}
-    if last_feedback and not last_feedback.get("is_valid", True):
-        errors = last_feedback.get("errors", [])
-        suggestions = last_feedback.get("suggestions", [])
-        parts = []
-        if errors:
-            parts.append("최근 오류: " + "; ".join(map(str, errors))[:400])
-        if suggestions:
-            parts.append("개선 지시: " + "; ".join(map(str, suggestions))[:400])
-        if parts:
-            extra_instruction = " / ".join(parts)
-
-    result = planner.generate_next_task(doc=doc, task_results=task_results, instruction=extra_instruction)
+    result = planner.generate_next_task(doc=doc, task_results=task_results)
 
     if result.get("error"):
         print(f"[FAIL] Task generation failed: {result['error']}")
@@ -289,9 +262,7 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
         print(f"  - Reasoning: {result.get('reasoning', 'N/A')[:100]}...")
         return {
             "is_complete": True,
-            "current_task": None,
-            "task_results": task_results,
-            "backtrack_to_task_id": None
+            "current_task": None
         }
 
     elif action == "next_task":
@@ -315,9 +286,7 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
 
         return {
             "current_task": task,
-            "is_complete": False,
-            "task_results": task_results,
-            "backtrack_to_task_id": None
+            "is_complete": False
         }
 
     else:
@@ -424,24 +393,7 @@ def validate_task_node(state: AgentState) -> Dict[str, Any]:
         if root_cause := validation_result.get("root_cause_task_id"):
             print(f"  - Root cause identified: {root_cause}")
 
-    updates: Dict[str, Any] = {
-        "validation_feedback": validation_result,
-        "last_validation_feedback": validation_result,
-    }
-
-    # Track retries and backtrack target
-    retry_counts = dict(state.get("retry_counts", {}))
-    if not validation_result.get("is_valid", False):
-        retry_counts[task_id] = retry_counts.get(task_id, 0) + 1
-        updates["retry_counts"] = retry_counts
-
-        root_cause = validation_result.get("root_cause_task_id")
-        if root_cause:
-            completed_ids = [r.get("task_id") for r in state.get("task_results", [])]
-            if root_cause in completed_ids:
-                updates["backtrack_to_task_id"] = root_cause
-
-    return updates
+    return {"validation_feedback": validation_result}
 
 def p7_router(state: AgentState) -> str:
     """
@@ -534,10 +486,7 @@ class Prototype7Agent:
             "task_results": [],
             "current_task": None,
             "current_task_output": None,
-            "is_complete": False,
-            "backtrack_to_task_id": None,
-            "retry_counts": {},
-            "last_validation_feedback": None,
+            "is_complete": False
         }
         final_state = {}
 

@@ -230,8 +230,7 @@ class LLMPlanner:
         self,
         doc: Any,
         task_results: List[Dict[str, Any]],
-        goal: str = "보험 상품 약관 문서에서, '정의'와 '조건' 섹션을 모두 식별하고, 각 섹션에서 데이터를 추출한 뒤, 이 둘을 정규화하고 그룹핑하여 최종 보험 상품 목록을 생성하세요.",
-        instruction: str = ""
+        goal: str = "보험 상품 약관 문서에서, '정의'와 '조건' 섹션을 모두 식별하고, 각 섹션에서 데이터를 추출한 뒤, 이 둘을 정규화하고 그룹핑하여 최종 보험 상품 목록을 생성하세요."
     ) -> Dict[str, Any]:
         """
         PROTOTYPE 7 v2: 완료된 Task 이력을 기반으로 다음 단일 Task를 생성합니다.
@@ -255,8 +254,6 @@ class LLMPlanner:
             "조건 추출, 그룹핑, 최종 조합 단계 중 미수행된 단계가 있다면 절대 `END` 하지 마세요."
             "최종 결과까지 모든 단계가 완료되어야 합니다."
         )
-        if instruction:
-            instruction_for_next_task += f"\n추가 지시: {instruction}"
 
         prompt = build_next_task_prompt(
             doc_summary=doc_summary,

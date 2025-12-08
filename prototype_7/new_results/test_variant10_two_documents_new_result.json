@@ -57,7 +57,7 @@
       "task_id": "task0",
       "success": true,
       "tool_used": "section_classifier",
-      "execution_time": 2.85,
+      "execution_time": 2.23,
       "error": null
     },
     {
@@ -65,7 +65,7 @@
       "task_id": "task1",
       "success": true,
       "tool_used": "definition_extract_v2",
-      "execution_time": 3.43,
+      "execution_time": 2.05,
       "error": null
     },
     {
@@ -73,7 +73,7 @@
       "task_id": "task2",
       "success": true,
       "tool_used": "condition_extract",
-      "execution_time": 6.64,
+      "execution_time": 5.84,
       "error": null
     },
     {
@@ -81,20 +81,12 @@
       "task_id": "task3",
       "success": true,
       "tool_used": "grouping_logic_extractor",
-      "execution_time": 7.46,
+      "execution_time": 31.45,
       "error": null
     },
     {
       "step": 5,
       "task_id": "task4",
-      "success": true,
-      "tool_used": "condition_extract",
-      "execution_time": 7.66,
-      "error": null
-    },
-    {
-      "step": 6,
-      "task_id": "task5",
       "success": true,
       "tool_used": "combination_generator",
       "execution_time": 0.0,
@@ -121,10 +113,10 @@
           6,
           7
         ],
-        "reasoning": "Section 0과 1은 보험종목의 명칭과 특약의 부가대상으로, 상품 구조를 정의하는 핵심 섹션입니다. Section 2는 보험기간, 납입기간, 가입나이 등 조건을 설명하는 섹션으로 condition에 해당합니다. 나머지 섹션들은 의무가입, 배당, 보험료 관련 사항 등으로, 주로 기타 정보에 해당하여 other로 분류했습니다."
+        "reasoning": "Section 0과 1은 보험종목의 명칭과 특약의 부가대상으로, 상품의 구조를 정의하는 핵심 섹션으로 보입니다. Section 2는 보험기간, 납입기간, 가입나이, 납입주기 등 조건을 나열하는 섹션으로, condition에 해당합니다. 나머지 섹션들은 의무가입, 배당, 보험료 관련 사항 등으로, 주어진 카테고리 중 other에 해당합니다."
       },
       "tool_used": "section_classifier",
-      "execution_time": 2.849473476409912,
+      "execution_time": 2.2271945476531982,
       "error": null
     },
     {
@@ -151,7 +143,7 @@
         "extraction_method": "v2_classifier_based"
       },
       "tool_used": "definition_extract_v2",
-      "execution_time": 3.42983341217041,
+      "execution_time": 2.049896478652954,
       "error": null
     },
     {
@@ -210,10 +202,10 @@
             "월납"
           ]
         ],
-        "reasoning": "'가입가능 조건' 테이블을 선택했습니다. '가. 해약환급금 미지급형'과 '나. 일반형'이라는 title에서 계층 정보를 추출하여 각각 '유형0' 컬럼으로 추가했습니다. 테이블 내 기존 '유형1'은 '유형2'로 조정했습니다. '가입불가 조건' 테이블의 데이터는 포함하지 않았습니다."
+        "reasoning": "'가입가능 조건' 테이블을 선택했습니다. '가. 해약환급금 미지급형'과 '나. 일반형'에서 각각의 '가입가능 조건' 테이블을 추출했습니다. 각 테이블 앞의 title '가. 해약환급금 미지급형'과 '나. 일반형'에서 계층 정보를 추출하여 각각 '유형0' 컬럼으로 추가했습니다. 테이블 내 기존 '유형1'은 그대로 유지했습니다."
       },
       "tool_used": "condition_extract",
-      "execution_time": 6.642095565795898,
+      "execution_time": 5.842591047286987,
       "error": null
     },
     {
@@ -345,73 +337,11 @@
         }
       },
       "tool_used": "grouping_logic_extractor",
-      "execution_time": 7.461680173873901,
+      "execution_time": 31.452937602996826,
       "error": null
     },
     {
       "task_id": "task4",
-      "success": true,
-      "data": {
-        "header": [
-          "유형0",
-          "유형1",
-          "유형2",
-          "보험기간",
-          "납입기간",
-          "가입나이_남",
-          "가입나이_여",
-          "납입주기"
-        ],
-        "data": [
-          [
-            "해약환급금 미지급형",
-            "간편심사형",
-            "-",
-            "80/90/100세 만기, 종신",
-            "10/15/20/25/30년납",
-            "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세",
-            "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세",
-            "월납"
-          ],
-          [
-            "해약환급금 미지급형",
-            "일반심사형",
-            "-",
-            "80/90/100세 만기, 종신",
-            "10/15/20/25/30년납",
-            "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
-            "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
-            "월납"
-          ],
-          [
-            "일반형",
-            "간편심사형",
-            "-",
-            "25/30년 만기, 80/90/100세 만기, 종신",
-            "5/7/10/15/20/25/30년납",
-            "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세\n만15세 - min[100 - 년만기, 90 - 년납, 80] 세",
-            "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세\n만15세 - min[100 - 년만기, 90 - 년납, 80] 세",
-            "월납"
-          ],
-          [
-            "일반형",
-            "일반심사형",
-            "-",
-            "25/30년 만기, 80/90/100세 만기, 종신",
-            "5/7/10/15/20/25/30년납",
-            "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세\n만15세 - min[100 - 년만기, 90 - 년납, 70] 세",
-            "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세\n만15세 - min[100 - 년만기, 90 - 년납, 70] 세",
-            "월납"
-          ]
-        ],
-        "reasoning": "'가입가능 조건' 테이블을 선택했습니다. '가. 해약환급금 미지급형'과 '나. 일반형'이라는 title에서 계층 정보를 추출하여 각각 '유형0' 컬럼으로 추가했습니다. 테이블 내 기존 '유형1'은 '유형2'로 조정했습니다. '가입불가 조건' 테이블의 데이터는 포함하지 않았습니다."
-      },
-      "tool_used": "condition_extract",
-      "execution_time": 7.662810325622559,
-      "error": null
-    },
-    {
-      "task_id": "task5",
       "success": true,
       "data": {
         "definitions": [
@@ -465,7 +395,7 @@
         }
       },
       "tool_used": "combination_generator",
-      "execution_time": 0.0010046958923339844,
+      "execution_time": 0.0010075569152832031,
       "error": null
     }
   ],

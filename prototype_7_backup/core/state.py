@@ -97,14 +97,12 @@ class AgentState(TypedDict):
     current_task: Optional[TaskDefinition]        # Current task being executed
     current_task_output: Optional[Any]            # Raw output from current task
     is_complete: bool                             # All tasks done (planner returned END)
-    backtrack_to_task_id: Optional[str]           # If set, backtrack target
-    retry_counts: Dict[str, int]                  # Per-task retry counters
-    last_validation_feedback: Optional[Dict]      # Last validation feedback
 
     # DEPRECATED (kept for backward compatibility, not used in v2)
     plan: Optional[Dict]                          # [DEPRECATED] Not used in 1-task-at-a-time
     current_task_index: int                       # [DEPRECATED] Not used in 1-task-at-a-time
     max_replans: int                              # [DEPRECATED] Not used in 1-task-at-a-time
+    backtrack_to_task_id: Optional[str]           # [DEPRECATED] Not used in 1-task-at-a-time
 
     # ===== LEGACY: Prototype 6 Intermediate Results =====
     classification_result: Optional[Dict]
