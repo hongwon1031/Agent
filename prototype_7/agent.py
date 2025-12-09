@@ -155,6 +155,82 @@ MAX_REPLAN_COUNT = 3
 # PROTOTYPE 7: TEMPLATE RESOLUTION
 # ============================================================================
 
+def validate_task_definition(current_task: Dict[str, Any], task_results: list) -> Dict[str, Any]:
+    """
+    범용 Task Definition Validator - 어떤 task에도 적용 가능한 규칙들만 검증
+
+    검증 항목:
+    1. Dependency가 실제로 완료됐는지
+    2. Template에서 참조하는 task가 존재하는지
+    3. Tool이 레지스트리에 있는지
+
+    Args:
+        current_task: 검증할 task definition
+        task_results: 이미 완료된 task 목록
+
+    Returns:
+        {
+            "is_valid": bool,
+            "error": str (if not valid),
+            "error_type": "task_definition_error" (if not valid),
+            "suggestion": str (if not valid)
+        }
+    """
+    task_id = current_task.get("task_id", "unknown")
+
+    # Rule 1: Dependency 검증 (성공한 task만)
+    dependencies = current_task.get("dependencies", [])
+    if dependencies is None or dependencies == "none" or dependencies == ["none"]:
+        dependencies = []
+
+    completed_ids = [r.get("task_id") for r in task_results if r.get("success")]
+
+    for dep_id in dependencies:
+        if dep_id not in completed_ids:
+            return {
+                "is_valid": False,
+                "error": f"Task {task_id} depends on {dep_id}, but {dep_id} is not completed successfully",
+                "error_type": "task_definition_error",
+                "suggestion": f"Complete {dep_id} first or remove it from dependencies"
+            }
+
+    # Rule 2: Template에서 참조하는 task가 존재하는지 (사전 검증)
+    import re
+    params_str = str(current_task.get("parameters", {}))
+    template_pattern = r'\{\{(task\d+)[.\[]'  # {{task0.data}} or {{task0[
+    referenced_tasks = re.findall(template_pattern, params_str)
+
+    for ref_task in set(referenced_tasks):
+        if ref_task not in completed_ids:
+            return {
+                "is_valid": False,
+                "error": f"Task {task_id} references {ref_task} in parameters, but {ref_task} is not completed",
+                "error_type": "task_definition_error",
+                "suggestion": f"Add {ref_task} to dependencies or remove reference"
+            }
+
+    # Rule 3: Tool 존재 여부 (이미 plan_node에서 체크하지만 이중 안전장치)
+    tool_name = current_task.get("tool_name")
+    if tool_name not in tools:
+        return {
+            "is_valid": False,
+            "error": f"Task {task_id} uses unknown tool: {tool_name}",
+            "error_type": "task_definition_error",
+            "suggestion": f"Use one of available tools: {list(tools.keys())}"
+        }
+
+    fallback = current_task.get("fallback_tool")
+    if fallback and fallback not in tools:
+        return {
+            "is_valid": False,
+            "error": f"Task {task_id} uses unknown fallback tool: {fallback}",
+            "error_type": "task_definition_error",
+            "suggestion": f"Use one of available tools: {list(tools.keys())}"
+        }
+
+    return {"is_valid": True}
+
+
 def resolve_templates(params: Dict[str, Any], task_results: list, document: Any, sections: Any = None) -> Dict[str, Any]:
     """
     Resolve template placeholders in task parameters.
@@ -243,15 +319,26 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
     """
     doc = state.get('original_doc')
     task_results = state.get('task_results', [])
+    last_feedback = state.get("last_validation_feedback") or {}
+    backtrack_to = state.get("backtrack_to_task_id")
+    current_task_state = state.get("current_task")
+    retry_counts = state.get("retry_counts", {})
 
     # Handle backtracking: drop results after target task to re-run from there
-    backtrack_to = state.get("backtrack_to_task_id")
+    backtrack_instruction = ""
     if backtrack_to:
         ids = [r.get("task_id") for r in task_results]
         if backtrack_to in ids:
             idx = ids.index(backtrack_to)
             task_results = task_results[:idx]  # remove the failing task as well
-            print(f"[P7 NODE] Backtracking to {backtrack_to}: trimming results to {len(task_results)} entries")
+
+            # CRITICAL: Get the reasoning for why we're backtracking
+            backtrack_reasoning = state.get("backtrack_reasoning", "")
+            if backtrack_reasoning:
+                backtrack_instruction = f"[BACKTRACK] 이전 작업({backtrack_to})을 재실행해야 합니다. 실패 원인: {backtrack_reasoning}"
+                print(f"[P7 NODE] Backtracking to {backtrack_to} with instruction: {backtrack_reasoning[:100]}...")
+            else:
+                print(f"[P7 NODE] Backtracking to {backtrack_to}: trimming results to {len(task_results)} entries")
         else:
             print(f"[P7 NODE] Backtrack target {backtrack_to} not found in results; ignoring.")
         # clear backtrack flag
@@ -263,20 +350,40 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
     # Call LLM to get next task or end signal
     # Build extra instruction from last validation feedback (if any)
     extra_instruction = ""
-    last_feedback = state.get("last_validation_feedback") or {}
-    if last_feedback and not last_feedback.get("is_valid", True):
+
+    # PRIORITY 1: Backtrack instruction (if backtracking to fix root cause)
+    if backtrack_instruction:
+        extra_instruction = backtrack_instruction
+    # PRIORITY 2: Task definition error (re-plan required)
+    elif last_feedback and last_feedback.get("skip_retry"):
+        failed_task_id = state.get("failed_task_id", "unknown")
         errors = last_feedback.get("errors", [])
         suggestions = last_feedback.get("suggestions", [])
-        parts = []
+        parts = [f"[RE-PLAN] Task {failed_task_id}의 정의가 잘못되었습니다."]
         if errors:
-            parts.append("최근 오류: " + "; ".join(map(str, errors))[:400])
+            parts.append("오류: " + "; ".join(map(str, errors))[:400])
         if suggestions:
-            parts.append("개선 지시: " + "; ".join(map(str, suggestions))[:400])
-        if parts:
-            extra_instruction = " / ".join(parts)
+            parts.append("제안: " + "; ".join(map(str, suggestions))[:400])
+        parts.append("완전히 새로운 task를 생성하세요. 이전 task는 폐기하십시오.")
+        extra_instruction = " / ".join(parts)
+        print(f"[P7 NODE] Re-plan instruction prepared: {extra_instruction[:150]}...")
+    # PRIORITY 3: Last validation feedback (for normal retry/continuation)
+    else:
+        last_feedback = state.get("last_validation_feedback") or {}
+        if last_feedback and not last_feedback.get("is_valid", True):
+            errors = last_feedback.get("errors", [])
+            suggestions = last_feedback.get("suggestions", [])
+            parts = []
+            if errors:
+                parts.append("최근 오류: " + "; ".join(map(str, errors))[:400])
+            if suggestions:
+                parts.append("개선 지시: " + "; ".join(map(str, suggestions))[:400])
+            if parts:
+                extra_instruction = " / ".join(parts)
 
     result = planner.generate_next_task(doc=doc, task_results=task_results, instruction=extra_instruction)
-
+    
+    result = planner.generate_next_task(doc=doc, task_results=task_results, instruction=extra_instruction,last_feedback = last_feedback, last_task = current_task_state)
     if result.get("error"):
         print(f"[FAIL] Task generation failed: {result['error']}")
         return {"error": f"Task generation failed: {result['error']}"}
@@ -291,7 +398,8 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
             "is_complete": True,
             "current_task": None,
             "task_results": task_results,
-            "backtrack_to_task_id": None
+            "backtrack_to_task_id": None,
+            "backtrack_reasoning": ""
         }
 
     elif action == "next_task":
@@ -301,7 +409,7 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
         print(f"[OK] Next task generated: {task_id}")
         print(f"  - Type: {task.get('task_type')}")
         print(f"  - Tool: {task.get('tool_name')}")
-        print(f"  - Reasoning: {result.get('reasoning', 'N/A')[:100]}...")
+        print(f"  - Reasoning: {result.get('reasoning', 'N/A')[]}...")
 
         # Validate tool exists
         tool_name = task.get("tool_name")
@@ -317,7 +425,8 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
             "current_task": task,
             "is_complete": False,
             "task_results": task_results,
-            "backtrack_to_task_id": None
+            "backtrack_to_task_id": None,
+            "backtrack_reasoning": ""
         }
 
     else:
@@ -339,37 +448,87 @@ def execute_task_node(state: AgentState) -> Dict[str, Any]:
     task_id = current_task.get('task_id')
     print(f"[INFO] Executing {task_id}: {current_task.get('description', 'N/A')}")
 
-    # Check dependencies
-    dependencies = current_task.get('dependencies', [])
-    # Handle case where LLM returns "none" as string or null
-    if dependencies is None or dependencies == "none" or dependencies == ["none"]:
-        dependencies = []
+    # ========== STEP 1: Task Definition Validation ==========
+    print(f"[VALIDATE] Checking task definition for {task_id}...")
+    definition_check = validate_task_definition(current_task, task_results)
 
-    for dep_id in dependencies:
-        if not any(r.get('task_id') == dep_id and r.get('success') for r in task_results):
-            return {"error": f"Dependency {dep_id} not completed successfully."}
+    if not definition_check.get("is_valid"):
+        error_msg = definition_check.get("error", "Unknown definition error")
+        suggestion = definition_check.get("suggestion", "")
+        print(f"[FAIL] Task definition invalid: {error_msg}")
+        print(f"[SUGGESTION] {suggestion}")
 
-    # Resolve template parameters
+        # Return with task_definition_error flag
+        return {
+            "error": error_msg,
+            "error_type": "task_definition_error",
+            "error_suggestion": suggestion,
+            "failed_task_id": task_id
+        }
+
+    print(f"[OK] Task definition valid")
+
+    # ========== STEP 2: Template Resolution (with error classification) ==========
     try:
         resolved_params = resolve_templates(current_task.get('parameters', {}), task_results, document, sections)
         print(f"[INFO] Parameters resolved: {len(str(resolved_params))} chars")
+    except KeyError as e:
+        # Template reference to non-existent task → Task Definition Error
+        error_msg = f"Template resolution failed (KeyError): {str(e)}"
+        print(f"[FAIL] {error_msg}")
+        return {
+            "error": error_msg,
+            "error_type": "task_definition_error",
+            "error_suggestion": f"Task {task_id} references non-existent task or field. Check template syntax and dependencies.",
+            "failed_task_id": task_id
+        }
     except Exception as e:
-        return {"error": f"Template resolution failed: {str(e)}"}
+        # Other template errors → Execution Error (retry 가능)
+        error_msg = f"Template resolution failed: {str(e)}"
+        print(f"[FAIL] {error_msg}")
+        return {
+            "error": error_msg,
+            "error_type": "execution_error",
+            "error_suggestion": "Check parameter format and try again",
+            "failed_task_id": task_id
+        }
 
-    # Execute primary tool
+    # ========== STEP 3: Tool Execution ==========
     tool_name = current_task.get('tool_name')
     tool = tools[tool_name]
     start_time = time.time()
     print(f"[INFO] Using primary tool: {tool_name}")
-    result = tool.execute(doc=document, params=resolved_params)
+
+    try:
+        result = tool.execute(doc=document, params=resolved_params)
+    except Exception as e:
+        # Tool execution exception → Execution Error
+        error_msg = f"Tool {tool_name} raised exception: {str(e)}"
+        print(f"[FAIL] {error_msg}")
+        return {
+            "error": error_msg,
+            "error_type": "execution_error",
+            "error_suggestion": f"Tool {tool_name} execution failed. Check tool implementation or parameters.",
+            "failed_task_id": task_id
+        }
 
     # Try fallback if primary fails
     fallback_tool_name = current_task.get('fallback_tool')
     if not result.success and fallback_tool_name:
         print(f"[INFO] Primary tool failed. Trying fallback: {fallback_tool_name}")
         tool = tools[fallback_tool_name]
-        result = tool.execute(doc=document, params=resolved_params)
-        tool_name = fallback_tool_name
+        try:
+            result = tool.execute(doc=document, params=resolved_params)
+            tool_name = fallback_tool_name
+        except Exception as e:
+            error_msg = f"Fallback tool {fallback_tool_name} raised exception: {str(e)}"
+            print(f"[FAIL] {error_msg}")
+            return {
+                "error": error_msg,
+                "error_type": "execution_error",
+                "error_suggestion": f"Both primary and fallback tools failed.",
+                "failed_task_id": task_id
+            }
 
     # Record result
     execution_time = time.time() - start_time
@@ -390,6 +549,7 @@ def execute_task_node(state: AgentState) -> Dict[str, Any]:
         print(f"[FAIL] Task {task_id} failed: {result.error}")
         print(f"[DEBUG] Failed output of {tool_name} (Task {task_id}): {result.error}")
         print(f"[DEBUG] Params for {tool_name} (Task {task_id}): {resolved_params}")
+
     return {
         "task_results": task_results,
         "current_task_output": result.data
@@ -402,9 +562,35 @@ def validate_task_node(state: AgentState) -> Dict[str, Any]:
     print("\n[P7 NODE] validate_task_node: Validating current task...")
     current_task = state.get('current_task')
     current_task_output = state.get('current_task_output')
+    error_type = state.get('error_type')
 
     if not current_task:
         return {"error": "No current_task to validate"}
+
+    # CRITICAL: Skip validation if task definition error (validation 무의미)
+    if error_type == "task_definition_error":
+        error_msg = state.get('error', 'Unknown task definition error')
+        suggestion = state.get('error_suggestion', '')
+        print(f"[SKIP] Skipping validation due to task_definition_error")
+        print(f"[ERROR] {error_msg}")
+        print(f"[SUGGESTION] {suggestion}")
+
+        return {
+            "validation_feedback": {
+                "is_valid": False,
+                "errors": [error_msg],
+                "suggestions": [suggestion],
+                "reasoning": "Task definition is invalid - re-planning required",
+                "skip_retry": True  # Signal to not retry this task
+            },
+            "last_validation_feedback": {
+                "is_valid": False,
+                "errors": [error_msg],
+                "suggestions": [suggestion],
+                "reasoning": "Task definition is invalid - re-planning required",
+                "skip_retry": True
+            }
+        }
 
     if current_task_output is None:
         print("[INFO] Task execution failed, skipping validation")
@@ -414,7 +600,48 @@ def validate_task_node(state: AgentState) -> Dict[str, Any]:
     task_id = current_task.get('task_id')
     print(f"[INFO] Validating {task_id} ({task_type})...")
 
+    # Build context with previous results
     context = {"previous_results": state.get('task_results', [])}
+
+    # CRITICAL: For grouping validation, add definition/condition headers and data
+    if task_type == "grouping":
+        task_results = state.get('task_results', [])
+
+        # Find definition extraction result
+        for result in task_results:
+            if result.get("success") and result.get("data"):
+                data = result.get("data", {})
+                # Check if this is definition result
+                if "header" in data and "data" in data and result.get("task_id", "").startswith("task"):
+                    # Try to identify by checking if it has definition-like structure
+                    header = data.get("header", [])
+                    if header and any(col in ["보종명", "유형1", "유형2"] for col in header):
+                        if "definition_header" not in context:  # First one is definition
+                            context["definition_header"] = header
+                            context["definition_data"] = data.get("data", [])
+                        else:  # Second one is condition
+                            context["condition_header"] = header
+                            context["condition_data"] = data.get("data", [])
+
+        # Alternative: Look for normalized results
+        for result in task_results:
+            if result.get("success") and result.get("data"):
+                result_task_type = result.get("data", {}).get("task_type", "")
+                if "normalize_def" in result_task_type or "definition" in str(result.get("tool_used", "")):
+                    data = result.get("data", {})
+                    if "header" in data:
+                        context["definition_header"] = data.get("header", [])
+                        context["definition_data"] = data.get("data", [])
+                elif "normalize_cond" in result_task_type or "condition" in str(result.get("tool_used", "")):
+                    data = result.get("data", {})
+                    if "header" in data:
+                        context["condition_header"] = data.get("header", [])
+                        context["condition_data"] = data.get("data", [])
+
+        print(f"[CONTEXT] Grouping validation context prepared:")
+        print(f"  - definition_header: {context.get('definition_header', 'NOT FOUND')}")
+        print(f"  - condition_header: {context.get('condition_header', 'NOT FOUND')}")
+
     validation_result = validator.validate(task_type=task_type, task_output=current_task_output, context=context)
 
     if validation_result.get("is_valid"):
@@ -440,6 +667,10 @@ def validate_task_node(state: AgentState) -> Dict[str, Any]:
             completed_ids = [r.get("task_id") for r in state.get("task_results", [])]
             if root_cause in completed_ids:
                 updates["backtrack_to_task_id"] = root_cause
+                # CRITICAL: Save reasoning for why we're backtracking
+                root_cause_reasoning = validation_result.get("root_cause_reasoning", "")
+                updates["backtrack_reasoning"] = root_cause_reasoning
+                print(f"[P7 VALIDATE] Backtrack reasoning saved: {root_cause_reasoning[:100]}...")
 
     return updates
 
@@ -536,8 +767,12 @@ class Prototype7Agent:
             "current_task_output": None,
             "is_complete": False,
             "backtrack_to_task_id": None,
+            "backtrack_reasoning": "",  # CRITICAL: Store why we're backtracking
             "retry_counts": {},
             "last_validation_feedback": None,
+            "error_type": None,  # NEW: Error classification
+            "error_suggestion": None,  # NEW: Error fix suggestion
+            "failed_task_id": None,  # NEW: Which task failed
         }
         final_state = {}
 

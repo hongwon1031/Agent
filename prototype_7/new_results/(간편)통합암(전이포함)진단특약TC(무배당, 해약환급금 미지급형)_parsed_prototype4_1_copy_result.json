@@ -1,0 +1,50 @@
+{
+  "success": false,
+  "error": "Task task1 depends on task2, but task2 is not completed successfully",
+  "task_log": [
+    {
+      "step": 1,
+      "task_id": "task0",
+      "success": true,
+      "tool_used": "section_classifier",
+      "execution_time": 3.57,
+      "error": null
+    }
+  ],
+  "final_data": null,
+  "task_results": [
+    {
+      "task_id": "task0",
+      "success": true,
+      "data": {
+        "definition_core": [
+          0,
+          1
+        ],
+        "definition_annotation": [],
+        "condition": [
+          2
+        ],
+        "other": [
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ],
+        "reasoning": "Section 0과 1은 보험종목과 특약의 명칭 및 부가대상에 대한 정의를 다루고 있어 definition_core로 분류했습니다. Section 2는 보험기간, 납입기간, 가입나이 등 조건을 다루고 있어 condition으로 분류했습니다. 나머지 섹션들은 보험료, 배당, 해지, 대출 등 기타 사항에 관한 내용으로, 주로 계약의 세부사항이나 절차를 설명하는 것으로 보여 other로 분류했습니다."
+      },
+      "tool_used": "section_classifier",
+      "execution_time": 3.5749568939208984,
+      "error": null
+    }
+  ]
+}

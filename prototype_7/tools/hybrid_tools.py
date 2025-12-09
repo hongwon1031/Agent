@@ -19,7 +19,6 @@ from core.prompt import (
     build_llm_merge_prompt,
     build_llm_cartesian_prompt,
     build_section_classifier_prompt,
-    build_llm_intelligent_merge_prompt,
     build_intelligent_condition_extract_prompt, # NEW IMPORT
     build_grouping_extraction_prompt, # NEW IMPORT for grouping logic
 )
@@ -1325,14 +1324,20 @@ class CombinationGeneratorTool:
                     continue
 
                 definition_row = def_data[def_idx]
+                match_condition = group.get("match_condition", {})
 
                 # Create merged definition
                 merged = {}
 
                 # Add all definition columns
+                # CRITICAL: JOIN key 컬럼은 match_condition 값으로 치환
                 for i, col in enumerate(def_header):
                     if i < len(definition_row):
-                        merged[col] = definition_row[i]
+                        # JOIN key 컬럼은 match_condition의 필터링된 값 사용
+                        if col in match_condition:
+                            merged[col] = match_condition[col]
+                        else:
+                            merged[col] = definition_row[i]
                     else:
                         merged[col] = None
 

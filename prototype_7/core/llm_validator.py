@@ -14,7 +14,8 @@ from openai import OpenAI
 from dotenv import load_dotenv
 from core.prompt import (build_validate_section_classifier_llm,
                          build_validate_definition_extract_v2_llm,
-                         build_validate_transform_llm)
+                         build_validate_transform_llm,
+                         build_validate_grouping_logic_llm_prompt)
 
 class LLMValidator:
     """
@@ -157,14 +158,16 @@ class LLMValidator:
             errors = result.get("errors", [])
             previous_results = context.get("previous_results", [])
 
-            root_cause_task_id = self._analyze_root_cause(
+            root_cause_analysis = self._analyze_root_cause(
                 task_type=task_type,
                 task_output=task_output,
                 errors=errors,
                 previous_results=previous_results
             )
 
-            result["root_cause_task_id"] = root_cause_task_id
+            if root_cause_analysis:
+                result["root_cause_task_id"] = root_cause_analysis.get("root_cause_task_id")
+                result["root_cause_reasoning"] = root_cause_analysis.get("root_cause_reasoning", "")
 
         return result
 
@@ -633,31 +636,18 @@ class LLMValidator:
                 "reasoning": "Merge validation failed due to an exception"
             }
 
-    def validate_grouping_logic(self, task_output: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+    def _validate_grouping_logic_rules(self, task_output: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """
-        NEW: Validate grouping logic extraction.
+        STAGE 1: Rule-based structural validation for grouping logic.
 
-        Checks:
-        1. Has required keys (groups, column_mapping)
-        2. Group indices are valid (in range)
-        3. Coverage ratio is acceptable (>= 50%)
-        4. JOIN keys are present
+        Fast checks for basic structure and coverage.
 
         Args:
             task_output: Grouping logic from GroupingLogicExtractorTool
-            {
-                "column_mapping": {"join_keys": [...], "value_columns": [...]},
-                "groups": [{id, definition_indices, condition_index, ...}],
-                "unmatched": {...},
-                "summary": {...}
-            }
-            context: {
-                "definition_data": [...],
-                "condition_data": [...]
-            }
+            context: Definition and condition data
 
         Returns:
-            Dict: Validation result
+            Dict: Validation result (structure only)
         """
         try:
             # Extract required data
@@ -760,6 +750,127 @@ class LLMValidator:
                 "suggestions": ["Check grouping logic output format"],
                 "reasoning": "Grouping validation failed due to an exception"
             }
+
+    def _validate_grouping_logic_llm(self, task_output: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        STAGE 2: LLM-based semantic validation for grouping logic.
+
+        Deep validation for logical consistency:
+        1. match_condition values vs actual definition row values
+        2. match_condition values vs actual condition row values
+        3. definition_indices actually satisfy match_condition
+        4. Unmatched definitions have valid reasons
+
+        Args:
+            task_output: Grouping logic from GroupingLogicExtractorTool
+            context: Definition and condition data with headers
+
+        Returns:
+            Dict: Validation result with semantic analysis
+        """
+        try:
+            column_mapping = task_output.get("column_mapping", {})
+            groups = task_output.get("groups", [])
+            unmatched = task_output.get("unmatched", {})
+            summary = task_output.get("summary", {})
+
+            definition_header = context.get("definition_header", [])
+            definition_data = context.get("definition_data", [])
+            condition_header = context.get("condition_header", [])
+            condition_data = context.get("condition_data", [])
+
+            # Build detailed group info for LLM
+            groups_detail = []
+            for group in groups[:10]:  # Limit to first 10 groups for prompt size
+                group_id = group.get("id")
+                match_condition = group.get("match_condition", {})
+                definition_indices = group.get("definition_indices", [])
+                condition_index = group.get("condition_index")
+
+                # Get actual definition rows
+                def_rows = []
+                for idx in definition_indices[:5]:  # Max 5 per group
+                    if idx < len(definition_data):
+                        row_dict = dict(zip(definition_header, definition_data[idx]))
+                        def_rows.append({"index": idx, "data": row_dict})
+
+                # Get actual condition row
+                cond_row = None
+                if condition_index is not None and condition_index < len(condition_data):
+                    cond_row = {"index": condition_index, "data": dict(zip(condition_header, condition_data[condition_index]))}
+
+                groups_detail.append({
+                    "id": group_id,
+                    "match_condition": match_condition,
+                    "definition_rows": def_rows,
+                    "condition_row": cond_row
+                })
+
+            # Unmatched definitions
+            unmatched_def_indices = unmatched.get("definition_indices", [])
+            unmatched_defs = []
+            for idx in unmatched_def_indices[:5]:  # Max 5
+                if idx < len(definition_data):
+                    row_dict = dict(zip(definition_header, definition_data[idx]))
+                    unmatched_defs.append({"index": idx, "data": row_dict})
+
+            # Build prompt
+            prompt = build_validate_grouping_logic_llm_prompt(
+                definition_header=definition_header,
+                condition_header=condition_header,
+                groups_detail=groups_detail,
+                unmatched_defs=unmatched_defs,
+                column_mapping=column_mapping,
+                summary=summary
+            )
+            print('llm성❗')
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+                temperature=0
+            )
+
+            result = json.loads(response.choices[0].message.content)
+            return result
+
+        except Exception as e:
+            return {
+                "is_valid": False,
+                "confidence": 0.0,
+                "errors": [f"LLM validation error: {str(e)}"],
+                "suggestions": ["Check grouping logic LLM validation"],
+                "reasoning": "Grouping LLM validation failed due to an exception"
+            }
+
+    def validate_grouping_logic(self, task_output: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        HYBRID: Validate grouping logic extraction (Rule + LLM).
+
+        Two-stage validation:
+        1. Rule-based: Fast structural checks
+        2. LLM-based: Deep semantic consistency checks
+
+        Args:
+            task_output: Grouping logic from GroupingLogicExtractorTool
+            context: {
+                "definition_header": [...],
+                "definition_data": [...],
+                "condition_header": [...],
+                "condition_data": [...]
+            }
+
+        Returns:
+            Dict: Validation result
+        """
+        # STAGE 1: Rule-based structural validation
+        rule_result = self._validate_grouping_logic_rules(task_output, context)
+        if not rule_result.get("is_valid"):
+            return rule_result  # Fast fail
+
+        # STAGE 2: LLM-based semantic validation
+        llm_result = self._validate_grouping_logic_llm(task_output, context)
+        return llm_result
 
     def validate_final_combinations(self, task_output: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -901,7 +1012,7 @@ class LLMValidator:
         task_output: Any,
         errors: List[str],
         previous_results: List[Dict[str, Any]]
-    ) -> Optional[str]:
+    ) -> Optional[Dict[str, str]]:
         """
         Analyze which earlier task caused current validation failure (Prototype 7).
 
@@ -916,13 +1027,18 @@ class LLMValidator:
             previous_results: List of earlier TaskResult dicts
 
         Returns:
-            task_id of root cause (e.g., "task0"), or None if no root cause found
+            Dict with root cause info:
+            {
+                "root_cause_task_id": "task0",
+                "root_cause_reasoning": "task0의 extract가 유형1 컬럼을 누락했음"
+            }
+            or None if no root cause found
 
         Example:
             - Current task: normalize_definitions (task1)
             - Error: "Column '유형1' not found"
             - Root cause: extract_definitions (task0) didn't capture this column
-            - Return: "task0"
+            - Return: {"root_cause_task_id": "task0", "root_cause_reasoning": "..."}
         """
         if not previous_results:
             return None
@@ -992,11 +1108,15 @@ class LLMValidator:
             analysis = json.loads(response.choices[0].message.content)
 
             if analysis.get("has_root_cause"):
-                return analysis.get("root_cause_task_id")
+                return {
+                    "root_cause_task_id": analysis.get("root_cause_task_id"),
+                    "root_cause_reasoning": analysis.get("reasoning", "")
+                }
             else:
                 return None
 
         except Exception as e:
             # If analysis fails, return None (no root cause identified)
+            print(f"[WARN] Root cause analysis failed: {str(e)}")
             return None
 

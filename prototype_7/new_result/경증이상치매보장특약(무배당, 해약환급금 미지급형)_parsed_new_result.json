@@ -57,23 +57,23 @@
       "task_id": "task0",
       "success": true,
       "tool_used": "section_classifier",
-      "execution_time": 2.49,
+      "execution_time": 2.51,
       "error": null
     },
     {
       "step": 2,
       "task_id": "task1",
       "success": true,
-      "tool_used": "condition_extract",
-      "execution_time": 3.44,
+      "tool_used": "definition_extract_v2",
+      "execution_time": 2.46,
       "error": null
     },
     {
       "step": 3,
       "task_id": "task2",
       "success": true,
-      "tool_used": "definition_extract_v2",
-      "execution_time": 2.34,
+      "tool_used": "condition_extract",
+      "execution_time": 3.62,
       "error": null
     },
     {
@@ -81,20 +81,12 @@
       "task_id": "task3",
       "success": true,
       "tool_used": "grouping_logic_extractor",
-      "execution_time": 3.24,
+      "execution_time": 3.06,
       "error": null
     },
     {
       "step": 5,
       "task_id": "task4",
-      "success": true,
-      "tool_used": "condition_extract",
-      "execution_time": 6.03,
-      "error": null
-    },
-    {
-      "step": 6,
-      "task_id": "task5",
       "success": true,
       "tool_used": "combination_generator",
       "execution_time": 0.0,
@@ -130,14 +122,51 @@
           15,
           16
         ],
-        "reasoning": "Section 0과 1은 보험종목과 특약의 부가대상에 대한 정의를 다루고 있어 definition_core로 분류했습니다. Section 2는 보험기간, 납입기간, 가입나이 등 조건을 다루고 있어 condition으로 분류했습니다. 나머지 섹션들은 보험료, 배당, 대출 등 기타 사항에 관한 내용으로, 정의나 조건과 직접적으로 관련되지 않으므로 other로 분류했습니다."
+        "reasoning": "Section 0과 1은 보험종목과 특약의 명칭 및 부가대상에 관한 테이블로, 상품 구조를 정의하는 핵심 섹션입니다. Section 2는 보험기간, 납입기간, 가입나이 등 조건을 설명하는 섹션으로 condition에 해당합니다. 나머지 섹션들은 보험료, 배당, 대출 등 기타 사항에 관한 내용으로 other에 분류됩니다."
       },
       "tool_used": "section_classifier",
-      "execution_time": 2.4855661392211914,
+      "execution_time": 2.5113682746887207,
       "error": null
     },
     {
       "task_id": "task1",
+      "success": true,
+      "data": {
+        "header": [
+          "명칭",
+          "명칭_1",
+          "보험종목"
+        ],
+        "data": [
+          [
+            "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "경증이상치매 보장계약",
+            "해약환급금 미지급형"
+          ],
+          [
+            "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "중등도이상치매 보장계약",
+            "해약환급금 미지급형"
+          ],
+          [
+            "경증이상치매보장특약(무배당)",
+            "경증이상치매 보장계약",
+            "일반형"
+          ],
+          [
+            "경증이상치매보장특약(무배당)",
+            "중등도이상치매 보장계약",
+            "일반형"
+          ]
+        ],
+        "extraction_method": "v2_classifier_based"
+      },
+      "tool_used": "definition_extract_v2",
+      "execution_time": 2.460087299346924,
+      "error": null
+    },
+    {
+      "task_id": "task2",
       "success": true,
       "data": {
         "header": [
@@ -172,47 +201,10 @@
             "월납"
           ]
         ],
-        "reasoning": "'가입가능 조건' 테이블을 선택했습니다. 테이블 앞의 title '가. 해약환급금 미지급형'과 '나. 일반형'에서 계층 정보를 추출하여 각각 '유형0' 컬럼으로 추가했습니다. 테이블 내 기존 '유형1'과 '유형2'는 그대로 유지했습니다. 컬럼명을 표준화하여 '보험료 납입기간'을 '납입기간'으로, '남자나이', '여자나이'를 각각 '가입나이_남', '가입나이_여'로 변경했습니다."
+        "reasoning": "'가입가능 조건' 테이블을 선택했습니다. 테이블 앞의 title '가. 해약환급금 미지급형'과 '나. 일반형'에서 계층 정보를 추출하여 각각 '유형0' 컬럼으로 추가했습니다. 테이블 내 기존 '유형1'과 '유형2'는 그대로 유지했습니다. 컬럼명은 규칙에 따라 표준화하였습니다."
       },
       "tool_used": "condition_extract",
-      "execution_time": 3.4381496906280518,
-      "error": null
-    },
-    {
-      "task_id": "task2",
-      "success": true,
-      "data": {
-        "header": [
-          "명칭",
-          "명칭_1",
-          "보험종목"
-        ],
-        "data": [
-          [
-            "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
-            "경증이상치매 보장계약",
-            "해약환급금 미지급형"
-          ],
-          [
-            "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
-            "중등도이상치매 보장계약",
-            "해약환급금 미지급형"
-          ],
-          [
-            "경증이상치매보장특약(무배당)",
-            "경증이상치매 보장계약",
-            "일반형"
-          ],
-          [
-            "경증이상치매보장특약(무배당)",
-            "중등도이상치매 보장계약",
-            "일반형"
-          ]
-        ],
-        "extraction_method": "v2_classifier_based"
-      },
-      "tool_used": "definition_extract_v2",
-      "execution_time": 2.3354079723358154,
+      "execution_time": 3.6159188747406006,
       "error": null
     },
     {
@@ -285,53 +277,11 @@
         }
       },
       "tool_used": "grouping_logic_extractor",
-      "execution_time": 3.239623785018921,
+      "execution_time": 3.062089204788208,
       "error": null
     },
     {
       "task_id": "task4",
-      "success": true,
-      "data": {
-        "header": [
-          "유형0",
-          "유형1",
-          "유형2",
-          "보험기간",
-          "납입기간",
-          "가입나이_남",
-          "가입나이_여",
-          "납입주기"
-        ],
-        "data": [
-          [
-            "해약환급금 미지급형",
-            "-",
-            "-",
-            "90/100세만기, 종신",
-            "10/15/20/25/30년납",
-            "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
-            "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
-            "월납"
-          ],
-          [
-            "일반형",
-            "-",
-            "-",
-            "90/100세만기, 종신",
-            "10/15/20/25/30년납",
-            "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
-            "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
-            "월납"
-          ]
-        ],
-        "reasoning": "'가입가능 조건' 테이블을 선택했습니다. 테이블 앞의 title '가. 해약환급금 미지급형'과 '나. 일반형'에서 계층 정보를 추출하여 각각 '유형0' 컬럼으로 추가했습니다. 테이블 내 기존 '유형1'과 '유형2'는 그대로 유지했습니다. 컬럼명은 규칙에 따라 표준화했습니다."
-      },
-      "tool_used": "condition_extract",
-      "execution_time": 6.033566236495972,
-      "error": null
-    },
-    {
-      "task_id": "task5",
       "success": true,
       "data": {
         "definitions": [
@@ -385,7 +335,7 @@
         }
       },
       "tool_used": "combination_generator",
-      "execution_time": 0.0011181831359863281,
+      "execution_time": 0.0011782646179199219,
       "error": null
     }
   ],
