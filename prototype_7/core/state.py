@@ -105,6 +105,11 @@ class AgentState(TypedDict):
     error_suggestion: Optional[str]               # Suggestion for fixing the error
     failed_task_id: Optional[str]                 # ID of task that failed
 
+    # NEW: Dependency-aware backtracking and recoverable errors
+    all_task_definitions: Dict[str, Any]          # Store all task definitions for dependency tracking
+    task_definition_failed: bool                  # Recoverable task definition error flag
+    task_definition_error: Optional[str]          # Error message for task definition
+
     # DEPRECATED (kept for backward compatibility, not used in v2)
     plan: Optional[Dict]                          # [DEPRECATED] Not used in 1-task-at-a-time
     current_task_index: int                       # [DEPRECATED] Not used in 1-task-at-a-time

@@ -57,7 +57,7 @@
       "task_id": "task0",
       "success": true,
       "tool_used": "section_classifier",
-      "execution_time": 4.04,
+      "execution_time": 3.33,
       "error": null
     },
     {
@@ -65,7 +65,7 @@
       "task_id": "task1",
       "success": true,
       "tool_used": "definition_extract_v2",
-      "execution_time": 2.52,
+      "execution_time": 4.08,
       "error": null
     },
     {
@@ -73,7 +73,7 @@
       "task_id": "task2",
       "success": true,
       "tool_used": "condition_extract",
-      "execution_time": 5.25,
+      "execution_time": 22.52,
       "error": null
     },
     {
@@ -81,7 +81,7 @@
       "task_id": "task3",
       "success": true,
       "tool_used": "grouping_logic_extractor",
-      "execution_time": 7.39,
+      "execution_time": 16.08,
       "error": null
     },
     {
@@ -121,10 +121,10 @@
           14,
           15
         ],
-        "reasoning": "Section 0과 1은 보험종목과 특약의 명칭 및 부가대상에 관한 테이블로, 상품 구조를 정의하는 핵심 섹션입니다. Section 2는 보험기간, 납입기간, 가입나이 등 조건을 나열하는 섹션으로, 가입 조건에 해당합니다. 나머지 섹션들은 보험료, 배당, 해지, 대출 등 기타 사항에 관한 내용으로, 정의나 조건과 직접 관련이 없는 기타 섹션으로 분류됩니다."
+        "reasoning": "Section 0과 1은 보험종목과 특약의 명칭 및 부가대상에 대한 테이블로, 상품 구조를 정의하는 핵심 섹션입니다. Section 2는 보험기간, 납입기간, 가입나이 등 조건을 나열하는 섹션으로, 가입 조건에 해당합니다. 나머지 섹션들은 보험료, 배당, 해지, 대출 등 기타 사항에 관한 내용으로, 정의나 조건과 직접 관련이 없는 기타 섹션으로 분류됩니다."
       },
       "tool_used": "section_classifier",
-      "execution_time": 4.0449817180633545,
+      "execution_time": 3.325176954269409,
       "error": null
     },
     {
@@ -151,7 +151,7 @@
         "extraction_method": "v2_classifier_based"
       },
       "tool_used": "definition_extract_v2",
-      "execution_time": 2.5183651447296143,
+      "execution_time": 4.0768983364105225,
       "error": null
     },
     {
@@ -213,7 +213,7 @@
         "reasoning": "'가입가능 조건' 테이블을 선택했습니다. '가. 해약환급금 미지급형'과 '나. 일반형'이라는 title에서 계층 정보를 추출하여 각각 '유형0' 컬럼으로 추가했습니다. 테이블 내 기존 '유형1'은 '유형2'로 조정했습니다. '가입불가 조건' 테이블의 데이터는 포함하지 않았습니다."
       },
       "tool_used": "condition_extract",
-      "execution_time": 5.245262145996094,
+      "execution_time": 22.51810884475708,
       "error": null
     },
     {
@@ -256,7 +256,7 @@
                 "match_type": "fuzzy"
               }
             },
-            "reasoning": "Definition 행 0은 보험종목='해약환급금 미지급형', 보험종목_1='간편심사형' 조건을 만족하므로 Condition 행 0과 매칭됩니다."
+            "reasoning": "Definition 행 0은 보험종목='해약환급금 미지급형'이고, 보험종목_1이 '간편심사형'과 의미적으로 일치하므로 Condition 행 0과 매칭됩니다."
           },
           {
             "id": 1,
@@ -280,7 +280,7 @@
                 "match_type": "fuzzy"
               }
             },
-            "reasoning": "Definition 행 0은 보험종목='해약환급금 미지급형', 보험종목_1='일반심사형' 조건을 만족하므로 Condition 행 1과 매칭됩니다."
+            "reasoning": "Definition 행 0은 보험종목='해약환급금 미지급형'이고, 보험종목_1이 '일반심사형'과 의미적으로 일치하므로 Condition 행 1과 매칭됩니다."
           },
           {
             "id": 2,
@@ -304,7 +304,7 @@
                 "match_type": "fuzzy"
               }
             },
-            "reasoning": "Definition 행 1은 보험종목='일반형', 보험종목_1='간편심사형' 조건을 만족하므로 Condition 행 2와 매칭됩니다."
+            "reasoning": "Definition 행 1은 보험종목='일반형'이고, 보험종목_1이 '간편심사형'과 의미적으로 일치하므로 Condition 행 2와 매칭됩니다."
           },
           {
             "id": 3,
@@ -328,7 +328,7 @@
                 "match_type": "fuzzy"
               }
             },
-            "reasoning": "Definition 행 1은 보험종목='일반형', 보험종목_1='일반심사형' 조건을 만족하므로 Condition 행 3과 매칭됩니다."
+            "reasoning": "Definition 행 1은 보험종목='일반형'이고, 보험종목_1이 '일반심사형'과 의미적으로 일치하므로 Condition 행 3과 매칭됩니다."
           }
         ],
         "unmatched": {
@@ -345,7 +345,7 @@
         }
       },
       "tool_used": "grouping_logic_extractor",
-      "execution_time": 7.389146327972412,
+      "execution_time": 16.07740092277527,
       "error": null
     },
     {
@@ -403,7 +403,7 @@
         }
       },
       "tool_used": "combination_generator",
-      "execution_time": 0.0008814334869384766,
+      "execution_time": 0.0009987354278564453,
       "error": null
     }
   ],

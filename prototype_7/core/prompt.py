@@ -424,7 +424,7 @@ Data 전체:
     // 예: "보종명+유형1+유형2 조합이 5건 ߺ"
   ],
   "suggestions": [
-    // errors가 있을 때만 구체적 개선 제안
+    // errors가 있을 때만 구체적 개선 제안(근본적인 문제를 해결할 수 있도록)
     // 예: "LLM 기반 Cartesian으로 재시도"
   ],
   "reasoning": "Cartesian Product 결과가 원본 테이블을 얼마나 잘 반영하는지에 대한 평가",
@@ -851,7 +851,6 @@ def build_grouping_extraction_prompt(
 ---
 
 """
-
     prompt = f"""
 {extra_instruction}당신은 보험 상품 정의(Definitions)와 가입 조건(Conditions)을 매칭하는 전문가입니다.
 
@@ -1329,9 +1328,12 @@ def build_next_task_prompt(
     """
     doc_summary_json = json.dumps(doc_summary, ensure_ascii=False, indent=2)
 
-    # Build task history summary
+    # Build task history summary (limit to recent tasks to prevent token explosion)
+    MAX_HISTORY_TASKS = 10  # Only include last 10 tasks
+    recent_tasks = task_results[-MAX_HISTORY_TASKS:] if len(task_results) > MAX_HISTORY_TASKS else task_results
+
     task_history = []
-    for result in task_results:
+    for result in recent_tasks:
         task_history.append({
             "task_id": result.get("task_id"),
             "tool_used": result.get("tool_used"),
@@ -1339,7 +1341,12 @@ def build_next_task_prompt(
             "data_keys": list(result.get("data", {}).keys()) if isinstance(result.get("data"), dict) else "non-dict"
         })
 
-    task_history_json = json.dumps(task_history, ensure_ascii=False, indent=2)
+    # Add summary if we truncated
+    history_note = ""
+    if len(task_results) > MAX_HISTORY_TASKS:
+        history_note = f"\n(Showing last {MAX_HISTORY_TASKS} of {len(task_results)} total tasks)\n"
+
+    task_history_json = history_note + json.dumps(task_history, ensure_ascii=False, indent=2)
     # 직전 task / 검증 결과를 요약해서 넣기
     if last_task:
         last_task_brief = {
@@ -1380,6 +1387,8 @@ def build_next_task_prompt(
 ## 직전 검증 결과 (last_validation_feedback)
 {last_feedback_json}
 
+**주의**: last_validation_feedback에 `root_cause_task_id` 필드가 있으면, 이는 실패의 근본 원인이 되는 task를 가리킵니다.
+
 ## 사용 가능한 도구
 {tool_schemas}
 
@@ -1418,20 +1427,35 @@ def build_next_task_prompt(
 
 ## 매우 중요
 
-1. 바로 직전 검증 결과가 is_valid == false 라면, 다음에 생성하는 task의 `task_type`은 **반드시 방금 실패한 task와 동일해야 한다.**
+1. 바로 직전 검증 결과가 is_valid == false 라면:
 
-   - 예: 직전 task_type == "grouping" 이고 is_valid == false →
-         다음 task_type도 "grouping" 이어야 한다.
-   - 예: 직전 task_type == "condition_extraction" 이고 is_valid == false →
-         다음 task_type도 "condition_extraction" 이어야 한다.
+   먼저 `last_validation_feedback`의 `root_cause_task_id`와 `직전 작업 메타`의 `task_id`를 비교하세요.
 
-2. 이때 허용되는 것은:
-   - description(설명) 수정
-   - parameters(파라미터) 수정
-   - instruction(추가 지시사항) 반영
-   뿐이다. **다른 task_type을 새로 만들거나 다음 stage로 넘어가는 것은 금지**다.
+   **Case A: root_cause_task_id == 직전 작업의 task_id**
+   - 직전 작업 자체가 문제이므로, **같은 task_type으로 재시도**해야 합니다.
+   - 예:
+     - 직전 작업 메타: {{"task_id": "task3", "task_type": "grouping"}}
+     - last_validation_feedback: {{"is_valid": false, "root_cause_task_id": "task3"}}
+     - 판단: "task3" == "task3" ✓
+     - → 다음 task는 task_type="grouping"으로 재시도
+   - 허용: description 수정, parameters 수정, instruction 반영
+   - 금지: 다른 task_type을 만들거나 다음 stage로 넘어가는 것
 
-3. 검증이 실패한 상태에서, 그 실패한 task의 output을 직접 사용하는 downstream task(예: grouping이 실패했는데 combination_generation을 만드는 것)를 생성해서는 안 된다.
+   **Case B: root_cause_task_id != 직전 작업의 task_id (백트래킹)**
+   - 이전 작업이 문제이므로, 백트래킹이 수행되었습니다.
+   - **task_results를 보고 정상적인 순서대로 다음 task를 생성**하세요.
+   - 예:
+     - 직전 작업 메타: {{"task_id": "task3", "task_type": "grouping"}}
+     - last_validation_feedback: {{"is_valid": false, "root_cause_task_id": "task1"}}
+     - 판단: "task1" != "task3" ✓ (백트래킹 발생)
+     - task_results: [task0] (task1 이후 삭제됨)
+     - → 다음은 task1 (condition_extraction)을 새로 생성
+   - **직전 task_type 규칙 무시**: 백트래킹 상황이므로 task_results만 보고 판단
+
+   **Case C: root_cause_task_id가 null이거나 없음**
+   - Case A와 동일하게 처리 (직전 task 자체 문제로 간주)
+
+2. 검증이 실패한 상태에서, 그 실패한 task의 output을 직접 사용하는 downstream task(예: grouping이 실패했는데 combination_generation을 만드는 것)를 생성해서는 안 된다.
 
 
 ## 중요 규칙
@@ -1562,6 +1586,7 @@ def build_validate_grouping_logic_llm_prompt(
     condition_header: List[str],
     groups_detail: List[Dict[str, Any]],
     unmatched_defs: List[Dict[str, Any]],
+    unmatched_conds: List[Dict[str, Any]],
     column_mapping: Dict[str, Any],
     summary: Dict[str, Any]
 ) -> str:
@@ -1615,19 +1640,57 @@ def build_validate_grouping_logic_llm_prompt(
     else:
         unmatched_str = "\n### Unmatched Definitions\nNone - all definitions matched.\n"
 
+    unmatched_con_str = ""
+    if unmatched_conds:
+        unmatched_con_str = "\n### Unmatched Conditions\n"
+        for ud in unmatched_conds:
+            unmatched_con_str += f"  - row{ud['index']}: {json.dumps(ud['data'], ensure_ascii=False)}\n"
+    else:
+        unmatched_con_str = "\n### Unmatched Conditions\nNone - all Conditions matched.\n"
+
     # Format column mapping
     join_keys = column_mapping.get("join_keys", [])
     value_columns = column_mapping.get("value_columns", [])
     mapping_str = f"**JOIN Keys**: {join_keys}\n**Value Columns**: {value_columns}"
 
     # Format summary
-    coverage_ratio = summary.get("coverage_ratio", 0.0)
-    matched_count = summary.get("matched_definition_count", 0)
-    total_defs = summary.get("total_definitions", 0)
-    summary_str = f"Coverage: {matched_count}/{total_defs} ({coverage_ratio:.1%})"
+    def_coverage = summary.get("coverage_ratio", 0.0)
+    def_matched = summary.get("matched_definition_count", 0)
+    def_total = summary.get("total_definitions", 0)
 
+    cond_matched = summary.get("matched_condition_count", None)
+    cond_total = summary.get("total_conditions", None)
+    cond_coverage = None
+    if cond_matched is not None and cond_total not in (None, 0):
+        cond_coverage = cond_matched / cond_total
+
+    summary_str = f"Definition Coverage: {def_matched}/{def_total} ({def_coverage:.1%})"
+    if cond_coverage is not None:
+        summary_str += f"\nCondition Coverage: {cond_matched}/{cond_total} ({cond_coverage:.1%})"
+
+    output_schema = """
+    {
+      "is_valid": true,
+      "confidence": 0.0,
+      "errors": [],
+      "suggestions": [],
+      "reasoning": "",
+      "root_cause_task_id": null
+    }
+    """
     prompt = f"""
-당신은 보험 상품 정의와 조건을 그룹핑하는 로직의 **논리적 일관성**을 검증하는 전문가입니다.
+당신은 보험 상품 정의(Definition)와 가입 조건(Condition)을 그룹핑하는 로직의
+**논리적 일관성**을 검증하는 전문가입니다.
+
+### 핵심 원칙
+
+- 목표: Definition/Condition 매칭이 **논리적으로 말이 되는지** 검증하고,
+  명백한 매칭 오류나 조합 누락이 있을 때만 is_valid: false 로 표시합니다.
+- fuzzy matching, 표기 차이, multi-value 셀은 넉넉하게 허용합니다.
+- 다만, 다음 두 경우에는 충분히 명확한 오류로 보고 is_valid: false 를 사용해도 됩니다.
+  1) 단일값 join_key가 완전히 다른 카테고리에 매칭된 경우
+  2) join_key 조합이 Condition에는 존재하는데, 특정 조합들만 일관되게 어떤 그룹에도 매칭되지 않은 경우
+     (명백히 있어야 할 조합이 빠진 것처럼 보이는 상황)
 
 ## 데이터 구조
 
@@ -1645,204 +1708,139 @@ def build_validate_grouping_logic_llm_prompt(
 {groups_str}
 
 {unmatched_str}
+{unmatched_con_str}
 
 ### Summary
 {summary_str}
 
 ---
+## 4. 검증 기준 (critical / warning 기준)
 
-## 검증 항목
+### 4.1 match_condition vs definition_rows
 
-다음 항목들을 **엄격하게** 검증하세요:
+각 그룹 g에 대해 g.match_condition 의 각 키-값 쌍이
+실제 definition_rows 와 모순되지 않는지 확인합니다.
 
-### 1. Match Condition vs Definition Row 일치성
-각 그룹의 `match_condition`에 명시된 값이 실제 `definition_rows`의 값과 **정확히 일치**하는지 확인하세요.
+먼저, 각 컬럼이 **단일값인지 / 다중값인지**를 구분합니다.
 
-**예시 문제:**
-- Group 1의 match_condition: {{"보험종목": "해약환급금 미지급형"}}
-- 하지만 definition row1: {{"보험종목": "일반형"}}
-- → **모순! 일반형이 해약환급금 조건과 매칭되면 안 됩니다.**
+- 단일값(single-value) 컬럼 예시:
+  - 상품 대분류, 보험종목, 유형0 등
+  - 값 안에 '/', '\\n', ',' 등의 구분자가 없고,
+    보통 하나의 카테고리만 의미하는 컬럼
 
-### 2. Match Condition vs Condition Row 일치성
-각 그룹의 `match_condition`과 `condition_row`의 값이 논리적으로 일치하는지 확인하세요.
+- 다중값(multi-value) 컬럼 예시:
+  - 한 셀에 여러 카테고리가 구분자('/', '\\n', ',', '∙' 등)로 나열된 컬럼
+  - 예: "간편심사(315)형 /간편심사(335)형 /간편심사(355)형 /일반심사형"
 
-**고려사항:**
-- Fuzzy matching: "해약환급금미지급형" vs "해약환급금 미지급형" (공백 차이)
-- Wildcard: "간편심사형" vs "간편심사(315)형" (세부 코드 포함)
-- 이런 경우들은 **일치로 간주**합니다.
+#### 4.1.1 다중값(multi-value) 컬럼
 
-### 3. Definition Indices 논리성
-같은 그룹의 `definition_indices`에 속한 모든 definition row들이 **동일한 카테고리**에 속하는지 확인하세요.
+- 이 컬럼은 "여러 가능한 옵션의 집합(슈퍼셋)"으로 간주합니다.
+- 셀 값을 구분자로 split 해서 개별 값 리스트로 만든 후,
+  match_condition의 값과 fuzzy 비교를 수행합니다.
+- **하나라도 의미적으로 match되면 → 정상 (PASS)** 로 간주합니다.
+- 단지 "다른 값이 추가로 있다"는 이유만으로는 절대 오류로 판단하지 마세요.
 
-**예시:**
-- 같은 그룹에 "해약환급금 미지급형"과 "일반형"이 섞여 있으면 **문제**입니다.
+#### 4.1.2 단일값(single-value) 컬럼
 
-### 4. Unmatched Definitions 타당성
-Unmatched에 남아있는 definition들이 **실제로 매칭할 수 없는** 합당한 이유가 있는지 확인하세요.
+- definition_row.data[컬럼] 값을 그대로 사용합니다 (split 불필요).
+- match_condition 값과 fuzzy 비교를 수행합니다.
+- 아래 fuzzy 규칙들을 모두 적용해도 전혀 match되지 않고,
+  의미적으로 완전히 다른 카테고리처럼 보이면 **critical error**로 간주할 수 있습니다.
 
-**예시:**
-- "일반형" 정의가 unmatched인데, condition table에 "일반형" 조건이 있다면 → **문제**
+### 4.1.3 Fuzzy Matching 규칙 (공통)
 
-### 5. Coverage 적정성
-전체 coverage가 너무 낮다면 (예: 50% 미만), 그룹핑 로직에 문제가 있을 가능성이 높습니다.
+두 문자열이 다음 중 하나라도 만족하면 match 로 간주합니다.
+
+1. 정확 일치 (대소문자/공백 차이만 있는 경우 포함)
+2. 한쪽이 다른 한쪽을 포함하는 경우 (substring)
+3. 괄호와 그 안의 숫자/코드를 제거한 뒤 일치
+   - 예: "간편심사(315)형" → "간편심사형"
+4. 공백/특수문자를 제거한 뒤 일치
+   - 예: "해약환급금 미지급형" → "해약환급금미지급형"
+
+이 규칙들을 모두 고려했을 때에도 전혀 겹치는 부분이 없고,
+상식적으로도 완전히 다른 카테고리처럼 보이면 "명백한 모순"입니다.
+
+---
+
+### 4.2 match_condition vs condition_row
+
+Condition row 가 있는 경우에도 위와 동일한 fuzzy 규칙을 적용합니다.
+
+- Condition row 의 join_keys 관련 컬럼 값에도 구분자가 있다면 split 후 비교합니다.
+- 하나라도 의미적으로 match되면 정상입니다.
+- 단지 "다른 옵션이 함께 있다"는 이유로는 절대 오류로 보지 마세요.
+
+---
+
+### 4.3 동일 Definition index의 다중 그룹 포함
+
+- 하나의 Definition index 가 여러 그룹에 포함되는 것은 **허용**됩니다.
+  (한 Definition 행이 여러 심사형/조건 조합을 포괄하는 경우 등)
+
+- 다음과 같은 경우에만 critical error 로 간주합니다.
+  1) 어떤 join_key 컬럼이 단일값 컬럼으로 보이고,
+  2) Definition row 의 그 컬럼 값은 명확하게 한 가지인데,
+  3) 서로 다른 그룹에서 이 컬럼에 대해 서로 완전히 다른 match_condition 값을 주장하는 경우
+     (예: definition 은 "해약환급금 미지급형"인데,
+      어떤 그룹은 "해약환급금 미지급형", 다른 그룹은 "일반형"이라고 주장하는 경우)
+
+---
+
+### 4.4 unmatched_defs 타당성
+
+- Definition Coverage 가 지나치게 낮을 경우
+  (예: coverage_ratio < 0.7)는 추출 로직에 문제가 있을 수 있으므로
+  warning 또는 상황에 따라 critical 로 간주할 수 있습니다.
+
+- 특히, 어떤 Definition 행이 특정 Condition 조합과 거의 동일한
+  join_key + 기간/연령 구조를 가지고 있는데도
+  어떤 그룹에도 포함되지 않은 경우는 critical error 후보입니다.
+
+---
+
+### 4.5 unmatched condition rows 타당성
+
+- Condition Table 의 행(가입조건)이 특정 상품/유형 조합을 분명히 나타내는데,
+  어떤 그룹에도 포함되지 않은 경우, 가입조건 누락일 가능성이 있습니다.
+
+- 특히, 다음 조건을 모두 만족하면 critical 로 판단해도 좋습니다.
+  1) 해당 condition row 의 join_key 컬럼들
+     (예: 유형0, 유형1, 또는 column_mapping.join_keys 에 지정된 컬럼들)이
+     Definition Table 에도 반복적으로 등장하는 값이고,
+  2) 같은 상품/특약 맥락에서, 유사한 join_key 조합들은 이미 그룹으로 매칭되어 있는데,
+  3) 특정 join_key 조합들만 일관되게 어떤 그룹에도 포함되지 않고
+     unmatched condition 으로 남아 있는 경우
+
+- 단, 일부 condition row 가 매칭되지 않았다는 사실만으로
+  무조건 critical 로 보지는 마세요.
+  "이 조합은 상식적으로 반드시 있어야 하는데 빠졌다" 라고 확신될 때만
+  is_valid: false 로 설정하는 것이 좋습니다.
 
 ---
 
 ## 출력 형식 (JSON)
 
 반드시 다음 형식으로 응답하세요:
+{output_schema}
 
-```json
-{{
-  "is_valid": true/false,
-  "confidence": 0.0-1.0,
-  "errors": [
-    "구체적인 오류 설명 (어떤 그룹의 어떤 값이 모순인지 명시)"
-  ],
-  "suggestions": [
-    "수정 방법 제안"
-  ],
-  "reasoning": "전체 검증 결과 요약",
-  "root_cause_task_id": "task3" or null
-}}
-```
-
-**중요:**
-- 단 하나라도 논리적 모순이 발견되면 `is_valid: false`로 설정하세요.
-- `errors`에는 구체적으로 "Group X의 row Y가 match_condition과 불일치" 같은 형식으로 작성하세요.
-- 문제가 grouping_logic_extractor 도구의 잘못이면 `root_cause_task_id`를 해당 task로 설정하세요.
+- is_valid:
+  - 위 기준(4.1~4.5)을 적용했을 때
+    명백한 모순 또는 조합 누락이 있다고 판단되면 false,
+    그렇지 않으면 true 로 설정합니다.
+- errors:
+  - critical 이라고 확신할 수 있는 문제만 한국어로 구체적으로 기술하세요.
+- suggestions:
+  - 문제가 있을 때 어떻게 수정하면 좋을지에 대한 제안을 적되,
+    가능하다면 근본 원인 수준으로 작성하세요.
+- reasoning:
+  - 전체 판단 근거를 간단히 요약해서 설명하세요.
+- root_cause_task_id:
+  - 문제가 특정 task (예: "task3")에 명확히 연결될 경우 해당 id 를 지정하고,
+    그렇지 않으면 null 로 둡니다.
 
 JSON만 반환하세요.
 """
-    return prompt
 
-def build_validate_grouping_logic_llm_prompt(
-    definition_header: List[str],
-    condition_header: List[str],
-    groups_detail: List[Dict[str, Any]],
-    unmatched_defs: List[Dict[str, Any]],
-    column_mapping: Dict[str, Any],
-    summary: Dict[str, Any],
-) -> str:
-    """
-    LLM이 GroupingLogicExtractorTool의 결과가 논리적으로 일관적인지 검증하기 위한 프롬프트 생성.
 
-    Args:
-        definition_header: Definition 테이블 헤더
-        condition_header: Condition 테이블 헤더
-        groups_detail: 각 그룹에 대한 상세 정보
-            [
-              {
-                "id": ...,
-                "match_condition": {...},
-                "definition_rows": [
-                  {"index": int, "data": {col: value, ...}}, ...
-                ],
-                "condition_row": {"index": int, "data": {col: value, ...}} or None
-              },
-              ...
-            ]
-        unmatched_defs: 매칭되지 않은 definition 행들 정보
-        column_mapping: {"join_keys": [...], "value_columns": [...]}
-        summary: {"total_definitions": ..., "total_conditions": ..., ...}
-
-    Returns:
-        LLM용 프롬프트 문자열
-    """
-    join_keys = column_mapping.get("join_keys", [])
-    value_columns = column_mapping.get("value_columns", [])
-
-    groups_json = json.dumps(groups_detail, ensure_ascii=False, indent=2)
-    unmatched_json = json.dumps(unmatched_defs, ensure_ascii=False, indent=2)
-    summary_json = json.dumps(summary, ensure_ascii=False, indent=2)
-    def_header_json = json.dumps(definition_header, ensure_ascii=False)
-    cond_header_json = json.dumps(condition_header, ensure_ascii=False)
-    join_keys_json = json.dumps(join_keys, ensure_ascii=False)
-    value_cols_json = json.dumps(value_columns, ensure_ascii=False)
-
-    prompt = f"""
-당신은 보험 상품 Definition 테이블과 Condition 테이블의 그룹핑 로직을 검증하는 전문가입니다.
-
-아래 정보는 이미 실행된 GroupingLogicExtractorTool의 결과입니다.
-당신의 역할은 **이 그룹핑이 논리적으로 타당한지**를 엄격하게 평가하는 것입니다.
-
----
-
-## 1. 테이블 스키마
-
-- Definition 헤더: {def_header_json}
-- Condition 헤더: {cond_header_json}
-
-- column_mapping:
-  - join_keys: {join_keys_json}
-  - value_columns: {value_cols_json}
-
-- summary:
-
-```json
-{summary_json}
-
-2. 그룹 상세 정보 (groups_detail)
-각 그룹에 대해 다음 정보가 제공됩니다:
-
-id: 그룹 ID
-match_condition: 이 그룹이 만족해야 한다고 주장하는 JOIN 조건
-definition_rows: 이 그룹에 속한다고 표시된 Definition 행들 (index + 실제 data)
-condition_row: 이 그룹과 매칭된 Condition 행 (index + 실제 data)
-{groups_json}
-
-3. 매칭되지 않은 Definition 행들 (unmatched_defs)
-{unmatched_json}
-
-4. 검증 기준 (아주 중요)
-다음 항목을 기준으로 논리적 일관성을 검증하세요.
-
-  4.1 match_condition vs definition_rows
-    각 그룹 g에 대해:
-    g.match_condition 안에 있는 각 키(예: "보험종목", "보험종목_1")에 대해 g.definition_rows[*].data 안의 해당 컬럼 값이 match_condition 값과 정확히 같거나 fuzzy_match로 허용 가능한 범위 내에 있어야 합니다.
-    
-    예시 (타당한 경우):
-      - match_condition.보험종목 = "해약환급금 미지급형"
-      - definition_row.data.보험종목 = "해약환급금 미지급형" → OK
-    예시 (잘못된 경우):
-      - match_condition.보험종목 = "해약환급금 미지급형"
-      - definition_row.data.보험종목 = "일반형" → 논리적 모순 → 반드시 오류로 간주
-    
-  4.2 match_condition vs condition_row
-    - g.condition_row.data 안의 JOIN 관련 컬럼(예: "유형0", "유형1", "유형2" 등)이 match_condition에서 주장하는 값들과 의미적으로 일치해야 합니다.
-    예: 
-      - match_condition.보험종목 = "해약환급금 미지급형"
-      - condition_row.data.유형0 = "해약환급금 미지급형" → OK
-    만약 Definition은 "일반형"인데 match_condition은 "해약환급금 미지급형"으로 되어 있고, Condition 행도 "해약환급금 미지급형"이라면, 이 그룹은 잘못된 매칭입니다.
-  4.3 definition_indices 일관성
-    한 Definition 행(index)이 서로 상충하는 조건을 가진 두 그룹에 동시에 속하면 안 됩니다.
-    (예: 같은 definition index가 한 그룹에서는 "간편심사형" 조건으로, 다른 그룹에서는 "일반심사형" 조건으로 매칭되어 있으면 논리적으로 모순)
-  4.4 unmatched_defs 타당성
-    unmatched_defs에 포함된 Definition 행은 정말로 어떤 Condition과도 논리적으로 매칭될 수 없는 경우여야 합니다.
-    만약 분명히 매칭 가능한 Condition 행이 있는데 unmatched로 남아 있다면, 이것 역시 오류입니다.
-5. 출력 형식 (반드시 이 JSON 스키마만 사용)
-
-아래 JSON 형식으로만 답변하세요. 불필요한 설명이나 텍스트는 포함하지 마세요.
-
-{{
-  "is_valid": true,
-  "confidence": 0.0,
-  "errors": [],
-  "suggestions": [],
-  "reasoning": ""
-}}
-
-is_valid: 그룹핑이 논리적으로 타당하면 true, 하나라도 심각한 문제가 있으면 false
-confidence: 0.0 ~ 1.0 사이의 신뢰도 (예: 0.9)
-errors: 발견된 문제들을 한국어 문자열로 나열
-
-예: "Definition index 1의 보험종목='일반형'인데, match_condition.보험종목='해약환급금 미지급형'으로 되어 있어 모순입니다."
-suggestions: 문제를 어떻게 수정하면 좋을지에 대한 제안 (예: "일반형 Definition은 일반형 Condition(유형0='일반형')과 매칭해야 합니다.")
-reasoning: 전체 판단 근거를 간단히 요약한 설명
-
-중요:
-
-한 개의 그룹이라도 논리적으로 잘못된 매칭이 있으면 is_valid=false 로 설정해야 합니다.
-JSON 외의 어떤 텍스트도 출력하지 마세요."""
-    
     return prompt

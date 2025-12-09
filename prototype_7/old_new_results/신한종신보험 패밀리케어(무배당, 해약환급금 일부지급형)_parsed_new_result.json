@@ -72,23 +72,23 @@
       "task_id": "task0",
       "success": true,
       "tool_used": "section_classifier",
-      "execution_time": 3.1,
+      "execution_time": 3.8,
       "error": null
     },
     {
       "step": 2,
       "task_id": "task1",
       "success": true,
-      "tool_used": "definition_extract_v2",
-      "execution_time": 4.6,
+      "tool_used": "condition_extract",
+      "execution_time": 5.95,
       "error": null
     },
     {
       "step": 3,
       "task_id": "task2",
       "success": true,
-      "tool_used": "condition_extract",
-      "execution_time": 3.45,
+      "tool_used": "definition_extract_v2",
+      "execution_time": 4.9,
       "error": null
     },
     {
@@ -96,7 +96,7 @@
       "task_id": "task3",
       "success": true,
       "tool_used": "grouping_logic_extractor",
-      "execution_time": 42.73,
+      "execution_time": 58.58,
       "error": null
     },
     {
@@ -142,62 +142,14 @@
           20,
           21
         ],
-        "reasoning": "Section 0은 보험종목의 명칭을 다루고 있어 상품 구조를 정의하는 핵심 섹션으로 분류했습니다. Section 1은 보험기간, 납입기간, 가입나이 등 조건을 다루고 있어 condition으로 분류했습니다. 나머지 섹션들은 보험료, 유지보너스, 계약대출 등 기타 사항에 관한 내용으로, 정의나 조건과 직접 관련이 없으므로 other로 분류했습니다."
+        "reasoning": "Section 0은 보험종목의 명칭을 다루고 있어 상품 구조를 정의하는 핵심 섹션으로 분류됩니다. Section 1은 보험기간, 납입기간, 가입나이 등을 다루고 있어 가입 조건에 해당합니다. 나머지 섹션들은 보험료, 유지보너스, 계약대출 등 기타 사항에 관한 내용으로, 정의나 조건과 직접적으로 관련되지 않으므로 'other'로 분류됩니다."
       },
       "tool_used": "section_classifier",
-      "execution_time": 3.10123872756958,
+      "execution_time": 3.804567813873291,
       "error": null
     },
     {
       "task_id": "task1",
-      "success": true,
-      "data": {
-        "header": [
-          "명칭",
-          "보험종목",
-          "보험종목_1",
-          "보험종목_2"
-        ],
-        "data": [
-          [
-            "신한종신보험 패밀리케어 (무배당, 해약환급금 일부지급형)",
-            "보장형 계약",
-            "해약환급금 일부지급형",
-            "1종"
-          ],
-          [
-            "신한종신보험 패밀리케어 (무배당, 해약환급금 일부지급형)",
-            "보장형 계약",
-            "해약환급금 일부지급형",
-            "2종"
-          ],
-          [
-            "신한종신보험 패밀리케어(무배당)",
-            "보장형 계약",
-            "일반형",
-            "일반형"
-          ],
-          [
-            "신한종신보험 패밀리케어(무배당, 적립형 계약)",
-            "적립형 계약",
-            "적립형 계약",
-            "적립형 계약"
-          ],
-          [
-            "신한종신보험 패밀리케어(무배당, 치매간병전환형 계약)",
-            "치매간병전환형 계약",
-            "치매간병전환형 계약",
-            "치매간병전환형 계약"
-          ]
-        ],
-        "extraction_method": "v2_classifier_based"
-      },
-      "tool_used": "definition_extract_v2",
-      "execution_time": 4.602750062942505,
-      "error": null
-    },
-    {
-      "task_id": "task2",
       "success": true,
       "data": {
         "header": [
@@ -252,10 +204,58 @@
             "일시납"
           ]
         ],
-        "reasoning": "각 섹션에서 '가입가능 조건' 테이블을 선택했습니다. '가. 보장형 계약', '나. 적립형 계약(전환형)', '다. 치매간병전환형 계약(전환형)'의 title에서 계층 정보를 추출하여 각각 '유형0' 컬럼으로 추가했습니다. 테이블 내 기존 '유형1', '유형2'는 그대로 유지했습니다. 컬럼명은 규칙에 따라 표준화했습니다."
+        "reasoning": "'가입가능 조건' 테이블을 선택했습니다. 각 테이블 앞의 title '가. 보장형 계약', '나. 적립형 계약(전환형)', '다. 치매간병전환형 계약(전환형)'에서 계층 정보를 추출하여 각각 '유형0' 컬럼으로 추가했습니다. 테이블 내 기존 '유형1', '유형2'는 그대로 유지했습니다. 컬럼명은 규칙에 따라 표준화했습니다."
       },
       "tool_used": "condition_extract",
-      "execution_time": 3.4455714225769043,
+      "execution_time": 5.949543237686157,
+      "error": null
+    },
+    {
+      "task_id": "task2",
+      "success": true,
+      "data": {
+        "header": [
+          "명칭",
+          "보험종목",
+          "보험종목_1",
+          "보험종목_2"
+        ],
+        "data": [
+          [
+            "신한종신보험 패밀리케어 (무배당, 해약환급금 일부지급형)",
+            "보장형 계약",
+            "해약환급금 일부지급형",
+            "1종"
+          ],
+          [
+            "신한종신보험 패밀리케어 (무배당, 해약환급금 일부지급형)",
+            "보장형 계약",
+            "해약환급금 일부지급형",
+            "2종"
+          ],
+          [
+            "신한종신보험 패밀리케어(무배당)",
+            "보장형 계약",
+            "일반형",
+            "일반형"
+          ],
+          [
+            "신한종신보험 패밀리케어(무배당, 적립형 계약)",
+            "적립형 계약",
+            "적립형 계약",
+            "적립형 계약"
+          ],
+          [
+            "신한종신보험 패밀리케어(무배당, 치매간병전환형 계약)",
+            "치매간병전환형 계약",
+            "치매간병전환형 계약",
+            "치매간병전환형 계약"
+          ]
+        ],
+        "extraction_method": "v2_classifier_based"
+      },
+      "tool_used": "definition_extract_v2",
+      "execution_time": 4.901733875274658,
       "error": null
     },
     {
@@ -305,7 +305,7 @@
                 "match_type": "exact"
               }
             },
-            "reasoning": "Definition 행 0은 유형1='보장형 계약', 유형2='해약환급금 일부지급형', 유형3='1종'이므로 Condition 행 0과 정확히 매칭됩니다."
+            "reasoning": "Definition 행 0은 모든 조건이 Condition 행 0과 정확히 일치하므로 매칭됩니다."
           },
           {
             "id": 1,
@@ -335,7 +335,7 @@
                 "match_type": "exact"
               }
             },
-            "reasoning": "Definition 행 1은 유형1='보장형 계약', 유형2='해약환급금 일부지급형', 유형3='2종'이므로 Condition 행 1과 정확히 매칭됩니다."
+            "reasoning": "Definition 행 1은 모든 조건이 Condition 행 1과 정확히 일치하므로 매칭됩니다."
           },
           {
             "id": 2,
@@ -353,19 +353,9 @@
                 "definition_value": "적립형 계약",
                 "condition_value": "적립형 계약(전환형)",
                 "match_type": "fuzzy"
-              },
-              "보험종목_1": {
-                "definition_value": "적립형 계약",
-                "condition_value": "-",
-                "match_type": "wildcard"
-              },
-              "보험종목_2": {
-                "definition_value": "적립형 계약",
-                "condition_value": "-",
-                "match_type": "wildcard"
               }
             },
-            "reasoning": "Definition 행 3은 유형1='적립형 계약', 유형2='적립형 계약', 유형3='적립형 계약'이므로 Condition 행 2와 매칭됩니다."
+            "reasoning": "Definition 행 3은 '적립형 계약'이 Condition 행 2의 '적립형 계약(전환형)'과 의미적으로 일치하므로 매칭됩니다."
           },
           {
             "id": 3,
@@ -383,19 +373,9 @@
                 "definition_value": "치매간병전환형 계약",
                 "condition_value": "치매간병전환형 계약(전환형)",
                 "match_type": "fuzzy"
-              },
-              "보험종목_1": {
-                "definition_value": "치매간병전환형 계약",
-                "condition_value": "-",
-                "match_type": "wildcard"
-              },
-              "보험종목_2": {
-                "definition_value": "치매간병전환형 계약",
-                "condition_value": "-",
-                "match_type": "wildcard"
               }
             },
-            "reasoning": "Definition 행 4는 유형1='치매간병전환형 계약', 유형2='치매간병전환형 계약', 유형3='치매간병전환형 계약'이므로 Condition 행 3과 매칭됩니다."
+            "reasoning": "Definition 행 4는 '치매간병전환형 계약'이 Condition 행 3의 '치매간병전환형 계약(전환형)'과 의미적으로 일치하므로 매칭됩니다."
           }
         ],
         "unmatched": {
@@ -414,7 +394,7 @@
         }
       },
       "tool_used": "grouping_logic_extractor",
-      "execution_time": 42.727091789245605,
+      "execution_time": 58.583571672439575,
       "error": null
     },
     {
@@ -487,7 +467,7 @@
         }
       },
       "tool_used": "combination_generator",
-      "execution_time": 0.0017516613006591797,
+      "execution_time": 0.002244234085083008,
       "error": null
     }
   ],

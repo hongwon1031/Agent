@@ -150,6 +150,7 @@ class Plan(BaseModel):
     reasoning: str
 
 MAX_REPLAN_COUNT = 3
+MAX_TASK_RETRIES = 5  # NEW: Maximum retries per task (allow more with better backtracking)
 
 # ============================================================================
 # PROTOTYPE 7: TEMPLATE RESOLUTION
@@ -330,13 +331,51 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
         ids = [r.get("task_id") for r in task_results]
         if backtrack_to in ids:
             idx = ids.index(backtrack_to)
-            task_results = task_results[:idx]  # remove the failing task as well
+
+            # NEW: Dependency-aware backtracking
+            # Find all tasks that depend on backtrack_to (directly or indirectly)
+            all_task_definitions = state.get("all_task_definitions", {})
+            tasks_to_rerun = set([backtrack_to])
+
+            # BFS to find all dependent tasks
+            queue = [backtrack_to]
+            while queue:
+                current = queue.pop(0)
+                for completed_id in ids[idx:]:  # Only check tasks after backtrack_to
+                    task_def = all_task_definitions.get(completed_id)
+                    if task_def:
+                        deps = task_def.get("dependencies", [])
+                        # Handle both list and string "none"
+                        if deps and deps != "none" and deps != ["none"]:
+                            if current in deps:
+                                if completed_id not in tasks_to_rerun:
+                                    tasks_to_rerun.add(completed_id)
+                                    queue.append(completed_id)
+
+            # Find minimum index to truncate (earliest task in dependency chain)
+            min_idx = idx
+            for task_id in tasks_to_rerun:
+                if task_id in ids:
+                    task_idx = ids.index(task_id)
+                    min_idx = min(min_idx, task_idx)
+
+            # Truncate to minimum index
+            task_results = task_results[:min_idx]
+
+            # NEW: Reset retry counts for tasks being re-run
+            retry_counts = dict(state.get("retry_counts", {}))
+            for task_id in tasks_to_rerun:
+                if task_id in retry_counts:
+                    old_count = retry_counts.pop(task_id)
+                    print(f"[P7 NODE] Resetting retry count for {task_id} (was {old_count})")
 
             # CRITICAL: Get the reasoning for why we're backtracking
             backtrack_reasoning = state.get("backtrack_reasoning", "")
             if backtrack_reasoning:
-                backtrack_instruction = f"[BACKTRACK] 이전 작업({backtrack_to})을 재실행해야 합니다. 실패 원인: {backtrack_reasoning}"
-                print(f"[P7 NODE] Backtracking to {backtrack_to} with instruction: {backtrack_reasoning[:100]}...")
+                backtrack_instruction = f"[BACKTRACK] {backtrack_to}와 그 의존 작업들을 재실행합니다. 실패 원인: {backtrack_reasoning}"
+                print(f"[P7 NODE] Dependency-aware backtracking: {sorted(tasks_to_rerun)}")
+                print(f"[P7 NODE] Truncating to index {min_idx} (was {len(ids)}, removed {len(ids)-min_idx} tasks)")
+                print(f"[P7 NODE] Backtrack reasoning: {backtrack_reasoning[:100]}...")
             else:
                 print(f"[P7 NODE] Backtracking to {backtrack_to}: trimming results to {len(task_results)} entries")
         else:
@@ -399,7 +438,8 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
             "current_task": None,
             "task_results": task_results,
             "backtrack_to_task_id": None,
-            "backtrack_reasoning": ""
+            "backtrack_reasoning": "",
+            "retry_counts": retry_counts  # Propagate updated retry_counts
         }
 
     elif action == "next_task":
@@ -409,7 +449,7 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
         print(f"[OK] Next task generated: {task_id}")
         print(f"  - Type: {task.get('task_type')}")
         print(f"  - Tool: {task.get('tool_name')}")
-        print(f"  - Reasoning: {result.get('reasoning', 'N/A')[]}...")
+        print(f"  - Reasoning: {result.get('reasoning', 'N/A')[:100]}...")
 
         # Validate tool exists
         tool_name = task.get("tool_name")
@@ -421,12 +461,19 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
         if fallback and fallback not in tools:
             return {"error": f"Invalid fallback_tool: {fallback}"}
 
+        # NEW: Save task definition for dependency tracking
+        all_task_definitions = state.get("all_task_definitions", {})
+        all_task_definitions[task_id] = task
+        print(f"[DEBUG] Saved task definition for {task_id} (dependencies: {task.get('dependencies', [])})")
+
         return {
             "current_task": task,
             "is_complete": False,
             "task_results": task_results,
             "backtrack_to_task_id": None,
-            "backtrack_reasoning": ""
+            "backtrack_reasoning": "",
+            "all_task_definitions": all_task_definitions,  # NEW
+            "retry_counts": retry_counts  # Propagate updated retry_counts
         }
 
     else:
@@ -458,12 +505,14 @@ def execute_task_node(state: AgentState) -> Dict[str, Any]:
         print(f"[FAIL] Task definition invalid: {error_msg}")
         print(f"[SUGGESTION] {suggestion}")
 
-        # Return with task_definition_error flag
+        # NEW: Use separate flag for recoverable task_definition_error (not "error")
         return {
-            "error": error_msg,
+            "task_definition_failed": True,  # NEW: Recoverable error flag
+            "task_definition_error": error_msg,  # NEW: Error message
             "error_type": "task_definition_error",
             "error_suggestion": suggestion,
             "failed_task_id": task_id
+            # NOTE: "error" field NOT set → won't trigger END in router
         }
 
     print(f"[OK] Task definition valid")
@@ -659,10 +708,21 @@ def validate_task_node(state: AgentState) -> Dict[str, Any]:
     # Track retries and backtrack target
     retry_counts = dict(state.get("retry_counts", {}))
     if not validation_result.get("is_valid", False):
-        retry_counts[task_id] = retry_counts.get(task_id, 0) + 1
+        root_cause = validation_result.get("root_cause_task_id")
+
+        # NEW: Only increment retry if root cause is current task (not a different task)
+        if root_cause and root_cause != task_id:
+            # Root cause is a different task - don't increment retry for current task
+            # Backtracking will handle it
+            print(f"[P7 VALIDATE] Root cause is {root_cause} (not {task_id}), skipping retry increment")
+        else:
+            # Current task's own problem - increment retry
+            retry_counts[task_id] = retry_counts.get(task_id, 0) + 1
+            print(f"[P7 VALIDATE] {task_id} retry count: {retry_counts[task_id]}/{MAX_TASK_RETRIES}")
+
         updates["retry_counts"] = retry_counts
 
-        root_cause = validation_result.get("root_cause_task_id")
+        # Set backtrack target if root cause is a different completed task
         if root_cause:
             completed_ids = [r.get("task_id") for r in state.get("task_results", [])]
             if root_cause in completed_ids:
@@ -678,18 +738,42 @@ def p7_router(state: AgentState) -> str:
     """
     PROTOTYPE 7 v2: Router after validation.
 
-    In the new 1-task-at-a-time design:
-    - Always return to planner (whether validation passed or failed)
-    - Planner will see validation results and decide next step
-    - Check if planner already signaled completion
+    Routes based on error type:
+    - Fatal error (state.error) → END
+    - task_definition_failed (recoverable) → PLAN (re-plan)
+    - Success → PLAN (next task)
     """
-    if state.get("error"):
-        print("[P7 ROUTER] Error detected -> END")
+    # Check for fatal errors (not recoverable)
+    error = state.get("error")
+    if error:
+        # Fatal error: max retries, recursion limit, etc.
+        print(f"[P7 ROUTER] Fatal error detected: {error[:100]} -> END")
         return "end"
 
     if state.get("is_complete"):
         print("[P7 ROUTER] Planner signaled completion -> END")
         return "end"
+
+    # NEW: Check for recoverable errors (task_definition_failed)
+    if state.get("task_definition_failed"):
+        task_def_error = state.get("task_definition_error", "Unknown")
+        failed_task_id = state.get("failed_task_id", "unknown")
+        print(f"[P7 ROUTER] Task definition error for {failed_task_id}: {task_def_error[:100]}")
+        print(f"[P7 ROUTER] -> PLAN (re-plan to fix definition)")
+        # NOTE: Flag will be cleared in state update, not here
+        return "plan"
+
+    # NEW: Check retry limit for current task
+    current_task = state.get("current_task")
+    if current_task:
+        task_id = current_task.get("task_id")
+        retry_counts = state.get("retry_counts", {})
+        if retry_counts.get(task_id, 0) >= MAX_TASK_RETRIES:
+            print(f"[P7 ROUTER] Max retries ({MAX_TASK_RETRIES}) exceeded for {task_id} -> END")
+            # Set fatal error to trigger END
+            # NOTE: We can't modify state here directly, but we return "end"
+            # The error should have been set in validate_task_node
+            return "end"
 
     # Always go back to planner for next task
     print("[P7 ROUTER] -> PLAN (generate next task)")
@@ -773,6 +857,11 @@ class Prototype7Agent:
             "error_type": None,  # NEW: Error classification
             "error_suggestion": None,  # NEW: Error fix suggestion
             "failed_task_id": None,  # NEW: Which task failed
+
+            # NEW: Dependency-aware backtracking and recoverable errors
+            "all_task_definitions": {},  # Store all task definitions for dependency tracking
+            "task_definition_failed": False,  # Recoverable task definition error flag
+            "task_definition_error": None,  # Error message for task definition
         }
         final_state = {}
 

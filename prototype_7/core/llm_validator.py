@@ -814,16 +814,38 @@ class LLMValidator:
                     row_dict = dict(zip(definition_header, definition_data[idx]))
                     unmatched_defs.append({"index": idx, "data": row_dict})
 
+            # Unmatched condition rows
+            unmatched_cond_indices = unmatched.get("condition_indices", [])
+            unmatched_conds = []
+            for idx in unmatched_cond_indices[:5]:  # Max 5
+                if idx < len(condition_data):
+                    row_dict = dict(zip(condition_header, condition_data[idx]))
+                    unmatched_conds.append({"index": idx, "data": row_dict})
+
+
+            print('🔥definition_header🔥')
+            print(definition_header)
+            print('🔥condition_header🔥')
+            print(condition_header)
+            print('🔥groups_detail🔥')
+            print(groups_detail)
+            print('🔥unmatched_defs🔥')
+            print(unmatched_defs)
+            print('🔥column_mapping🔥')
+            print(column_mapping)
+            print('🔥summary🔥')
+            print(summary)
+            print('🔥END🔥')
             # Build prompt
             prompt = build_validate_grouping_logic_llm_prompt(
                 definition_header=definition_header,
                 condition_header=condition_header,
                 groups_detail=groups_detail,
                 unmatched_defs=unmatched_defs,
+                unmatched_conds=unmatched_conds,
                 column_mapping=column_mapping,
                 summary=summary
             )
-            print('llm성❗')
             response = self.client.chat.completions.create(
                 model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
