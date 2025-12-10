@@ -8,7 +8,7 @@ import json
 import sys
 import argparse
 from pathlib import Path
-from agent import Prototype6Agent, Prototype7Agent
+from agent import  Prototype7Agent
 
 
 def load_document(doc_path: str):
