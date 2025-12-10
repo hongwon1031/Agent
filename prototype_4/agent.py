@@ -157,7 +157,7 @@ class Prototype3Agent:
             )
 
             if not task_result["success"]:
-                print(f"[FAIL] Task {task_id} failed after {task_result['attempts']} attempts")
+                print(f"🚨[FAIL] Task {task_id} failed after {task_result['attempts']} attempts")
                 return {
                     "success": False,
                     "execution_plan": plan,
@@ -165,7 +165,7 @@ class Prototype3Agent:
                     "error": f"Task {task_id} failed: {task_result['error']}"
                 }
 
-            print(f"[OK] Task {task_id} succeeded")
+            print(f"🚨[OK] Task {task_id} succeeded")
             previous_results[task_id] = task_result["data"]
 
         # Step 4: 최종 결과

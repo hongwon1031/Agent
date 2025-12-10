@@ -375,7 +375,7 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
                 backtrack_instruction = f"[BACKTRACK] {backtrack_to}와 그 의존 작업들을 재실행합니다. 실패 원인: {backtrack_reasoning}"
                 print(f"[P7 NODE] Dependency-aware backtracking: {sorted(tasks_to_rerun)}")
                 print(f"[P7 NODE] Truncating to index {min_idx} (was {len(ids)}, removed {len(ids)-min_idx} tasks)")
-                print(f"[P7 NODE] Backtrack reasoning: {backtrack_reasoning[:100]}...")
+                print(f"[P7 NODE] Backtrack reasoning: {backtrack_reasoning[:]}...")
             else:
                 print(f"[P7 NODE] Backtracking to {backtrack_to}: trimming results to {len(task_results)} entries")
         else:
@@ -515,7 +515,7 @@ def execute_task_node(state: AgentState) -> Dict[str, Any]:
             # NOTE: "error" field NOT set → won't trigger END in router
         }
 
-    print(f"[OK] Task definition valid")
+    print(f"🚨[OK] Task definition valid")
 
     # ========== STEP 2: Template Resolution (with error classification) ==========
     try:
@@ -592,10 +592,10 @@ def execute_task_node(state: AgentState) -> Dict[str, Any]:
     task_results.append(task_result)
 
     if result.success:
-        print(f"[OK] Task {task_id} completed successfully ({execution_time:.2f}s)")
+        print(f"🚨[OK] Task {task_id} completed successfully ({execution_time:.2f}s)")
         print(f"[DEBUG] Output of {tool_name} (Task {task_id}): {result.data}")
     else:
-        print(f"[FAIL] Task {task_id} failed: {result.error}")
+        print(f"🚨[FAIL] Task {task_id} failed: {result.error}")
         print(f"[DEBUG] Failed output of {tool_name} (Task {task_id}): {result.error}")
         print(f"[DEBUG] Params for {tool_name} (Task {task_id}): {resolved_params}")
 
@@ -730,7 +730,7 @@ def validate_task_node(state: AgentState) -> Dict[str, Any]:
                 # CRITICAL: Save reasoning for why we're backtracking
                 root_cause_reasoning = validation_result.get("root_cause_reasoning", "")
                 updates["backtrack_reasoning"] = root_cause_reasoning
-                print(f"[P7 VALIDATE] Backtrack reasoning saved: {root_cause_reasoning[:100]}...")
+                print(f"[P7 VALIDATE] Backtrack reasoning saved: {root_cause_reasoning[:]}...")
 
     return updates
 

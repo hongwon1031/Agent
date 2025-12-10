@@ -909,98 +909,6 @@ class IntelligentConditionExtractTool:
             )
 
 
-# class DefinitionConditionMergeTool:
-#     """
-#     LLM-based Intelligent Merge Tool.
-#     Merges definition combinations with raw condition data using flexible,
-#     semantic matching powered by an LLM.
-#     """
-
-#     def __init__(self):
-#         self.name = "definition_condition_merge"
-#         load_dotenv(dotenv_path=r"c:\Users\NT-165\Desktop\Project\Toy\.env")
-#         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-#     def execute(self, doc: Any, params: Dict[str, Any]) -> ToolResult:
-#         """
-#         Merges definition combinations with raw condition data using an LLM.
-
-#         Args:
-#             params:
-#                 definitions: list[dict] - Expanded definition combinations.
-#                 condition_header: list[str] - Header of the raw condition table.
-#                 condition_data: list[list[str]] - Data of the raw condition table.
-#                 instruction: str (optional) - Additional instruction for the merge.
-
-#         Returns:
-#             ToolResult with data from the LLM, including the merged definitions
-#             and join statistics.
-#         """
-#         try:
-#             definitions = params.get("definitions", [])
-#             condition_header = params.get("condition_header", [])
-#             condition_data = params.get("condition_data", [])
-#             instruction = params.get("instruction", "")
-
-#             if not definitions:
-#                 return ToolResult(
-#                     success=False, error="No definitions provided", tool_name=self.name
-#                 )
-            
-#             # If no condition data, return definitions as is.
-#             if not condition_header or not condition_data:
-#                 return ToolResult(
-#                     success=True,
-#                     data={
-#                         "definitions": definitions,
-#                         "total_count": len(definitions),
-#                         "join_stats": {"status": "skipped", "reason": "no_condition_data"}
-#                     },
-#                     tool_name=self.name
-#                 )
-
-#             # Build the intelligent merge prompt
-#             prompt = build_llm_intelligent_merge_prompt(
-#                 definitions=definitions,
-#                 condition_header=condition_header,
-#                 condition_data=condition_data,
-#                 instruction=instruction,
-#             )
-
-#             # Call the LLM
-#             response = self.client.chat.completions.create(
-#                 model="gpt-4o",
-#                 messages=[{"role": "user", "content": prompt}],
-#                 response_format={"type": "json_object"},
-#                 temperature=0,
-#                 max_tokens=12000
-#             )
-#             raw = response.choices[0].message.content
-#             print("=== MERGE RAW RESPONSE ===")
-#             print(raw)
-#             result_data = json.loads(response.choices[0].message.content)
-
-#             # Basic validation of the LLM response
-#             if "definitions" not in result_data or "join_stats" not in result_data:
-#                 return ToolResult(
-#                     success=False,
-#                     error="LLM response is missing required keys: 'definitions' or 'join_stats'.",
-#                     tool_name=self.name
-#                 )
-
-#             return ToolResult(
-#                 success=True,
-#                 data=result_data,
-#                 tool_name=self.name
-#             )
-
-#         except Exception as e:
-#             return ToolResult(
-#                 success=False,
-#                 error=f"DefinitionConditionMergeTool error: {str(e)}",
-#                 tool_name=self.name
-#             )
-
 
 # ================================================================================================
 # NEW: Grouping-based Combination Generation Tools
@@ -1286,27 +1194,16 @@ class CombinationGeneratorTool:
         def_data: List[List[str]],
         cond_header: List[str],
         cond_data: List[List[str]],
-        grouping_logic: Dict[str, Any]
+        grouping_logic: Dict[str, Any],
     ) -> List[Dict[str, str]]:
-        """
-        그룹핑 로직에 따라 조합 생성
-
-        Args:
-            def_header: Definition 헤더
-            def_data: Definition 데이터
-            cond_header: Condition 헤더
-            cond_data: Condition 데이터
-            grouping_logic: 그룹핑 로직
-
-        Returns:
-            최종 definition 리스트 (dict 형태)
-        """
         final_definitions = []
         column_mapping = grouping_logic.get("column_mapping", {})
         value_columns = column_mapping.get("value_columns", [])
         groups = grouping_logic.get("groups", [])
 
-        # Process each group
+        # NEW: join_keys 가져오기 (예: ["보험종목", "보험종목_1"])
+        join_keys = set(column_mapping.get("join_keys", []))
+
         for group in groups:
             definition_indices = group.get("definition_indices", [])
             condition_index = group.get("condition_index")
@@ -1316,32 +1213,31 @@ class CombinationGeneratorTool:
                 continue
 
             condition_row = cond_data[condition_index]
+            match_condition = group.get("match_condition", {}) or {}
 
-            # For each definition in this group
             for def_idx in definition_indices:
                 if def_idx >= len(def_data):
                     print(f"[WARNING] Invalid definition_index: {def_idx}")
                     continue
 
                 definition_row = def_data[def_idx]
-                match_condition = group.get("match_condition", {})
+                merged: Dict[str, Any] = {}
 
-                # Create merged definition
-                merged = {}
-
-                # Add all definition columns
-                # CRITICAL: JOIN key 컬럼은 match_condition 값으로 치환
+                # 1) 정의 컬럼은 원본 그대로 복사 (덮어쓰기 X)
                 for i, col in enumerate(def_header):
                     if i < len(definition_row):
-                        # JOIN key 컬럼은 match_condition의 필터링된 값 사용
-                        if col in match_condition:
-                            merged[col] = match_condition[col]
-                        else:
-                            merged[col] = definition_row[i]
+                        merged[col] = definition_row[i]
                     else:
                         merged[col] = None
 
-                # Add condition value columns
+                # 2) JOIN 키에 대한 "카테고리" 컬럼 추가
+                #    예: 보험종목 -> 보험종목_category
+                for jk in join_keys:
+                    if jk in match_condition:
+                        category_col = f"{jk}_category"
+                        merged[category_col] = match_condition[jk]
+
+                # 3) Condition value 컬럼들 붙이기 (보험기간, 납입기간, 가입나이_남, ...)
                 for col in value_columns:
                     if col in cond_header:
                         col_idx = cond_header.index(col)
@@ -1354,26 +1250,20 @@ class CombinationGeneratorTool:
 
                 final_definitions.append(merged)
 
-        # Process unmatched definitions (condition 값은 null)
+        # unmatched definitions 처리 부분은 그대로 두면 됩니다
         unmatched_def_indices = grouping_logic.get("unmatched", {}).get("definition_indices", [])
         for def_idx in unmatched_def_indices:
             if def_idx >= len(def_data):
                 continue
-
             definition_row = def_data[def_idx]
             merged = {}
-
-            # Add definition columns
             for i, col in enumerate(def_header):
                 if i < len(definition_row):
                     merged[col] = definition_row[i]
                 else:
                     merged[col] = None
-
-            # Add condition columns as null
             for col in value_columns:
                 merged[col] = None
-
             final_definitions.append(merged)
 
         return final_definitions
