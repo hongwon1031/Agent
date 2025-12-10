@@ -120,15 +120,15 @@ tools = {
 }
 
 # --- [NEW] Pydantic Models for Plan Validation ---
-
+# 개별적인 task 구조
 class Task(BaseModel):
-    task_id: str
-    task_type: str
-    tool_name: str
-    fallback_tool: Optional[str] = None
-    parameters: Dict[str, Any]
-    dependencies: List[str]
-    output_key: str
+    task_id: str # task id
+    task_type: str # task 종류
+    tool_name: str # 실행 tool
+    fallback_tool: Optional[str] = None # main 툴 실패시 대체옵션
+    parameters: Dict[str, Any] # 입력값
+    dependencies: List[str] # 해당 task 실행 전 완료되어야하는 task(의존성)
+    output_key: str # 결과물 state에 저장할 때 사용할 key
 
     @field_validator('tool_name')
     @classmethod
@@ -318,14 +318,14 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
     1. Initially (task_results empty) - generates first task
     2. After each task validation - generates next task or signals completion
     """
-    doc = state.get('original_doc')
-    task_results = state.get('task_results', [])
-    last_feedback = state.get("last_validation_feedback") or {}
-    backtrack_to = state.get("backtrack_to_task_id")
-    current_task_state = state.get("current_task")
-    retry_counts = state.get("retry_counts", {})
+    doc = state.get('original_doc') # 원본 문서
+    task_results = state.get('task_results', []) # 수행 완료된 task의 결과들
+    last_feedback = state.get("last_validation_feedback") or {} # 마지막 검증 결과
+    backtrack_to = state.get("backtrack_to_task_id") # 백트래킹할곳
+    current_task_state = state.get("current_task") # 최근 검증 task
+    retry_counts = state.get("retry_counts", {}) # 재시도 횟수
 
-    # Handle backtracking: drop results after target task to re-run from there
+    # 백트래킹
     backtrack_instruction = ""
     if backtrack_to:
         ids = [r.get("task_id") for r in task_results]
@@ -337,7 +337,7 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
             all_task_definitions = state.get("all_task_definitions", {})
             tasks_to_rerun = set([backtrack_to])
 
-            # BFS to find all dependent tasks
+            # BFS로 backtrack_to에 의존하는 task들 찾기
             queue = [backtrack_to]
             while queue:
                 current = queue.pop(0)
@@ -352,24 +352,24 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
                                     tasks_to_rerun.add(completed_id)
                                     queue.append(completed_id)
 
-            # Find minimum index to truncate (earliest task in dependency chain)
+            # 되돌려야 하는 task들 중 가장 앞쪽 인덱스 서치
             min_idx = idx
             for task_id in tasks_to_rerun:
                 if task_id in ids:
                     task_idx = ids.index(task_id)
                     min_idx = min(min_idx, task_idx)
 
-            # Truncate to minimum index
+            # task_result를 min_idx 이전까지만 남기고 전부 삭제
             task_results = task_results[:min_idx]
 
-            # NEW: Reset retry counts for tasks being re-run
+            # NEW: 되돌릴 task들의 retry count 초기화
             retry_counts = dict(state.get("retry_counts", {}))
             for task_id in tasks_to_rerun:
                 if task_id in retry_counts:
                     old_count = retry_counts.pop(task_id)
                     print(f"[P7 NODE] Resetting retry count for {task_id} (was {old_count})")
 
-            # CRITICAL: Get the reasoning for why we're backtracking
+            # CRITICAL:backtrack_reasoning 있으면 플래너에게 줄 추가 지시문 생성
             backtrack_reasoning = state.get("backtrack_reasoning", "")
             if backtrack_reasoning:
                 backtrack_instruction = f"[BACKTRACK] {backtrack_to}와 그 의존 작업들을 재실행합니다. 실패 원인: {backtrack_reasoning}"
@@ -387,13 +387,13 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
     print(f"\n[P7 NODE] plan_node: Generating next task (completed: {num_completed})...")
 
     # Call LLM to get next task or end signal
-    # Build extra instruction from last validation feedback (if any)
+    # instruction 생성 (3가지 우선순위)
     extra_instruction = ""
 
-    # PRIORITY 1: Backtrack instruction (if backtracking to fix root cause)
+    # PRIORITY 1:백트래킹 instruction
     if backtrack_instruction:
         extra_instruction = backtrack_instruction
-    # PRIORITY 2: Task definition error (re-plan required)
+    # PRIORITY 2: task 정의 자체가 틀려서 재설계 필요한 경우
     elif last_feedback and last_feedback.get("skip_retry"):
         failed_task_id = state.get("failed_task_id", "unknown")
         errors = last_feedback.get("errors", [])
@@ -406,7 +406,7 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
         parts.append("완전히 새로운 task를 생성하세요. 이전 task는 폐기하십시오.")
         extra_instruction = " / ".join(parts)
         print(f"[P7 NODE] Re-plan instruction prepared: {extra_instruction[:150]}...")
-    # PRIORITY 3: Last validation feedback (for normal retry/continuation)
+    # PRIORITY 3: 일반적인 validtion 피드백(오류/개선 지시)
     else:
         last_feedback = state.get("last_validation_feedback") or {}
         if last_feedback and not last_feedback.get("is_valid", True):
@@ -419,16 +419,21 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
                 parts.append("개선 지시: " + "; ".join(map(str, suggestions))[:400])
             if parts:
                 extra_instruction = " / ".join(parts)
-
-    result = planner.generate_next_task(doc=doc, task_results=task_results, instruction=extra_instruction)
     
-    result = planner.generate_next_task(doc=doc, task_results=task_results, instruction=extra_instruction,last_feedback = last_feedback, last_task = current_task_state)
+    # 플래너
+    result = planner.generate_next_task(doc=doc, 
+                                        task_results=task_results, 
+                                        instruction=extra_instruction,
+                                        last_feedback = last_feedback, 
+                                        last_task = current_task_state)
     if result.get("error"):
         print(f"[FAIL] Task generation failed: {result['error']}")
         return {"error": f"Task generation failed: {result['error']}"}
 
     action = result.get("action")
 
+
+    # 종료
     if action == "end":
         # All tasks complete
         print(f"[OK] Planner signals completion")
@@ -442,6 +447,7 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
             "retry_counts": retry_counts  # Propagate updated retry_counts
         }
 
+    # 다음 task 진행
     elif action == "next_task":
         # New task to execute
         task = result.get("task")
@@ -451,7 +457,7 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
         print(f"  - Tool: {task.get('tool_name')}")
         print(f"  - Reasoning: {result.get('reasoning', 'N/A')[:100]}...")
 
-        # Validate tool exists
+        # 유효한 tool / fallback_tool인지 체크
         tool_name = task.get("tool_name")
         if tool_name not in tools:
             return {"error": f"Invalid tool_name: {tool_name}. Available: {list(tools.keys())}"}
@@ -461,7 +467,7 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
         if fallback and fallback not in tools:
             return {"error": f"Invalid fallback_tool: {fallback}"}
 
-        # NEW: Save task definition for dependency tracking
+        # NEW: 이 task 정의를 all_task_definitions에 저장(나중에 dependency 기반 backtracking용)
         all_task_definitions = state.get("all_task_definitions", {})
         all_task_definitions[task_id] = task
         print(f"[DEBUG] Saved task definition for {task_id} (dependencies: {task.get('dependencies', [])})")
@@ -479,11 +485,14 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
     else:
         return {"error": f"Unknown action from planner: {action}"}
 
+# execute node
+# 현재 state에 들어있는 current_task를 실제로 실행하고 결과/에러를 task_result에 기록
 def execute_task_node(state: AgentState) -> Dict[str, Any]:
     """
     PROTOTYPE 7 v2: Execute the current task.
     """
     print("\n[P7 NODE] execute_task_node: Executing current task...")
+    # state에서 현재 상태 꺼냄
     current_task = state.get('current_task')
     task_results = state.get('task_results', [])
     document = state.get('original_doc')
@@ -793,21 +802,24 @@ def build_p7_graph():
     """
     workflow = StateGraph(AgentState)
 
-    # Add nodes
+    # 노드 추가
     workflow.add_node("plan", plan_node)
     workflow.add_node("execute_task", execute_task_node)
     workflow.add_node("validate_task", validate_task_node)
 
-    # Set entry point
+    # 엔트리 포인트 설정(그래프 처음 시작할때 진입노드)
     workflow.set_entry_point("plan")
 
     # Add edges
+    # plan node 실행 후 state를 보고 current_task가 있으면 execute_task로 이동, 없으면 end
     workflow.add_conditional_edges(
         "plan",
         lambda state: "execute_task" if state.get("current_task") else "end",
         {"execute_task": "execute_task", "end": END}
     )
+    # execute -> validate
     workflow.add_edge("execute_task", "validate_task")
+    # validate -> p7_router를 기반으로 plan/end 결정
     workflow.add_conditional_edges(
         "validate_task",
         p7_router,
@@ -826,9 +838,10 @@ class Prototype7Agent:
     def run(self, doc: Any) -> Dict[str, Any]:
         print("\n" + "="*80 + "\nPROTOTYPE 7: Dynamic Task Execution Agent\n" + "="*80)
         try:
+            # 문서를 section 단위로 파싱
             accessor = DocumentAccessor(doc)
             section_objects = accessor.get_all_sections()
-            # Convert Section objects to dict
+            # section 객체를 dict 형태로 변환해서 langgraph state에 넣을 수 있도록 준비
             sections = [
                 {
                     "index": s.index,
@@ -842,17 +855,17 @@ class Prototype7Agent:
             print(f"[ERROR] DocumentAccessor failed: {e}")
             sections = []
 
-        # PROTOTYPE 7 v2: Initialize state for 1-task-at-a-time execution
+        # PROTOTYPE 7 v2: 초기 상태(state) 구성
         inputs = {
-            "original_doc": doc,
-            "sections": sections,
-            "task_results": [],
-            "current_task": None,
-            "current_task_output": None,
-            "is_complete": False,
-            "backtrack_to_task_id": None,
+            "original_doc": doc, # 원본 문서
+            "sections": sections, # 섹션 단위로 분해된 문서
+            "task_results": [], # 지금까지 task 결과
+            "current_task": None, # 현재 실행중인 task
+            "current_task_output": None, # 현재 task의 결과
+            "is_complete": False, # 완료 플래그
+            "backtrack_to_task_id": None, # 어느 task로 되돌아갈지
             "backtrack_reasoning": "",  # CRITICAL: Store why we're backtracking
-            "retry_counts": {},
+            "retry_counts": {}, 
             "last_validation_feedback": None,
             "error_type": None,  # NEW: Error classification
             "error_suggestion": None,  # NEW: Error fix suggestion
@@ -863,9 +876,12 @@ class Prototype7Agent:
             "task_definition_failed": False,  # Recoverable task definition error flag
             "task_definition_error": None,  # Error message for task definition
         }
+        # 그래프 실행 중 마지막 상태를 누적할 dictionary
         final_state = {}
 
+        # 그래프 실행
         try:
+            # 랭그래프의 스트리밍 실행 함수(graph.stream)
             for step in self.graph.stream(inputs, config={"recursion_limit": 100}):
                 if node_state := next(iter(step.values()), None):
                     final_state.update(node_state)
@@ -879,7 +895,9 @@ class Prototype7Agent:
                     "task_results": final_state.get("task_results", []),
                 }
 
+            # 성공 case 처리
             task_results = final_state.get("task_results", [])
+            # final_data는 마지막 task의 data를 최종 산출물로 가져옴
             final_data = task_results[-1].get("data") if task_results else None
             task_log = self._build_task_log(final_state)
             print("\n" + "="*80 + f"\nPROTOTYPE 7 COMPLETE: {len(task_results)} tasks executed\n" + "="*80)
@@ -907,49 +925,3 @@ class Prototype7Agent:
             for idx, r in enumerate(state.get("task_results", []))
         ]
 
-
-# ============================================================================
-# LEGACY PROTOTYPE 6 (Stub for backward compatibility)
-# ============================================================================
-
-class Prototype6Agent:
-    """
-    Legacy Prototype 6 Agent - Not fully implemented in Prototype 7 directory.
-    Use prototype_6 directory for full P6 functionality.
-    """
-    def __init__(self):
-        print("[WARN] Prototype6Agent is a stub in prototype_7. Use --prototype 7 instead.")
-
-    def run(self, doc: Any) -> Dict[str, Any]:
-        """
-        Stub implementation - directs users to use Prototype 7 or switch to prototype_6 directory.
-        """
-        return {
-            "success": False,
-            "error": "Prototype 6 is not fully implemented in prototype_7 directory. Use --prototype 7 or run from prototype_6 directory.",
-            "final_data": None,
-            "task_log": []
-        }
-
-# ============================================================================
-# LEGACY PROTOTYPE 6 (Stub for backward compatibility)
-# ============================================================================
-
-class Prototype6Agent:
-    """
-    Legacy Prototype 6 Agent - Not fully implemented in Prototype 7 directory.
-    Use prototype_6 directory for full P6 functionality.
-    """
-    def __init__(self):
-        print("[WARN] Prototype6Agent is a stub in prototype_7. Use --prototype 7 instead.")
-
-    def run(self, doc: Any) -> Dict[str, Any]:
-        """
-        Stub implementation - directs users to use Prototype 7 or switch to prototype_6 directory.
-        """
-        return {
-            "success": False,
-            "error": "Prototype 6 is not fully implemented in prototype_7 directory. Use --prototype 7 or run from prototype_6 directory.",
-            "final_data": None,
-            "task_log": []
-        }
