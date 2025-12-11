@@ -21,6 +21,7 @@ from tools.hybrid_tools import (
     LLMCartesianTool,
     RuleCartesianTool,
     IntelligentConditionExtractTool,
+    ConditionTransformTool,
     GroupingLogicExtractorTool,
     CombinationGeneratorTool,
 )
@@ -114,7 +115,8 @@ tools = {
     "rule_cartesian": RuleCartesianTool(),
     "llm_cartesian": LLMCartesianTool(),
     "condition_extract": IntelligentConditionExtractTool(),
-    
+    "condition_transform": ConditionTransformTool(),
+
     "grouping_logic_extractor": GroupingLogicExtractorTool(),
     "combination_generator": CombinationGeneratorTool(),
 }
@@ -392,11 +394,9 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
 
     # PRIORITY 1:백트래킹 instruction
     if backtrack_instruction:
-        print('[🚨백트래킹 실시🚨]')
         extra_instruction = backtrack_instruction
     # PRIORITY 2: task 정의 자체가 틀려서 재설계 필요한 경우
     elif last_feedback and last_feedback.get("skip_retry"):
-        print('[🚨🚨task 변경 실시🚨🚨]')
         failed_task_id = state.get("failed_task_id", "unknown")
         errors = last_feedback.get("errors", [])
         suggestions = last_feedback.get("suggestions", [])
@@ -410,7 +410,6 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
         print(f"[P7 NODE] Re-plan instruction prepared: {extra_instruction[:150]}...")
     # PRIORITY 3: 일반적인 validtion 피드백(오류/개선 지시)
     else:
-        print('[🚨🚨🚨그냥 instruction 바꿔서 재시도🚨🚨🚨]')
         last_feedback = state.get("last_validation_feedback") or {}
         if last_feedback and not last_feedback.get("is_valid", True):
             errors = last_feedback.get("errors", [])
