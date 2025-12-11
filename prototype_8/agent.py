@@ -501,6 +501,8 @@ def execute_task_node(state: AgentState) -> Dict[str, Any]:
     # state에서 현재 상태 꺼냄
     current_task = state.get('current_task')
     task_results = state.get('task_results', [])
+    task_history = state.get('task_history', [])  # NEW
+
     document = state.get('original_doc')
     sections = state.get('sections')
 
@@ -605,7 +607,8 @@ def execute_task_node(state: AgentState) -> Dict[str, Any]:
         "error": result.error if not result.success else None
     }
     task_results.append(task_result)
-
+    task_history.append(task_result)   
+    
     if result.success:
         print(f"🚨[OK] Task {task_id} completed successfully ({execution_time:.2f}s)")
         print(f"[DEBUG] Output of {tool_name} (Task {task_id}): {result.data}")
@@ -616,6 +619,7 @@ def execute_task_node(state: AgentState) -> Dict[str, Any]:
 
     return {
         "task_results": task_results,
+        "task_history": task_history,
         "current_task_output": result.data
     }
 
@@ -866,6 +870,7 @@ class Prototype7Agent:
             "original_doc": doc, # 원본 문서
             "sections": sections, # 섹션 단위로 분해된 문서
             "task_results": [], # 지금까지 task 결과
+            "task_history": [], # 디버깅용
             "current_task": None, # 현재 실행중인 task
             "current_task_output": None, # 현재 task의 결과
             "is_complete": False, # 완료 플래그
@@ -903,6 +908,7 @@ class Prototype7Agent:
 
             # 성공 case 처리
             task_results = final_state.get("task_results", [])
+            task_history = final_state.get("task_history", [])
             # final_data는 마지막 task의 data를 최종 산출물로 가져옴
             final_data = task_results[-1].get("data") if task_results else None
             task_log = self._build_task_log(final_state)
@@ -912,6 +918,7 @@ class Prototype7Agent:
                 "final_data": final_data,
                 "task_log": task_log,
                 "task_results": task_results,
+                "task_history": task_history,
                 "error": None,
             }
         except Exception as e:
