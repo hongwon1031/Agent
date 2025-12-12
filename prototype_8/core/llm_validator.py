@@ -93,9 +93,16 @@ class LLMValidator:
                 # 그 외 extract는 기존 definition-aware validator 사용
                 result = self.validate_extract_definitions(task_output, context)
         elif task_type == "extract_condition":
-            result = self.validate_condition_extract(task_output, context)
+            # NEW: LLM-based validation for condition_extract
+            result = self.validate_condition_extract_llm(task_output, context)
+        elif task_type == "table_split":
+            # NEW: LLMTableSplitTool validation
+            result = self.validate_table_split_llm(task_output, context)
         elif task_type == "transform":
             result = self.validate_transform(task_output, context)
+        elif task_type == "condition_transform":
+            # NEW: ConditionTransformTool validation
+            result = self.validate_condition_transform_llm(task_output, context)
         elif task_type == "merge":
             result = self.validate_merge(task_output, context)
         elif task_type == "normalize_def":
@@ -406,6 +413,181 @@ class LLMValidator:
                 "reasoning": "DefinitionExtractV2 validation failed"
             }
 
+    def validate_table_split_llm(
+        self,
+        task_output: Dict[str, Any],
+        context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        LLMTableSplitTool 결과를 LLM으로 검증
+
+        Args:
+            task_output: {"header": [...], "data": [...], "notes": "..."}
+            context: {
+                "original_header": [...],
+                "original_data": [...],
+                "previous_results": [...]
+            }
+
+        Returns:
+            Dict: 검증 결과
+        """
+        try:
+            split_header = task_output.get("header") or []
+            split_data = task_output.get("data") or []
+
+            # 기본 형태 검증
+            if not split_header or not split_data:
+                return {
+                    "is_valid": False,
+                    "confidence": 0.8,
+                    "errors": ["table_split returned empty header or data"],
+                    "suggestions": [
+                        "Check if input table has valid data",
+                        "Review split parameters"
+                    ],
+                    "reasoning": "table_split produced empty table"
+                }
+
+            # 원본 데이터 가져오기
+            original_header = context.get("original_header", [])
+            original_data = context.get("original_data", [])
+
+            if not original_header or not original_data:
+                return {
+                    "is_valid": False,
+                    "confidence": 0.5,
+                    "errors": ["Original data not found in context"],
+                    "suggestions": ["Ensure validate_task_node passes original_header/data in context"],
+                    "reasoning": "Cannot validate without original data"
+                }
+
+            from core.prompt import build_validate_table_split_llm_prompt
+
+            prompt = build_validate_table_split_llm_prompt(
+                original_header=original_header,
+                original_data=original_data,
+                split_header=split_header,
+                split_data=split_data,
+            )
+
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+                temperature=0
+            )
+
+            result = json.loads(response.choices[0].message.content)
+            return result
+
+        except Exception as e:
+            return {
+                "is_valid": False,
+                "confidence": 0.0,
+                "errors": [f"Validation error: {str(e)}"],
+                "suggestions": ["Check table_split output and retry"],
+                "reasoning": "Table split validation failed"
+            }
+
+    def validate_condition_transform_llm(
+        self,
+        task_output: Dict[str, Any],
+        context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        ConditionTransformTool 결과를 LLM으로 검증
+
+        Args:
+            task_output: {"header": [...], "data": [...], "notes": "..."}
+            context: {
+                "original_header": [...],
+                "original_data": [...],
+                "previous_results": [...]
+            }
+
+        Returns:
+            Dict: 검증 결과
+        """
+        try:
+            transformed_header = task_output.get("header") or []
+            transformed_data = task_output.get("data") or []
+
+            # 기본 형태 검증
+            if not transformed_header or not transformed_data:
+                return {
+                    "is_valid": False,
+                    "confidence": 0.8,
+                    "errors": ["condition_transform returned empty header or data"],
+                    "suggestions": [
+                        "Check if input condition table has valid data",
+                        "Review transform parameters"
+                    ],
+                    "reasoning": "condition_transform produced empty table"
+                }
+
+            # 필수 컬럼 사전 체크 (빠른 실패)
+            required_columns = [
+                "보험기간", "납입기간",
+                "주피보험자최소가입연령", "주피보험자최대가입연령",
+                "주피보험자최소가입연령구분코드", "주피보험자최대가입연령구분코드",
+                "주피보험자가입성별"
+            ]
+
+            missing_columns = [col for col in required_columns if col not in transformed_header]
+            if missing_columns:
+                return {
+                    "is_valid": False,
+                    "confidence": 0.9,
+                    "errors": [f"필수 컬럼 누락: {missing_columns}"],
+                    "suggestions": [
+                        "Check ConditionTransformTool schema mapping logic",
+                        f"Add missing columns: {missing_columns}"
+                    ],
+                    "reasoning": f"Required columns missing: {missing_columns}"
+                }
+
+            # 원본 데이터 가져오기
+            original_header = context.get("original_header", [])
+            original_data = context.get("original_data", [])
+
+            if not original_header or not original_data:
+                return {
+                    "is_valid": False,
+                    "confidence": 0.5,
+                    "errors": ["Original condition data not found in context"],
+                    "suggestions": ["Ensure validate_task_node passes original_header/data in context"],
+                    "reasoning": "Cannot validate without original data"
+                }
+
+            from core.prompt import build_validate_condition_transform_llm_prompt
+
+            prompt = build_validate_condition_transform_llm_prompt(
+                original_header=original_header,
+                original_data=original_data,
+                transformed_header=transformed_header,
+                transformed_data=transformed_data,
+            )
+
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+                temperature=0
+            )
+
+            result = json.loads(response.choices[0].message.content)
+            return result
+
+        except Exception as e:
+            return {
+                "is_valid": False,
+                "confidence": 0.0,
+                "errors": [f"Validation error: {str(e)}"],
+                "suggestions": ["Check condition_transform output and retry"],
+                "reasoning": "Condition transform validation failed"
+            }
+
     def validate_transform(
         self,
         task_output: Dict[str, Any],
@@ -552,6 +734,131 @@ class LLMValidator:
                 "errors": [f"Validation error: {str(e)}"],
                 "suggestions": ["Check condition_extract output format"],
                 "reasoning": "Condition extract validation failed"
+            }
+
+    def validate_condition_extract_llm(
+        self,
+        task_output: Dict[str, Any],
+        context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Condition Extract 결과를 LLM으로 검증
+
+        Args:
+            task_output: {"header": [...], "data": [...], "reasoning": "..."}
+            context: {
+                "condition_sections": [...],
+                "all_sections": [...],
+                "previous_results": [...]
+            }
+
+        Returns:
+            Dict: {
+                "is_valid": bool,
+                "confidence": float,
+                "errors": List[str],
+                "suggestions": List[str],
+                "reasoning": str
+            }
+        """
+        try:
+            extracted_header = task_output.get("header") or []
+            extracted_data = task_output.get("data") or []
+
+            # 기본 형태 검증
+            if not extracted_header or not extracted_data:
+                # Check if condition_sections exist
+                condition_sections = context.get("condition_sections", [])
+                if not condition_sections:
+                    # No condition sections provided, empty result is valid
+                    return {
+                        "is_valid": True,
+                        "confidence": 1.0,
+                        "errors": [],
+                        "suggestions": [],
+                        "reasoning": "No condition sections provided, empty result is valid"
+                    }
+                else:
+                    # Sections exist but extraction returned empty
+                    return {
+                        "is_valid": False,
+                        "confidence": 0.7,
+                        "errors": ["condition_extract returned empty header/data despite condition sections existing"],
+                        "suggestions": [
+                            "Check if condition sections contain valid tables",
+                            "Review extraction logic"
+                        ],
+                        "reasoning": "condition_extract produced empty table"
+                    }
+
+            # Get condition sections for validation
+            condition_sections = context.get("condition_sections", [])
+
+            if not condition_sections:
+                # No original sections to compare against
+                # Just do basic sanity checks
+                join_key_candidates = ["유형0", "유형1", "유형2", "심사형", "보장형"]
+                join_keys_found = [col for col in extracted_header if col in join_key_candidates]
+
+                if not join_keys_found:
+                    return {
+                        "is_valid": False,
+                        "confidence": 0.6,
+                        "errors": ["No JOIN key columns (유형0, 유형1, etc.) found in extracted table"],
+                        "suggestions": ["Ensure condition table includes type columns for joining"],
+                        "reasoning": "Condition extract missing JOIN key columns"
+                    }
+
+                return {
+                    "is_valid": True,
+                    "confidence": 0.8,
+                    "errors": [],
+                    "suggestions": [],
+                    "reasoning": f"Basic validation passed: {len(extracted_header)} columns, {len(extracted_data)} rows, JOIN keys: {join_keys_found}"
+                }
+
+            # Build LLM validation prompt
+            from core.prompt import build_validate_condition_extract_llm_prompt
+
+            prompt = build_validate_condition_extract_llm_prompt(
+                condition_sections=condition_sections,
+                extracted_header=extracted_header,
+                extracted_data=extracted_data
+            )
+
+            # Call LLM for validation
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"},
+                temperature=0
+            )
+
+            result = json.loads(response.choices[0].message.content)
+
+            # Ensure required fields
+            if "is_valid" not in result:
+                result["is_valid"] = False
+            if "confidence" not in result:
+                result["confidence"] = 0.5
+            if "errors" not in result:
+                result["errors"] = []
+            if "suggestions" not in result:
+                result["suggestions"] = []
+            if "reasoning" not in result:
+                result["reasoning"] = "LLM validation completed"
+
+            return result
+
+        except Exception as e:
+            return {
+                "is_valid": False,
+                "confidence": 0.0,
+                "errors": [f"LLM validation error: {str(e)}"],
+                "suggestions": ["Check condition_extract output format", "Review LLM validation prompt"],
+                "reasoning": "Condition extract LLM validation failed"
             }
 
     def validate_merge(

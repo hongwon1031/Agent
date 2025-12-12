@@ -185,33 +185,33 @@ TOOL_SCHEMAS = {
         "parameters": {
             "definition_header": {
                 "type": "list[str]",
-                "description": "Normalized definition table header",
-                "required": True,
-                "example": "{{task1.data.header}}",
-            },
-            "definition_data": {
-                "type": "list[list[str]]",
-                "description": "Normalized definition table data",
-                "required": True,
-                "example": "{{task1.data.data}}",
-            },
-            "condition_header": {
-                "type": "list[str]",
-                "description": "Normalized condition table header",
+                "description": "Split definition table header from task2 (llm_table_split)",
                 "required": True,
                 "example": "{{task2.data.header}}",
             },
-            "condition_data": {
+            "definition_data": {
                 "type": "list[list[str]]",
-                "description": "Normalized condition table data",
+                "description": "Split definition table data from task2 (llm_table_split)",
                 "required": True,
                 "example": "{{task2.data.data}}",
             },
+            "condition_header": {
+                "type": "list[str]",
+                "description": "Transformed condition table header from task4 (condition_transform)",
+                "required": True,
+                "example": "{{task4.data.header}}",
+            },
+            "condition_data": {
+                "type": "list[list[str]]",
+                "description": "Transformed condition table data from task4 (condition_transform)",
+                "required": True,
+                "example": "{{task4.data.data}}",
+            },
             "grouping_logic": {
                 "type": "dict",
-                "description": "matched_list_items를 포함하는 grouping 결과",
+                "description": "Grouping logic with matched_list_items from task5 (grouping_logic_extractor)",
                 "required": True,
-                "example": "{{task4.data}}",
+                "example": "{{task5.data}}",
             },
         },
         "returns": {
@@ -221,20 +221,20 @@ TOOL_SCHEMAS = {
         },
     },
     "llm_table_split": {
-        "description": "LLM-based semantic splitting of multi-value cells (범용, Definition/Condition 모두 적용)",
+        "description": "LLM-based semantic splitting of multi-value cells in Definition table (Task2 전용, header 유지)",
         "supported_formats": ["table"],
         "parameters": {
             "header": {
                 "type": "list[string]",
-                "description": "Table header",
+                "description": "Definition table header from task1",
                 "required": True,
-                "example": "{{task2.data.header}}",
+                "example": "{{task1.data.header}}",
             },
             "data": {
                 "type": "list[list[any]]",
-                "description": "Table data rows",
+                "description": "Definition table data from task1",
                 "required": True,
-                "example": "{{task2.data.data}}",
+                "example": "{{task1.data.data}}",
             },
             "row_indices": {
                 "type": "list[int]",
@@ -254,7 +254,37 @@ TOOL_SCHEMAS = {
             "notes": "string - Splitting notes",
         },
     },
-    
+    "condition_transform": {
+        "description": "Transform condition table: split values + parse age formulas + map to standard schema (Task4 전용)",
+        "supported_formats": ["table"],
+        "parameters": {
+            "header": {
+                "type": "list[string]",
+                "description": "Condition table header from task3 (condition_extract)",
+                "required": True,
+                "example": "{{task3.data.header}}",
+            },
+            "data": {
+                "type": "list[list[any]]",
+                "description": "Condition table data from task3 (condition_extract)",
+                "required": True,
+                "example": "{{task3.data.data}}",
+            },
+            "instruction": {
+                "type": "string",
+                "description": "Additional transformation guidance (optional)",
+                "required": False,
+            },
+        },
+        "returns": {
+            "header": "list[string] - Transformed header with standard schema: "
+                     "['보험기간', '납입기간', '주피보험자최소가입연령', '주피보험자최대가입연령', "
+                     "'주피보험자최소가입연령구분코드', '주피보험자최대가입연령구분코드', '주피보험자가입성별', ...]",
+            "data": "list[list[any]] - Transformed data with split values (lists) and parsed formulas (strings)",
+            "notes": "string - Transformation notes",
+        },
+    },
+
 }
 
 

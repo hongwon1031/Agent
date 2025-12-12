@@ -671,6 +671,64 @@ def validate_task_node(state: AgentState) -> Dict[str, Any]:
     # Build context with previous results
     context = {"previous_results": state.get('task_results', [])}
 
+    # NEW: For table_split validation, add original definition data
+    if task_type == "table_split":
+        task_results = state.get('task_results', [])
+
+        # task1 (definition_extract_v2) 결과에서 원본 데이터 추출
+        for result in task_results:
+            if result.get("task_id") == "task1" and result.get("success"):
+                data = result.get("data", {})
+                context["original_header"] = data.get("header", [])
+                context["original_data"] = data.get("data", [])
+                break
+
+        print(f"[CONTEXT] Table split validation context prepared:")
+        print(f"  - original_header: {context.get('original_header', 'NOT FOUND')}")
+        print(f"  - original_data rows: {len(context.get('original_data', []))}")
+
+    # NEW: For condition_transform validation, add original condition data
+    if task_type == "condition_transform":
+        task_results = state.get('task_results', [])
+
+        # task3 (condition_extract) 결과에서 원본 데이터 추출
+        for result in task_results:
+            if result.get("task_id") == "task3" and result.get("success"):
+                data = result.get("data", {})
+                context["original_header"] = data.get("header", [])
+                context["original_data"] = data.get("data", [])
+                break
+
+        print(f"[CONTEXT] Condition transform validation context prepared:")
+        print(f"  - original_header: {context.get('original_header', 'NOT FOUND')}")
+        print(f"  - original_data rows: {len(context.get('original_data', []))}")
+
+    # NEW: For extract_condition validation, add condition_sections
+    if task_type == "extract_condition":
+        task_results = state.get('task_results', [])
+
+        # Get all_sections from state
+        all_sections = state.get("sections", [])
+
+        # task0 (section_classifier) 결과에서 condition indices 추출
+        condition_indices = []
+        for result in task_results:
+            if result.get("task_id") == "task0" and result.get("success"):
+                data = result.get("data", {})
+                condition_indices = data.get("condition", [])
+                break
+
+        # Build condition_sections from all_sections and condition_indices
+        if all_sections and condition_indices:
+            condition_sections = [s for s in all_sections if s.get("index") in condition_indices]
+            context["condition_sections"] = condition_sections
+            context["all_sections"] = all_sections
+
+        print(f"[CONTEXT] Condition extract validation context prepared:")
+        print(f"  - all_sections count: {len(all_sections)}")
+        print(f"  - condition_indices: {condition_indices}")
+        print(f"  - condition_sections count: {len(context.get('condition_sections', []))}")
+
     # CRITICAL: For grouping validation, add definition/condition headers and data
     if task_type == "grouping":
         task_results = state.get('task_results', [])
