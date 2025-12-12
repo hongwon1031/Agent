@@ -143,25 +143,25 @@ TOOL_SCHEMAS = {
         "parameters": {
             "definition_header": {
                 "type": "list[str]",
-                "description": "Split definition table header (from llm_table_split)",
+                "description": "Normalized definition table header",
                 "required": True,
                 "example": "{{task2.data.header}}",
             },
             "definition_data": {
                 "type": "list[list[any]]",
-                "description": "Split definition table data (with lists)",
+                "description": "Normalized definition table data (no combinations, raw table)",
                 "required": True,
                 "example": "{{task2.data.data}}",
             },
             "condition_header": {
                 "type": "list[str]",
-                "description": "Transformed condition table header (from condition_transform)",
+                "description": "Normalized condition table header",
                 "required": True,
                 "example": "{{task4.data.header}}",
             },
             "condition_data": {
                 "type": "list[list[any]]",
-                "description": "Transformed condition table data (with lists and formulas)",
+                "description": "Normalized condition table data (no combinations, raw table)",
                 "required": True,
                 "example": "{{task4.data.data}}",
             },
@@ -187,31 +187,31 @@ TOOL_SCHEMAS = {
                 "type": "list[str]",
                 "description": "Normalized definition table header",
                 "required": True,
-                "example": "{{task2.data.header}}",
+                "example": "{{task1.data.header}}",
             },
             "definition_data": {
                 "type": "list[list[str]]",
                 "description": "Normalized definition table data",
                 "required": True,
-                "example": "{{task2.data.data}}",
+                "example": "{{task1.data.data}}",
             },
             "condition_header": {
                 "type": "list[str]",
                 "description": "Normalized condition table header",
                 "required": True,
-                "example": "{{task4.data.header}}",
+                "example": "{{task2.data.header}}",
             },
             "condition_data": {
                 "type": "list[list[str]]",
                 "description": "Normalized condition table data",
                 "required": True,
-                "example": "{{task4.data.data}}",
+                "example": "{{task2.data.data}}",
             },
             "grouping_logic": {
                 "type": "dict",
                 "description": "matched_list_items를 포함하는 grouping 결과",
                 "required": True,
-                "example": "{{task5.data}}",
+                "example": "{{task4.data}}",
             },
         },
         "returns": {
@@ -221,20 +221,20 @@ TOOL_SCHEMAS = {
         },
     },
     "llm_table_split": {
-        "description": "LLM-based semantic splitting of multi-value cells (Definition용, header 유지)",
+        "description": "LLM-based semantic splitting of multi-value cells (범용, Definition/Condition 모두 적용)",
         "supported_formats": ["table"],
         "parameters": {
             "header": {
                 "type": "list[string]",
-                "description": "Definition table header (from definition_extract_v2)",
+                "description": "Table header",
                 "required": True,
-                "example": "{{task1.data.header}}",
+                "example": "{{task2.data.header}}",
             },
             "data": {
                 "type": "list[list[any]]",
-                "description": "Definition table data rows",
+                "description": "Table data rows",
                 "required": True,
-                "example": "{{task1.data.data}}",
+                "example": "{{task2.data.data}}",
             },
             "row_indices": {
                 "type": "list[int]",
@@ -254,37 +254,7 @@ TOOL_SCHEMAS = {
             "notes": "string - Splitting notes",
         },
     },
-    "condition_transform": {
-        "description": "Transform raw condition table to final schema (Condition 전용: splits + parses ages + maps schema)",
-        "supported_formats": ["table"],
-        "parameters": {
-            "header": {
-                "type": "list[string]",
-                "description": "Original condition table header (from condition_extract)",
-                "required": True,
-                "example": "{{task3.data.header}}",
-            },
-            "data": {
-                "type": "list[list[string]]",
-                "description": "Original condition table rows",
-                "required": True,
-                "example": "{{task3.data.data}}",
-            },
-            "instruction": {
-                "type": "string",
-                "description": "Additional guidance for transformation (optional)",
-                "required": False,
-            },
-        },
-        "returns": {
-            "header": "list[string] - Final schema: ['보종명','유형1','유형2','보험기간','납입기간',"
-                      "'주피보험자최소가입연령','주피보험자최대가입연령',"
-                      "'주피보험자최소가입연령구분코드','주피보험자최대가입연령구분코드','주피보험자가입성별']",
-            "data": "list[list[any]] - Transformed rows with lists (보험기간, 납입기간, 성별) and age formulas as strings",
-            "notes": "string - Transformation notes",
-        },
-    },
-
+    
 }
 
 

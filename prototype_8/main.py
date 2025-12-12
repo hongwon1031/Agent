@@ -69,6 +69,7 @@ def main():
             # 필요 시 task_results를 포함시킴
             if "task_results" not in result and hasattr(agent, "task_results"):
                 result["task_results"] = getattr(agent, "task_results", [])
+                result["task_history"] = getattr(agent, "task_history", [])
                 result["debug_logs"] = agent.debug_logs  # 필요하다면
             output_path = results_dir / f"{doc_path.stem}_new_result.json"
             save_result(result, str(output_path))

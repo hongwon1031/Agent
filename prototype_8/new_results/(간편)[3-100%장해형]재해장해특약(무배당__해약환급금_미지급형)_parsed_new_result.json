@@ -3133,7 +3133,7 @@
             ]
           ]
         ],
-        "notes": "보험종목_1 컬럼: 간편심사 계열 vs 일반심사형으로 분리"
+        "reasoning": "보험종목_1 컬럼: 간편심사 계열 vs 일반심사형으로 분리"
       },
       "tool_used": "llm_table_split",
       "execution_time": 2.8651304244995117,
