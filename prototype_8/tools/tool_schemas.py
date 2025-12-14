@@ -124,6 +124,18 @@ TOOL_SCHEMAS = {
                 "required": True,
                 "example": "{{task0.data.condition}}",
             },
+            "definition_core_indices": {
+                "type": "list[int]",
+                "description": "Indices of definition_core sections (to read annotations/notes)",
+                "required": False,
+                "example": "{{task0.data.definition_core}}",
+            },
+            "definition_annotation_indices": {
+                "type": "list[int]",
+                "description": "Indices of definition_annotation sections (to read annotations/notes)",
+                "required": False,
+                "example": "{{task0.data.definition_annotation}}",
+            },
             "instruction": {
                 "type": "string",
                 "description": "Additional guidance for extraction",
@@ -174,7 +186,7 @@ TOOL_SCHEMAS = {
         "returns": {
             "column_mapping": "dict - {join_keys: list[str], value_columns: list[str]}",
             "groups": "list[dict] - each group: {definition_indices: list[int], "
-                      "matched_list_items: list[int|None], condition_index: int, ...}",
+                      "matched_list_items: list[int|None], condition_indices: list[int], ...}",
             "unmatched": "dict - {definition_indices: list[int], condition_indices: list[int]}",
             "summary": "dict - Statistics summary (total counts, coverage ratio)",
         },

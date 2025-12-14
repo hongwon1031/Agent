@@ -836,45 +836,46 @@ def validate_task_node(state: AgentState) -> Dict[str, Any]:
             context["condition_sections"] = condition_sections
             context["all_sections"] = all_sections
 
+        # Also get definition sections for annotation reference checking
+        definition_core_indices = []
+        definition_annotation_indices = []
+        for r in state.get("task_results", []):
+            if r.get("success") and r.get("tool_used") == "section_classifier":
+                data = r.get("data", {})
+                definition_core_indices = data.get("definition_core", [])
+                definition_annotation_indices = data.get("definition_annotation", [])
+                break
+
+        if all_sections and (definition_core_indices or definition_annotation_indices):
+            all_definition_indices = definition_core_indices + definition_annotation_indices
+            definition_sections = [s for s in all_sections if s.get("index") in all_definition_indices]
+            context["definition_sections"] = definition_sections
+
         print(f"[CONTEXT] Condition extract validation context prepared:")
         print(f"  - all_sections count: {len(all_sections)}")
         print(f"  - condition_indices: {condition_indices}")
         print(f"  - condition_sections count: {len(context.get('condition_sections', []))}")
+        print(f"  - definition_sections count: {len(context.get('definition_sections', []))}")
 
     # CRITICAL: For grouping validation, add definition/condition headers and data
     if task_type == "grouping":
-        task_results = state.get('task_results', [])
+        task_results = state.get("task_results", [])
 
-        # Find definition extraction result
-        for result in task_results:
-            if result.get("success") and result.get("data"):
-                data = result.get("data", {})
-                # Check if this is definition result
-                if "header" in data and "data" in data and result.get("task_id", "").startswith("task"):
-                    # Try to identify by checking if it has definition-like structure
-                    header = data.get("header", [])
-                    if header and any(col in ["보종명", "유형1", "유형2"] for col in header):
-                        if "definition_header" not in context:  # First one is definition
-                            context["definition_header"] = header
-                            context["definition_data"] = data.get("data", [])
-                        else:  # Second one is condition
-                            context["condition_header"] = header
-                            context["condition_data"] = data.get("data", [])
+        def last_success(tool_name: str):
+            for r in reversed(task_results):
+                if r.get("success") and r.get("tool_used") == tool_name and isinstance(r.get("data"), dict):
+                    return r["data"]
+            return None
 
-        # Alternative: Look for normalized results
-        for result in task_results:
-            if result.get("success") and result.get("data"):
-                result_task_type = result.get("data", {}).get("task_type", "")
-                if "normalize_def" in result_task_type or "definition" in str(result.get("tool_used", "")):
-                    data = result.get("data", {})
-                    if "header" in data:
-                        context["definition_header"] = data.get("header", [])
-                        context["definition_data"] = data.get("data", [])
-                elif "normalize_cond" in result_task_type or "condition" in str(result.get("tool_used", "")):
-                    data = result.get("data", {})
-                    if "header" in data:
-                        context["condition_header"] = data.get("header", [])
-                        context["condition_data"] = data.get("data", [])
+        def_data = last_success("llm_table_split") or last_success("rule_table_split") or last_success("definition_extract_v2")
+        cond_data = last_success("condition_transform") or last_success("condition_extract")
+
+        if def_data:
+            context["definition_header"] = def_data.get("header", [])
+            context["definition_data"] = def_data.get("data", [])
+        if cond_data:
+            context["condition_header"] = cond_data.get("header", [])
+            context["condition_data"] = cond_data.get("data", [])
 
         print(f"[CONTEXT] Grouping validation context prepared:")
         print(f"  - definition_header: {context.get('definition_header', 'NOT FOUND')}")

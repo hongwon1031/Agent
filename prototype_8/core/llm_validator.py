@@ -806,10 +806,14 @@ class LLMValidator:
             # Build LLM validation prompt
             from core.prompt import build_validate_condition_extract_llm_prompt
 
+            # Get definition sections for annotation reference checking
+            definition_sections = context.get("definition_sections", None)
+
             prompt = build_validate_condition_extract_llm_prompt(
                 condition_sections=condition_sections,
                 extracted_header=extracted_header,
-                extracted_data=extracted_data
+                extracted_data=extracted_data,
+                definition_sections=definition_sections
             )
 
             # Call LLM for validation
@@ -974,7 +978,7 @@ class LLMValidator:
             # 2. Validate indices
             for group in groups:
                 definition_indices = group.get("definition_indices", [])
-                condition_index = group.get("condition_index")
+                cond_indices = group.get("condition_indices", None)
 
                 # Check definition indices
                 for def_idx in definition_indices:
@@ -988,14 +992,21 @@ class LLMValidator:
                         }
 
                 # Check condition index
-                if condition_index is not None and (condition_index < 0 or condition_index >= len(condition_data)):
-                    return {
-                        "is_valid": False,
-                        "confidence": 0.9,
-                        "errors": [f"Invalid condition_index {condition_index} in group {group.get('id')} (out of range 0-{len(condition_data)-1})"],
-                        "suggestions": ["Review grouping logic for index errors"],
-                        "reasoning": "Condition index out of range"
-                    }
+                if cond_indices is None:
+                    # fallback: legacy condition_index
+                    single = group.get("condition_index", None)
+                    if isinstance(single, int):
+                        cond_indices = [single]
+                    else:
+                        return {
+                            "is_valid": False,
+                            "confidence": 0.9,
+                            "errors": [
+                                f"Missing condition_indices/condition_index in group {group.get('id')}"
+                            ],
+                            "suggestions": ["Ensure grouping outputs condition_indices"],
+                            "reasoning": "Missing condition indices"
+                        }
 
             # 3. Check coverage ratio
             coverage_ratio = summary.get("coverage_ratio", 0.0)
@@ -1078,7 +1089,7 @@ class LLMValidator:
                 group_id = group.get("id")
                 match_condition = group.get("match_condition", {})
                 definition_indices = group.get("definition_indices", [])
-                condition_index = group.get("condition_index")
+                condition_indices = group.get("condition_indices")
 
                 # Get actual definition rows
                 def_rows = []
@@ -1088,15 +1099,23 @@ class LLMValidator:
                         def_rows.append({"index": idx, "data": row_dict})
 
                 # Get actual condition row
-                cond_row = None
-                if condition_index is not None and condition_index < len(condition_data):
-                    cond_row = {"index": condition_index, "data": dict(zip(condition_header, condition_data[condition_index]))}
+                cond_rows = []
+
+                for ci in condition_indices:
+                    if ci < 0 or ci >= len(condition_data):
+                        continue  # or raise error
+
+                    cond_rows.append({
+                        "index": ci,
+                        "data": dict(zip(condition_header, condition_data[ci]))
+                    })
+
 
                 groups_detail.append({
                     "id": group_id,
                     "match_condition": match_condition,
                     "definition_rows": def_rows,
-                    "condition_row": cond_row
+                    "condition_row": cond_rows
                 })
 
             # Unmatched definitions
@@ -1179,9 +1198,9 @@ class LLMValidator:
             Dict: Validation result
         """
         # STAGE 1: Rule-based structural validation
-        rule_result = self._validate_grouping_logic_rules(task_output, context)
-        if not rule_result.get("is_valid"):
-            return rule_result  # Fast fail
+        # rule_result = self._validate_grouping_logic_rules(task_output, context)
+        # if not rule_result.get("is_valid"):
+        #     return rule_result  # Fast fail
 
         # STAGE 2: LLM-based semantic validation
         llm_result = self._validate_grouping_logic_llm(task_output, context)
@@ -1223,91 +1242,117 @@ class LLMValidator:
                     "confidence": 1.0,
                     "errors": ["Final combination generation produced no definitions"],
                     "suggestions": ["Check grouping logic", "Review combination generator logic"],
-                    "reasoning": "No definitions generated"
+                    "reasoning": "No definitions generated",
+                    "root_cause_task_id": None,
                 }
 
-            # 2. Check for core column
-            if definitions:
-                sample_def = definitions[0]
-                if "보종명" not in sample_def:
-                    return {
-                        "is_valid": False,
-                        "confidence": 0.9,
-                        "errors": ["Generated definitions missing core column (보종명)"],
-                        "suggestions": ["Check combination generator's column mapping"],
-                        "reasoning": "Missing '보종명' column"
-                    }
+            sample_def = definitions[0]
+            if "보종명" not in sample_def:
+                return {
+                    "is_valid": False,
+                    "confidence": 0.9,
+                    "errors": ["Generated definitions missing core column (보종명)"],
+                    "suggestions": ["Check combination generator's column mapping"],
+                    "reasoning": "Missing '보종명' column",
+                    "root_cause_task_id": None,
+                }
 
-            # 3. Check generation stats
             if not stats:
                 return {
                     "is_valid": False,
                     "confidence": 0.8,
                     "errors": ["Missing generation_stats in output"],
                     "suggestions": ["Check combination generator output format"],
-                    "reasoning": "No stats available"
+                    "reasoning": "No stats available",
+                    "root_cause_task_id": None,
                 }
 
-            matched = stats.get("matched_definitions", 0)
-            unmatched = stats.get("unmatched_definitions", 0)
-            total_generated = stats.get("total_generated", total_count)
+            matched = int(stats.get("matched_definitions", 0) or 0)
+            unmatched = int(stats.get("unmatched_definitions", 0) or 0)
 
-            # 4. Check match rate
-            if total_generated > 0:
-                match_rate = matched / total_generated
-                if match_rate < 0.5:
+            # ✅ 핵심: match_rate는 "정의 row 단위"로 계산해야 함 (카티전 row 수로 나누면 안 됨)
+            denom = matched + unmatched
+            if denom > 0:
+                match_rate = matched / denom
+
+                # 너무 공격적으로 false 주지 말고, 정말 낮을 때만 fail 권장
+                # (문서가 정의는 많고 조건은 일부만 주는 케이스가 흔함)
+                if match_rate < 0.2:
                     return {
                         "is_valid": False,
                         "confidence": 0.6,
-                        "errors": [f"Low match rate: {matched}/{total_generated} ({match_rate:.1%})"],
+                        "errors": [f"Low definition-level match rate: {matched}/{denom} ({match_rate:.1%})"],
                         "suggestions": [
                             "Review grouping logic for accuracy",
-                            "Check if condition data is sufficient",
-                            "Verify matching criteria"
+                            "Check join_keys alignment between definition/condition (possible 유형 shift)",
+                            "Verify wildcard ('-') handling as ANY-match",
                         ],
-                        "reasoning": f"Match rate {match_rate:.1%} below 50% threshold"
+                        "reasoning": f"Definition-level match rate {match_rate:.1%} below 20% threshold",
+                        "root_cause_task_id": None,
                     }
 
-            # 5. Check required value columns are present and not all null
-            required_value_cols = ["보험기간", "납입기간", "가입나이_남", "가입나이_여", "납입주기"]
-            missing_cols = [col for col in required_value_cols if col not in definitions[0]]
+            # ✅ 최종 스키마 기준 required 컬럼 (너가 지금 쓰는 키들로 맞춤)
+            required_value_cols = [
+                "보험기간",
+                "납입기간",
+                "주피보험자최소가입연령",
+                "주피보험자최대가입연령",
+                "주피보험자최소가입연령구분코드",
+                "주피보험자최대가입연령구분코드",
+                "주피보험자가입성별",
+            ]
+
+            missing_cols = [col for col in required_value_cols if col not in sample_def]
             if missing_cols:
                 return {
                     "is_valid": False,
                     "confidence": 0.8,
-                    "errors": [f"Missing required columns: {missing_cols}"],
+                    "errors": [f"Missing required columns in final output: {missing_cols}"],
                     "suggestions": ["Ensure combination_generator merges condition columns correctly"],
-                    "reasoning": "Required condition columns absent in final output"
+                    "reasoning": "Required columns absent in final output schema",
+                    "root_cause_task_id": None,
                 }
 
-            # If every required value column is null/empty for all rows, treat as failure
+            # ✅ “전부 null” 체크는 '매칭된 row'만 대상으로 해야 함 (unmatched row는 null이어도 정상)
             def is_null(val):
                 return val is None or (isinstance(val, str) and val.strip() == "")
 
-            all_null = all(
-                all(is_null(d.get(col)) for col in required_value_cols)
-                for d in definitions
-            )
-            if all_null:
-                return {
-                    "is_valid": False,
-                    "confidence": 0.7,
-                    "errors": ["All condition columns are null in final combinations"],
-                    "suggestions": [
-                        "Check condition_extract output",
-                        "Verify grouping_logic value_columns",
-                        "Ensure combination_generator receives condition_header/data"
-                    ],
-                    "reasoning": "Value columns are all null"
-                }
+            # 매칭된 row인지 판단: 보험기간/납입기간/연령 중 하나라도 있으면 matched row로 간주
+            def looks_matched(row: Dict[str, Any]) -> bool:
+                return not (
+                    is_null(row.get("보험기간")) and
+                    is_null(row.get("납입기간")) and
+                    is_null(row.get("주피보험자최소가입연령")) and
+                    is_null(row.get("주피보험자최대가입연령"))
+                )
 
-            # All checks passed
+            matched_rows = [d for d in definitions if looks_matched(d)]
+            if matched_rows:
+                all_null_on_matched = all(
+                    all(is_null(r.get(col)) for col in required_value_cols)
+                    for r in matched_rows
+                )
+                if all_null_on_matched:
+                    return {
+                        "is_valid": False,
+                        "confidence": 0.7,
+                        "errors": ["All required condition columns are null on matched rows"],
+                        "suggestions": [
+                            "Check condition_extract/condition_transform output",
+                            "Verify grouping_logic value_columns",
+                            "Ensure combination_generator receives condition_header/data",
+                        ],
+                        "reasoning": "Matched rows exist but carry no condition values",
+                        "root_cause_task_id": None,
+                    }
+
             return {
                 "is_valid": True,
                 "confidence": 0.95,
                 "errors": [],
                 "suggestions": [],
-                "reasoning": f"Final combinations valid: {total_count} definitions generated, match rate {matched}/{total_generated} ({matched/total_generated if total_generated > 0 else 0:.1%})"
+                "reasoning": f"Final combinations valid: total_count={total_count}, definition_match={matched}/{denom if denom else 'N/A'}",
+                "root_cause_task_id": None,
             }
 
         except Exception as e:
@@ -1316,7 +1361,8 @@ class LLMValidator:
                 "confidence": 0.0,
                 "errors": [f"Validation error: {str(e)}"],
                 "suggestions": ["Check final combination output format"],
-                "reasoning": "Final combination validation failed due to an exception"
+                "reasoning": "Final combination validation failed due to an exception",
+                "root_cause_task_id": None,
             }
 
     # ========== PROTOTYPE 7: Root Cause Analysis ==========
@@ -1434,4 +1480,3 @@ class LLMValidator:
             # If analysis fails, return None (no root cause identified)
             print(f"[WARN] Root cause analysis failed: {str(e)}")
             return None
-

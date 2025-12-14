@@ -210,6 +210,7 @@ def build_validate_section_classifier_llm(
 - definition_core에 상품 구조/종류/명칭 관련 내용이 있음
 - condition에 기간/나이 등 조건 정보가 있음
 - 대부분의 분류가 말이 됨
+- definition_annotation은 비어있을 수 있음
 
 **명백한 오류 (is_valid=false가 될 수 있음)**:
 - definition_core에 정의 관련 내용이 전혀 없고 조건만 있음
@@ -220,6 +221,29 @@ def build_validate_section_classifier_llm(
 - "정의한다" vs "설명한다" 같은 표현 차이 → 실질적으로 같음
 - core vs annotation의 경계 애매함 → 둘 다 합리적이면 OK
 - 제목과 내용의 미묘한 불일치 → 내용 우선
+
+### suggestions 작성 규칙 (매우 중요)
+
+suggestions는 planner가 그대로 재계획/백트래킹 instruction으로 사용합니다.
+따라서 아래 규칙을 반드시 따르세요.
+
+1) suggestions는 "해야 할 행동" 형태로 구체적으로 작성하세요. (추상적 조언 금지)
+   - 나쁜 예: "분류가 이상합니다. 다시 확인하세요."
+   - 좋은 예: "섹션 [2,5]는 보험기간/납입기간/가입나이 키워드가 강하므로 other → condition으로 재분류하세요."
+
+2) 가능하면 반드시 section index 목록을 포함하세요.
+   - 형식 예: section_indices=[2,5]
+
+3) suggestion 문장 안에 최소 1개의 근거 키워드를 포함하세요.
+   - 예: 보험기간, 납입기간, 가입나이, 납입주기, 만xx세, min[, 명칭, 특약, 보험종목, 유형, 보장계약, 각주, 참고, ※
+
+4) 아래 표준 포맷 중 하나로 작성하세요 (자유형 금지):
+   - "REPLAN_HINT: move section_indices=[...] from other->condition (evidence: ...)"
+   - "REPLAN_HINT: move section_indices=[...] from other->definition_core (evidence: ...)"
+   - "REPLAN_HINT: move section_indices=[...] from definition_core->condition (evidence: ...)"
+   - "REPLAN_HINT: move section_indices=[...] from condition->other (evidence: ...)"
+   - "REPLAN_HINT: move section_indices=[...] from definition_core->definition_annotation (evidence: 각주/※/참고/주))"
+
 
 다음 JSON 형식으로 반환:
 {{
@@ -331,94 +355,6 @@ Data 행 수: {len(data)}
 
     return base
 
-
-
-# ==================================================================================================
-# validate_definition_extract_v2_llm
-# ==================================================================================================
-
-def build_validate_condition_extract_v2_llm(
-    definition_sections: List[Dict[str, Any]],
-    header: List[str],
-    data: List[List[str]],
-) -> str:
-    base = f"""당신은 데이터 추출 품질을 검토하는 전문가입니다.
-
-**임무**:
-- DefinitionExtractV2 도구가 원본 섹션에서 테이블을 **올바르게 추출**했는지 확인하세요.
-- 정의 관련 섹션들(테이블 + 텍스트)를 보고, DefinitinoExtractV2가 추출한 테이블이 이 섹션들의 정의 + 주석/예외를 대체로 잘 반영했는지 확인하세요
-
-**원본 정의 관련 섹션들 (샘플)**:
-{json.dumps(definition_sections, ensure_ascii=False, indent=2)}
-
-**추출된 테이블**:
-Header: {json.dumps(header, ensure_ascii=False)}
-Data 행 수: {len(data)}
-전체 Data:
-{json.dumps(data, ensure_ascii=False, indent=2)}
-
-### DefinitionExtractV2의 역할 이해하기
-
-**ExtractV2가 하는 일**:
-- 원본 core 섹션의 테이블/텍스트에서 **있는 그대로** header와 data 추출
-- 원본 컬럼명 유지 (예: "명칭", "보험종목" → 그대로 사용)
-- 여러 core 섹션의 테이블 병합
-- **Annotation 섹션이 있으면** LLM으로 병합 (주석 반영해서 테이블 업데이트)
-
-**ExtractV2가 하지 않는 일** (이건 다음 단계인 Cartesian의 역할):
-- ❌ 컬럼명 정규화 ("명칭" → "보종명", "보험종목" → "유형1" 변환 등)
-- ❌ 계층 구조 확장/재구성
-- ❌ 데이터 변환/재배치
-
-### 검증 기준 (추출 품질만 확인)
-
-**합리적인 추출 (is_valid=true)**:
-1. Header와 Data가 비어있지 않음
-2. 원본 정의 섹션의 주요 내용이 누락되지 않음
-3. 주석 행("※", "주:", "*")이 데이터로 잘못 포함되지 않음
-4. 여러 섹션 병합 시 데이터 손실이나 중복이 없음
-5. 정의 섹션 안에 주석/예외 텍스트가 있는 경우, 주석/예외 내용이 합리적으로 반영됨 (완벽하지 않아도 OK)
-
-**명백한 추출 오류 (is_valid=false가 될 수 있음)**:
-1. Header나 Data가 완전히 비어있음
-2. 원본 데이터의 col,row값과 Header,Data의 값이 일치하지 않음
-3. 원본 정의 섹션에 있는 중요한 데이터 행이 추출되지 않음
-4. 여러 테이블 병합 시 명백한 헤더 불일치로 데이터 깨짐
-5. 정의 테이블과 주석/예외 병합 과정에서 정의 데이터가 손실되거나 완전히 잘못됨
-6. 원본 테이블의 컬럼이 누락됨 (예: 원본 4개 컬럼 → 추출 결과 3개 컬럼)
-
-**무시해야 할 것들** (다음 단계의 역할):
-- ❌ 컬럼명 정규화 ("명칭" → "보종명" 등)
-- ❌ 계층 구조 확장/재구성
-- ❌ 데이터 변환/재배치
-
-### 검토 규칙
-
-**중요한 마음가짐**:
-- ExtractV2는 **변환기가 아니라 추출기**입니다
-- 원본에 있는 내용을 **있는 그대로** 잘 가져왔는지 확인하세요
-- 컬럼명 표준화나 구조 개선은 다음 단계의 역할입니다
-- **명백한 추출 오류**만 지적하세요
-
-다음 JSON 형식으로 반환:
-{{
-  "is_valid": true/false,
-  "confidence": 0.0~1.0,
-  "errors": [
-    // 명백한 추출 오류만 기록
-    // 예: "원본 테이블의 2번째 행이 누락됨"
-    // 예: "주석 행 '※ 참고사항'이 데이터로 잘못 포함됨"
-  ],
-  "suggestions": [
-    // errors가 있을 때만 구체적 개선 제안
-    // 예: "LLM 기반 추출로 재시도"
-  ],
-  "reasoning": "원본 섹션의 내용이 테이블로 올바르게 추출되었는지 평가"
-}}
-
-**참고**: 컬럼명이나 구조가 이상해도, 원본이 그렇다면 올바른 추출입니다. is_valid=true를 반환하세요."""
-
-    return base
 
 # ==================================================================================================
 # validate_transform
@@ -702,7 +638,7 @@ Data 행 수: {len(transformed_data)}
    - ⚠️ **계산하지 않음** (수식을 숫자로 변환하면 안 됨)
 
 3. **성별 추출**:
-   - `"가입나이_남"`, `"가입나이_여"` → `["남", "여"]` 또는 단일값
+   - `"가입나이_남"`, `"가입나이_여"` → `["(1)남자", "(2)여자"]` 또는 단일값
 
 4. **연령구분코드 생성**:
    - "만" 포함 → `"(2)만연령"`
@@ -734,7 +670,7 @@ Data 행 수: {len(transformed_data)}
 2. **리스트 분리 정확성**:
    - `보험기간`: `["80세 만기", "90세 만기"]` 형태 (list)
    - `납입기간`: `["10년납", "15년납"]` 형태 (list)
-   - `주피보험자가입성별`: `["남", "여"]` 또는 단일값
+   - `주피보험자가입성별`: `["(1)남자", "(2)여자"]` 또는 단일값
 
 3. **가입연령 형식**:
    - `주피보험자최소가입연령`: 상수 문자열 (예: `"만 15세"`, `"15세"`)
@@ -804,6 +740,7 @@ def build_validate_condition_extract_llm_prompt(
     condition_sections: List[Dict[str, Any]],
     extracted_header: List[str],
     extracted_data: List[List[str]],
+    definition_sections: List[Dict[str, Any]] = None,
 ) -> str:
     """
     Condition Extract 결과 검증용 LLM 프롬프트 생성
@@ -812,10 +749,24 @@ def build_validate_condition_extract_llm_prompt(
         condition_sections: 원본 condition 섹션들 (섹션 제목, 테이블 등)
         extracted_header: 추출된 테이블 header
         extracted_data: 추출된 테이블 data
+        definition_sections: 원본 definition 섹션들 (주석 참조용, optional)
 
     Returns:
         str: LLM 검증 프롬프트
     """
+    definition_section_text = ""
+    if definition_sections:
+        definition_section_text = f"""
+
+## Definition Sections (참조용)
+
+Definition 섹션의 주석을 참조하여 조건을 추가했는지 확인하는 데 사용합니다:
+
+```json
+{json.dumps(definition_sections, ensure_ascii=False, indent=2)}
+```
+"""
+
     base = f"""당신은 **보험 상품 문서 파싱 검증 전문가**입니다.
 
 ## 역할
@@ -829,7 +780,7 @@ Condition Extract Tool이 원본 섹션들에서 가입 조건 테이블을 올�
 ```json
 {json.dumps(condition_sections, ensure_ascii=False, indent=2)}
 ```
-
+{definition_section_text}
 ## 추출된 Condition Table
 
 Condition Extract Tool이 위 섹션들에서 다음 테이블을 추출했습니다:
@@ -850,8 +801,8 @@ Condition Extract Tool이 위 섹션들에서 다음 테이블을 추출했습�
    - 여러 섹션의 테이블을 하나로 병합
 
 2. **계층 정보를 컬럼으로 추가**
-   - 섹션 제목 (title)에서 계층 정보 추출하여 "유형0", "유형1", "유형2" 등의 컬럼 생성
-   - 예: "가. 해약환급금 미지급형" → 유형0 컬럼에 "해약환급금 미지급형" 추가
+   - 섹션 제목 (title)에서 계층 정보 추출하여 "유형1", "유형2", "유형3" 등의 컬럼 생성
+   - 예: "가. 해약환급금 미지급형" → 유형1 컬럼에 "해약환급금 미지급형" 추가
 
 3. **컬럼명 정규화**
    - 원본 테이블의 다양한 컬럼명을 표준 형식으로 변환
@@ -875,7 +826,7 @@ Condition Extract Tool이 위 섹션들에서 다음 테이블을 추출했습�
 - 표준화된 컬럼명을 사용하는가?
   - 일반적 컬럼: "보험기간", "납입기간", "가입나이_남", "가입나이_여", "납입주기" 등
 - JOIN key 컬럼이 존재하는가?
-  - 최소 1개 이상의 유형 컬럼 ("유형0", "유형1", "유형2", "심사형", "보장형" 등)
+  - 최소 1개 이상의 유형 컬럼 ("유형1", "유형2", "심사형", "보장형" 등)
 
 ### 3. **데이터 내용 품질** (중요)
 - 보험기간/납입기간 형식이 합리적인가?
@@ -900,6 +851,17 @@ Condition Extract Tool이 위 섹션들에서 다음 테이블을 추출했습�
 - condition_sections의 테이블 데이터가 추출 결과에 포함되었는가?
 - 불필요한 정보 (주석, 설명 등)는 제외되었는가?
 - "가입불가 조건", "제외 사항" 등은 일반적으로 제외되어야 함
+
+### 6. **⚠️ 주석 참조 처리 (CRITICAL!)** (선택적 - definition_sections가 있을 때만)
+- Definition 섹션의 주석(text paragraph)에 **"A는 B와 동일"** 패턴이 있는가?
+  - 예: "데이터사이언스 트랙은 컴퓨터공학 트랙과 동일한 필수과목 규정을 적용한다."
+- 참조 패턴이 있으면, **참조된 조건(A)이 추출 결과에 포함**되었는가?
+  - 예: "데이터사이언스" 조건이 "컴퓨터공학" 조건을 복사하여 추가되었는가?
+- **검증 방법**:
+  1. Definition 섹션의 모든 text paragraph를 읽기
+  2. "A는 B와 동일", "A의 경우 B와 동일한" 패턴 찾기
+  3. 추출된 Condition 테이블에서 A 유형의 행이 있는지 확인
+  4. 없으면 오류: "주석에서 'A는 B와 동일'을 발견했으나, A 조건이 추출되지 않았습니다"
 
 ## 흔한 오류 패턴
 
@@ -939,7 +901,7 @@ Condition Extract Tool이 위 섹션들에서 다음 테이블을 추출했습�
   "errors": [
     // 명백한 오류만 기록
     // 예: "condition_sections에 테이블이 있으나 추출 결과가 비어있습니다"
-    // 예: "JOIN key 컬럼 (유형0, 유형1 등)이 하나도 없습니다"
+    // 예: "JOIN key 컬럼 (유형1, 유형2 등)이 하나도 없습니다"
     // 예: "보험기간/납입기간 컬럼이 모두 빈 값입니다"
   ],
   "suggestions": [
@@ -1401,7 +1363,9 @@ def build_grouping_extraction_prompt(
    인덱스 기반의 간단한 JSON 구조를 만듭니다.
 
 - 같은 JOIN 키 값(같은 조건 조합)을 가진 Definition 행들 → 항상 같은 그룹
-- 각 그룹은 정확히 하나의 Condition 행(`condition_index`)과 연결됨
+- **⚠️ CRITICAL**: 각 그룹은 **하나 또는 여러 개의 Condition 행**(`condition_indices`)과 연결될 수 있습니다
+  - 같은 JOIN 키 값을 가진 Condition 행이 여러 개 있으면 **모두 리스트에 포함**해야 합니다
+  - 예: 주계약/해약환급금 미지급형 조건이 3개 행(0,1,2)으로 나뉘어 있으면 `condition_indices: [0, 1, 2]`
 - 하나의 Definition 행이 여러 그룹에 포함될 수 있습니다 (리스트 컬럼 때문에 JOIN 키 조합이 여러 개인 경우).
 
 ---
@@ -1411,8 +1375,8 @@ def build_grouping_extraction_prompt(
 
 Definition과 Condition 테이블에서 **같은 개념을 담고 있는 컬럼들**을 찾아 JOIN 키로 사용하세요.
 
-- 예시: Definition의 `"보험종목"` ↔ Condition의 `"유형0"`
-- 예시: Definition의 `"보험종목_1"`(심사형) ↔ Condition의 `"유형1"`
+- 예시: Definition의 `"보험종목"` ↔ Condition의 `"유형1"`
+- 예시: Definition의 `"보험종목_1"`(심사형) ↔ Condition의 `"유형2"`
 
 **중요**:
 
@@ -1420,7 +1384,43 @@ Definition과 Condition 테이블에서 **같은 개념을 담고 있는 컬럼�
 - JOIN 키가 아닌 컬럼(예: 상품명/명칭 등)은 **그룹을 쪼개는 기준으로 절대 사용하지 마세요.**
   - 같은 JOIN 키 값을 가진 Definition 행들이 여러 개라면, 그 행들은 **항상 같은 그룹의 `definition_indices`에 모두 포함**되어야 합니다.
 
-컬럼명이 다르더라도 의미적으로 같으면 JOIN 키로 사용할 수 있습니다.
+**컬럼명이 다르더라도 의미적으로 같으면 JOIN 키로 사용할 수 있습니다.**
+
+#### 1-1. 컬럼명 Shift 처리 (CRITICAL!)
+
+두 테이블의 컬럼명이 **한 칸씩 shift되어 있는 경우**, 데이터 값을 보고 올바른 매핑을 찾아야 합니다.
+
+**예시: 컬럼명 shift 케이스**
+
+**Definition 테이블:**
+```
+보종명 | 유형1 | 유형2 | 유형3
+-------|-------|-------|-------
+상품A  | 보장형 계약 | 해약환급금 일부지급형 | 1종
+상품A  | 보장형 계약 | 해약환급금 일부지급형 | 2종
+```
+
+**Condition 테이블:**
+```
+유형1 | 유형2 | 유형3 | 보험기간
+------|-------|-------|----------
+보장형 계약 | 해약환급금 일부지급형 | 1종 | 종신
+보장형 계약 | 해약환급금 일부지급형 | 2종 | 종신
+```
+
+**올바른 매핑 (데이터 값 기준):**
+- Definition `유형1` (보장형 계약) ↔ Condition `유형1` (보장형 계약) ✅
+- Definition `유형2` (해약환급금 일부지급형) ↔ Condition `유형2` (해약환급금 일부지급형) ✅
+- Definition `유형3` (1종/2종) ↔ Condition `유형3` (1종/2종) ✅
+
+**JOIN keys 선택:**
+- Definition 기준: `['유형1', '유형2', '유형3']` ✅
+- 또는 Condition 기준: `['유형1', '유형2', '유형3']` ✅
+- **둘 다 같은 개념이므로 어느 쪽을 선택해도 무방합니다.**
+
+**매칭 시 주의:**
+- `match_condition`에는 **실제 값**을 기록합니다: `{{"유형1": "보장형 계약", "유형2": "해약환급금 일부지급형", "유형3": "1종"}}`
+- Definition 행과 Condition 행의 **값이 일치하면 매칭**합니다 (컬럼명이 달라도 OK!)
 
 ### 2. Fuzzy Matching (의미 기반 매칭)
 문자열이 정확히 일치하지 않아도 **의미적으로 같으면 매칭**하세요.
@@ -1430,13 +1430,53 @@ Definition과 Condition 테이블에서 **같은 개념을 담고 있는 컬럼�
 - 코드 포함: `"TYPE_A(001)"` vs `"TYPE_A"`
 - 계열 차이: `"고급(13)형"` vs `"고급형"`
 
-### 3. Wildcard 처리
-특정 값(예: `"-"`, `"*"` 등)이 "모든 값과 매칭되는 와일드카드"로 쓰인 것처럼 보이면, 해당 컬럼에서는 와일드카드로 취급할 수 있습니다.
+### 3. Wildcard/미기재 처리 (CRITICAL!)
 
-**예시**:
-- Definition: `유형2 = "-"`
-- Condition: `유형2 = "특정값"` 또는 `유형2 = "-"`
-- → 둘 다 매칭 O
+`"-"`, `"—"`, `""`, `null`, `"해당없음"` 은 상황에 따라 의미가 다릅니다. 아래 규칙을 따르세요.
+
+(1) 미기재(생략) 우선 해석
+- Condition 행이 특정 상위 섹션(title) 아래에 있고(예: "나. 적립형 계약(전환형)"),
+  그 섹션명이 이미 어떤 상품유형을 지칭한다면,
+  표 내부의 `유형1="-"`, `유형2="-"` 는 "ANY"가 아니라 "표에서 생략된 값"일 가능성이 큽니다.
+- 이 경우 매칭은 상위 섹션에서 추출된 계층 컬럼(예: 유형0 등)과 다른 join key로 수행하고,
+  `"-"` 컬럼은 join에서 제외(무시)하되, "모든 정의를 확장"하는 근거로 사용하지 마세요.
+
+(2) ANY(모든 값 허용) 해석 조건
+- Condition 행에 `유형X="-"`가 있고,
+  그 행이 "특정 유형1은 지정되어 있으나 유형2만 미지정"처럼 명확히 옵션 축을 열어둔 형태라면
+  (예: 유형1="해약환급금 미지급형", 유형2="-"),
+  이때의 `"-"`는 ANY로 해석합니다.
+- ANY로 해석하는 경우:
+  - 해당 컬럼은 join 조건에서 제외하고,
+  - 나머지 join key로 매칭되는 Definition 행들을 가능한 한 많이 포함시킵니다.
+  - Definition 쪽에 실제로 존재하는 유형2 값들만 허용됩니다(새 값을 생성하지 않음).
+
+(3) 금지
+- `"-"`가 있다는 이유만으로 근거 없이 coverage_ratio를 높이기 위해 임의 매칭을 만들지 마세요.
+
+
+**예시 2: Condition에 와일드카드 (일반적인 케이스)**
+```
+Definition row: 유형1=적립형 계약, 유형2=적립형 계약, 유형3=적립형 계약
+Condition row: 유형0=적립형 계약(전환형), 유형1="-", 유형2="-"
+```
+
+**매칭 로직:**
+1. 유형1 비교: "적립형 계약" (Def) ↔ "적립형 계약(전환형)" (Cond) → Fuzzy 매칭 O ✅
+2. 유형2 비교: "적립형 계약" (Def) ↔ **`"-"` (Cond)** → 와일드카드이므로 **무시** ✅
+3. 유형3 비교: "적립형 계약" (Def) ↔ **`"-"` (Cond)** → 와일드카드이므로 **무시** ✅
+4. **결과**: 매칭 성공! ✅
+
+**match_condition 기록:**
+```json
+{{
+  "유형1": "적립형 계약",
+  "유형2": "-",   // 와일드카드 표시
+  "유형3": "-"
+}}
+```
+
+**중요:** JOIN keys에 포함된 컬럼이라도 **값이 와일드카드면 해당 키는 무시**하고 나머지 키만으로 매칭하세요.
 
 ### 4. 우선순위
 매칭 시 다음 우선순위를 따르세요:
@@ -1471,13 +1511,13 @@ Definitions 테이블의 셀 값이 리스트인 경우:
   "id": 0,
   "definition_indices": [0],
   "matched_list_items": [0],
-  "condition_index": 0
+  "condition_indices": [0]
 }},
 {{
   "id": 1,
   "definition_indices": [0],
   "matched_list_items": [1],
-  "condition_index": 1
+  "condition_indices": [1]
 }}
 ```
 
@@ -1493,14 +1533,14 @@ Definitions 테이블의 셀 값이 리스트인 경우:
   "id": 0,
   "definition_indices": [0],
   "matched_list_items": [[0, 1, 2]],  ← 315, 335, 355 모두 "간편심사형"과 매칭!
-  "condition_index": 0,
+  "condition_indices": [0],
   "reasoning": "'간편심사형'은 fuzzy matching으로 '간편심사(315)형', '간편심사(335)형', '간편심사(355)형' 모두와 매칭됩니다."
 }},
 {{
   "id": 1,
   "definition_indices": [0],
   "matched_list_items": [3],
-  "condition_index": 1
+  "condition_indices": [1]
 }}
 ```
 
@@ -1528,8 +1568,8 @@ Definitions 테이블의 셀 값이 리스트인 경우:
       "match_condition": {{"JOIN_KEY_1": "값1", "JOIN_KEY_2": "값2"}},
       "definition_indices": [0, 3],
       "matched_list_items": [null, null],
-      "condition_index": 1,
-      "reasoning": "이 그룹이 이렇게 매칭된 이유를 1~2문장으로 간단히 설명합니다."
+      "condition_indices": [1, 2, 3],
+      "reasoning": "이 그룹이 이렇게 매칭된 이유를 1~2문장으로 간단히 설명합니다. 같은 JOIN 키 값을 가진 Condition 행이 여러 개 있어 모두 포함했습니다."
     }}
   ],
   "unmatched": {{
@@ -1551,13 +1591,17 @@ Definitions 테이블의 셀 값이 리스트인 경우:
 **필드 설명**:
 - `column_mapping`:
   - `join_keys`: Definition과 Condition을 매칭하는 데 사용된 컬럼들
-  - `value_columns`: 이후 Python에서 Condition으로부터 값을 가져올 컬럼 이름 리스트
+    - Definition 기준 컬럼명 또는 Condition 기준 컬럼명 사용 가능 (예: `['유형1', '유형2', '유형3']` 또는 `['유형1', '유형2', '유형3']`)
+    - 컬럼명이 shift되어 있어도 **같은 개념**을 나타내면 어느 쪽 이름을 사용해도 무방
+  - `value_columns`: 이후 Python에서 Condition으로부터 값을 가져올 컬럼 이름 리스트 (Condition 기준 컬럼명 사용)
 
 - `groups`: 각 그룹의 매칭 정보
   - `id`: 그룹 고유 번호
   - `match_condition`: 이 그룹의 매칭 조건 (JOIN 키 값들)
   - `definition_indices`: 이 그룹에 속한 Definition 행 번호들 (0-based)
-  - `condition_index`: 매칭되는 Condition 행 번호 (0-based)
+  - `condition_indices`: 매칭되는 Condition 행 번호들 (0-based, **⚠️ LIST로 변경됨!**)
+    - **같은 JOIN 키 값을 가진 Condition 행이 여러 개 있으면 모두 포함**해야 합니다
+    - 예: 주계약/해약환급금 미지급형 조건이 3개 행으로 나뉘어 있으면 `[0, 1, 2]`
   - `reasoning`: 왜 이렇게 그룹핑했는지 설명
 
 - `unmatched`:
@@ -1571,10 +1615,17 @@ Definitions 테이블의 셀 값이 리스트인 경우:
 ## 주의사항
 1. **인덱스는 0-based**: 첫 번째 행은 인덱스 0
 2. **중복 허용 (리스트 값의 경우)**: Definition 행이 리스트 값을 가진 경우, **여러 그룹에 속할 수 있습니다** (각 그룹은 서로 다른 리스트 요소 또는 요소 조합과 매칭).
-3. **완전성**: 가능한 한 모든 Definition 행을 매칭하려고 노력 (coverage_ratio 높이기)
+3. **완전성**: "조건이 있는 조합"을 우선 정확히 매칭하세요.
+   Definition에만 존재하고 Condition에 없는 조합(unmatched_defs)은 정상일 수 있습니다.
 4. **일관성**: 같은 조건을 가진 Definition 행들은 반드시 같은 그룹으로
-5. **정확성**: `definition_indices`, `condition_index`의 범위를 반드시 검증
+5. **정확성**: `definition_indices`, `condition_indices`의 범위를 반드시 검증
 6. **Fuzzy matching 우선**: 정확히 일치하지 않아도 의미적으로 같으면 매칭 (예: "간편심사형" ↔ "간편심사(315)형")
+7. **값 기반 매칭 (CRITICAL)**: 컬럼명이 다르더라도 **데이터 값**을 보고 매칭하세요
+   - Definition의 "보장형 계약" 값이 Condition의 "보장형 계약" 값과 일치하면 → 매칭 O
+   - 컬럼명(유형1 vs 유형0)은 다를 수 있지만, 값이 같으면 같은 개념입니다
+8. **와일드카드 우선 처리 (CRITICAL)**: `"-"` 값은 와일드카드(ANY)로 취급하여 **해당 키는 무시**하고 매칭
+   - Condition의 유형2="-"이면, Definition의 유형2는 어떤 값이든 매칭됩니다
+   - 와일드카드가 있는 row도 반드시 매칭하여 coverage_ratio를 높이세요
 
 --- 
 
@@ -1583,617 +1634,19 @@ Definitions 테이블의 셀 값이 리스트인 경우:
     return prompt
 
 
-
-
-# ------------------------------------------------------------------------------------------------------------------------------
-# --------------------------------------------grouping 출력 형태 줄이기test ------------------------------------------------------------------
-# ------------------------------------------------------------------------------------------------------------------------------
-
-
-
-def build_grouping_extraction_prompt_1(
-    definition_header: List[str],
-    definition_data: List[List[str]],
-    condition_header: List[str],
-    condition_data: List[List[str]],
-    instruction: str = ""
-) -> str:
-    """
-    LLM이 Definition-Condition 매칭 그룹을 추출하기 위한 프롬프트 생성
-
-    Args:
-        definition_header: Definition 테이블 헤더
-        definition_data: Definition 테이블 데이터
-        condition_header: Condition 테이블 헤더
-        condition_data: Condition 테이블 데이터
-        instruction: 추가 지시사항 (optional)
-
-    Returns:
-        그룹핑 추출을 위한 LLM 프롬프트
-    """
-    # 테이블 포맷팅 (너무 길면 샘플만)
-    def_table = format_table_for_prompt(definition_header, definition_data, max_rows=50)
-    cond_table = format_table_for_prompt(condition_header, condition_data, max_rows=20)
-
-    extra_instruction = ""
-    if instruction:
-        extra_instruction = f"""
-**⚠️ 최우선 지시사항 (반드시 적용)**:
-{instruction}
-
----
-
-"""
-    prompt = f"""
-당신은 보험 상품 정의(Definitions)와 가입 조건(Conditions)을 매칭하는 전문가입니다.
-
-{extra_instruction}
-
-## 입력 데이터
-
-**Definitions 테이블** (상품/유형 정의):
-```
-{def_table}
-```
-
-**Conditions 테이블** (가입 조건):
-```
-{cond_table}
-```
-
----
-
-## 작업 목표
-
-Definition 테이블의 각 행이 Condition 테이블의 어떤 행과 매칭되는지 분석하여 **그룹**으로 묶으세요.
-
-- **같은 조건을 공유하는 Definition 행들 → 같은 그룹**
-- 각 그룹은 하나의 Condition 행과 연결됨
-- 최종적으로 Python이 이 그룹 정보를 바탕으로 조합을 생성함
-
----
-
-## 매칭 규칙
-
-### 1. JOIN 키 파악
-Definition과 Condition 테이블 사이의 **공통 컬럼**을 찾아 JOIN 키로 사용하세요.
-
-**주의**:
-- 컬럼명이 다르더라도 의미적으로 같으면 매칭 가능
-
-### 2. Fuzzy Matching (의미 기반 매칭)
-문자열이 정확히 일치하지 않아도 **의미적으로 같으면 매칭**하세요.
-
-**예시**:
-- `"간편심사(315)형"` ≈ `"간편심사형"` → 매칭 O
-- `"일반심사형"` ≈ `"일반형"` → 매칭 O
-- `"유형1"` (Definition) ≈ `"심사형"` (Condition) → 같은 개념이면 매칭 O
-
-### 3. Wildcard 처리
-`"-"` 값은 **모든 값과 매칭**됩니다.
-
-**예시**:
-- Definition: `유형2 = "-"`
-- Condition: `유형2 = "특정값"` 또는 `유형2 = "-"`
-- → 둘 다 매칭 O
-
-### 4. 우선순위
-매칭 시 다음 우선순위를 따르세요:
-1. **Exact Match** (정확히 일치) - 최우선
-2. **Fuzzy Match** (의미 일치) - 차선
-3. **Wildcard** (`"-"`) - 최후
-
-### 5. 다중값 처리
-한 컬럼 내에 여러값들이 존재할 경우 판단해서 의미적으로 매칭되지 않는 값은 지우세요
-- `"환급(A)형 / 환급(B)형 / 일반형"` ≈ `"환급형"` →  "환급(A)형 / 환급(B)형" 만 매칭
-
-### 6. 리스트 값 매칭 (NEW)
-
-Definition 셀이 **리스트**인 경우 (예: `["일반형", "간편심사형"]`):
-- 각 리스트 요소를 별도로 매칭하세요
-- 각 매칭에 대해 **별도의 그룹**을 생성하세요
-- `matched_list_items` 필드에 리스트의 몇 번째 요소가 매칭되었는지 기록하세요
-
-**예시**:
-
-Definition 행 0: `{{"유형1": ["일반형", "간편심사(315)형 /간편심사(335)형 /간편심사(355)형"]}}`
-Condition 행 0: `{{"유형1": "일반형"}}`
-Condition 행 1: `{{"유형1": "간편심사형"}}`
-
-**출력**:
-```json
-{{
-  "id": 0,
-  "definition_indices": [0],
-  "matched_list_items": [0],  // ← 리스트의 0번째 요소 ("일반형")
-  "condition_index": 0
-}},
-{{
-  "id": 1,
-  "definition_indices": [0],
-  "matched_list_items": [1],  // ← 리스트의 1번째 요소 ("간편심사(...)")
-  "condition_index": 1
-}}
-```
-
-**주의**:
-- `matched_list_items`는 `definition_indices`와 **1:1 대응**됩니다
-- Definition 셀이 문자열이면 `matched_list_items`에 `null` 사용
-- 같은 Definition 행이 여러 그룹에 나타날 수 있습니다 (리스트의 각 요소마다)
-
----
-
-## 출력 형식
-
-다음 JSON 형식으로 그룹핑 로직을 반환하세요:
-
-```json
-{{
-  "column_mapping": {{
-    "join_keys": ["유형1", "유형2"],
-    "value_columns": ["보험기간", "납입기간", "가입나이_남", "가입나이_여", "납입주기"]
-  }},
-  "groups": [
-    {{
-      "id": 0,
-      "match_condition": {{"유형1": "일반형", "유형2": "-"}},
-      "definition_indices": [0, 3, 7, 11],
-      "matched_list_items": [null, null, null, null],
-      "condition_index": 0,
-      "reasoning": "Definition 행 0, 3, 7, 11은 모두 유형1='일반형', 유형2='-' 조건을 만족하므로 Condition 행 0과 매칭됩니다."
-    }},
-    {{
-      "id": 1,
-      "match_condition": {{"유형1": "간편심사형"}},
-      "definition_indices": [1, 2, 4, 8],
-      "condition_index": 1,
-      "reasoning": "Definition 행들의 '간편심사(315)형'은 Condition의 '간편심사형'과 의미적으로 같으므로 Condition 행 1과 매칭됩니다."
-    }}
-  ],
-  "unmatched": {{
-    "definition_indices": [15, 20],
-    "condition_indices": [5]
-  }},
-  "summary": {{
-    "total_definitions": {len(definition_data)},
-    "total_conditions": {len(condition_data)},
-    "total_groups": 2,
-    "matched_definition_count": {len(definition_data) - 2},
-    "unmatched_definition_count": 2,
-    "coverage_ratio": 0.95
-  }}
-}}
-```
-
-**필드 설명**:
-- `column_mapping`:
-  - `join_keys`: Definition과 Condition을 매칭하는 데 사용된 컬럼들
-  - `value_columns`: Condition에서 가져올 값 컬럼들 (보험기간, 납입기간 등)
-
-- `groups`: 각 그룹의 매칭 정보
-  - `id`: 그룹 고유 번호
-  - `match_condition`: 이 그룹의 매칭 조건 (JOIN 키 값들)
-  - `definition_indices`: 이 그룹에 속한 Definition 행 번호들 (0-based)
-  - `condition_index`: 매칭되는 Condition 행 번호 (0-based)
-  - `reasoning`: 왜 이렇게 그룹핑했는지 설명
-
-- `unmatched`:
-  - `definition_indices`: 어떤 Condition과도 매칭되지 않은 Definition 행들
-  - `condition_indices`: 어떤 Definition과도 매칭되지 않은 Condition 행들
-
-- `summary`: 전체 통계 요약
-
----
-
-## 예시
-
-**Input Definitions**:
-```
-Index | 보종명    | 유형1        | 유형2
-------|-----------|--------------|-------
-    0 | 암보험    | 일반형       | -
-    1 | 암보험    | 간편심사형   | -
-    2 | 암보험    | 일반형       | 특정A
-```
-
-**Input Conditions**:
-```
-Index | 유형1    | 유형2 | 보험기간 | 납입기간
-------|----------|-------|----------|----------
-    0 | 일반형   | -     | 10년     | 10년
-    1 | 간편심사형 | -   | 종신     | 전기납
-    2 | 일반형   | 특정A | 20년     | 20년
-```
-
-**Correct Output**:
-```json
-{{
-  "column_mapping": {{
-    "join_keys": ["유형1", "유형2"],
-    "value_columns": ["보험기간", "납입기간"]
-  }},
-  "groups": [
-    {{
-      "id": 0,
-      "match_condition": {{"유형1": "일반형", "유형2": "-"}},
-      "definition_indices": [0],
-      "condition_index": 0,
-      "reasoning": "Definition 행 0은 유형1='일반형', 유형2='-'이므로 Condition 행 0과 정확히 매칭됩니다."
-    }},
-    {{
-      "id": 1,
-      "match_condition": {{"유형1": "간편심사형", "유형2": "-"}},
-      "definition_indices": [1],
-      "condition_index": 1,
-      "reasoning": "Definition 행 1은 유형1='간편심사형'이므로 Condition 행 1과 매칭됩니다."
-    }},
-    {{
-      "id": 2,
-      "match_condition": {{"유형1": "일반형", "유형2": "특정A"}},
-      "definition_indices": [2],
-      "condition_index": 2,
-      "reasoning": "Definition 행 2는 유형1='일반형', 유형2='특정A'이므로 Condition 행 2와 매칭됩니다."
-    }}
-  ],
-  "unmatched": {{
-    "definition_indices": [],
-    "condition_indices": []
-  }},
-  "summary": {{
-    "total_definitions": 3,
-    "total_conditions": 3,
-    "total_groups": 3,
-    "matched_definition_count": 3,
-    "unmatched_definition_count": 0,
-    "coverage_ratio": 1.0
-  }}
-}}
-```
-
----
-
-## 주의사항
-
-1. **인덱스는 0-based**: 첫 번째 행은 인덱스 0
-2. **중복 방지**: 한 Definition 행은 오직 하나의 그룹에만 속함
-3. **완전성**: 가능한 한 모든 Definition 행을 매칭하려고 노력 (coverage_ratio 높이기)
-4. **일관성**: 같은 조건을 가진 Definition 행들은 반드시 같은 그룹으로
-5. **정확성**: `definition_indices`, `condition_index`의 범위를 반드시 검증
-
---- 
-
-이제 위 규칙에 따라 Definition과 Condition 테이블을 분석하여 그룹핑 로직을 JSON으로 반환하세요.
-"""
-    return prompt
-
-
-
-
-# -------------------------------------------------------------------------------------------------------------------------
-# ------------------------------------------------기존 grouping------------------------------------------------
-# -------------------------------------------------------------------------------------------------------------------------
-
-
-def build_grouping_extraction_prompt_2(
-    definition_header: List[str],
-    definition_data: List[List[str]],
-    condition_header: List[str],
-    condition_data: List[List[str]],
-    instruction: str = ""
-) -> str:
-    """
-    LLM이 Definition-Condition 매칭 그룹을 추출하기 위한 프롬프트 생성
-
-    Args:
-        definition_header: Definition 테이블 헤더
-        definition_data: Definition 테이블 데이터
-        condition_header: Condition 테이블 헤더
-        condition_data: Condition 테이블 데이터
-        instruction: 추가 지시사항 (optional)
-
-    Returns:
-        그룹핑 추출을 위한 LLM 프롬프트
-    """
-    # 테이블 포맷팅 (너무 길면 샘플만)
-    def_table = format_table_for_prompt(definition_header, definition_data, max_rows=50)
-    cond_table = format_table_for_prompt(condition_header, condition_data, max_rows=20)
-
-    extra_instruction = ""
-    if instruction:
-        extra_instruction = f"""
-**⚠️ 최우선 지시사항 (반드시 적용)**:
-{instruction}
-
----
-
-"""
-    prompt = f"""
-당신은 보험 상품 정의(Definitions)와 가입 조건(Conditions)을 매칭하는 전문가입니다.
-
-{extra_instruction}
-
-## 입력 데이터
-
-**Definitions 테이블** (상품/유형 정의):
-```
-{def_table}
-```
-
-**Conditions 테이블** (가입 조건):
-```
-{cond_table}
-```
-
----
-
-## 작업 목표
-
-Definition 테이블의 각 행이 Condition 테이블의 어떤 행과 매칭되는지 분석하여 **그룹**으로 묶으세요.
-
-- **같은 조건을 공유하는 Definition 행들 → 같은 그룹**
-- 각 그룹은 하나의 Condition 행과 연결됨
-- 최종적으로 Python이 이 그룹 정보를 바탕으로 조합을 생성함
-
----
-
-## 매칭 규칙
-
-### 1. JOIN 키 파악
-Definition과 Condition 테이블 사이의 **공통 컬럼**을 찾아 JOIN 키로 사용하세요.
-
-**일반적인 JOIN 키 후보**:
-- `유형1`, `유형2`, `유형3`, ...
-- `심사형`, `보장형`
-- `보험기간`, `납입기간` (경우에 따라)
-
-**주의**:
-- Definition의 `보종명`은 보통 JOIN 키가 **아닙니다** (고정값이므로)
-- 컬럼명이 다르더라도 의미적으로 같으면 매칭 가능
-
-### 2. Fuzzy Matching (의미 기반 매칭)
-문자열이 정확히 일치하지 않아도 **의미적으로 같으면 매칭**하세요.
-
-**예시**:
-- `"간편심사(315)형"` ≈ `"간편심사형"` → 매칭 O
-- `"일반심사형"` ≈ `"일반형"` → 매칭 O
-- `"유형1"` (Definition) ≈ `"심사형"` (Condition) → 같은 개념이면 매칭 O
-
-### 3. Wildcard 처리
-`"-"` 값은 **모든 값과 매칭**됩니다.
-
-**예시**:
-- Definition: `유형2 = "-"`
-- Condition: `유형2 = "특정값"` 또는 `유형2 = "-"`
-- → 둘 다 매칭 O
-
-### 4. 우선순위
-매칭 시 다음 우선순위를 따르세요:
-1. **Exact Match** (정확히 일치) - 최우선
-2. **Fuzzy Match** (의미 일치) - 차선
-3. **Wildcard** (`"-"`) - 최후
-
-### 5. 다중값 처리
-한 컬럼 내에 여러값들이 존재할 경우 판단해서 의미적으로 매칭되지 않는 값은 지우세요
-- `"환급(A)형 / 환급(B)형 / 일반형"` ≈ `"환급형"` →  "환급(A)형 / 환급(B)형" 만 매칭
-
-### 6. 리스트 값 매칭 (NEW)
-
-Definition 셀이 **리스트**인 경우 (예: `["일반형", "간편심사형"]`):
-- 각 리스트 요소를 별도로 매칭하세요
-- 각 매칭에 대해 **별도의 그룹**을 생성하세요
-- `matched_list_items` 필드에 리스트의 몇 번째 요소가 매칭되었는지 기록하세요
-
-**예시**:
-
-Definition 행 0: `{{"유형1": ["일반형", "간편심사(315)형 /간편심사(335)형 /간편심사(355)형"]}}`
-Condition 행 0: `{{"유형1": "일반형"}}`
-Condition 행 1: `{{"유형1": "간편심사형"}}`
-
-**출력**:
-```json
-{{
-  "id": 0,
-  "definition_indices": [0],
-  "matched_list_items": [0],  // ← 리스트의 0번째 요소 ("일반형")
-  "condition_index": 0
-}},
-{{
-  "id": 1,
-  "definition_indices": [0],
-  "matched_list_items": [1],  // ← 리스트의 1번째 요소 ("간편심사(...)")
-  "condition_index": 1
-}}
-```
-
-**주의**:
-- `matched_list_items`는 `definition_indices`와 **1:1 대응**됩니다
-- Definition 셀이 문자열이면 `matched_list_items`에 `null` 사용
-- 같은 Definition 행이 여러 그룹에 나타날 수 있습니다 (리스트의 각 요소마다)
-
----
-
-## 출력 형식
-
-다음 JSON 형식으로 그룹핑 로직을 반환하세요:
-
-```json
-{{
-  "column_mapping": {{
-    "join_keys": ["유형1", "유형2"],
-    "value_columns": ["보험기간", "납입기간", "가입나이_남", "가입나이_여", "납입주기"]
-  }},
-  "groups": [
-    {{
-      "id": 0,
-      "match_condition": {{"유형1": "일반형", "유형2": "-"}},
-      "definition_indices": [0, 3, 7, 11],
-      "matched_list_items": [null, null, null, null],
-      "condition_index": 0,
-      "fuzzy_matches": {{
-        "유형1": {{
-          "definition_value": "일반형",
-          "condition_value": "일반형",
-          "match_type": "exact"
-        }},
-        "유형2": {{
-          "definition_value": "-",
-          "condition_value": "-",
-          "match_type": "wildcard"
-        }}
-      }},
-      "reasoning": "Definition 행 0, 3, 7, 11은 모두 유형1='일반형', 유형2='-' 조건을 만족하므로 Condition 행 0과 매칭됩니다."
-    }},
-    {{
-      "id": 1,
-      "match_condition": {{"유형1": "간편심사형"}},
-      "definition_indices": [1, 2, 4, 8],
-      "condition_index": 1,
-      "fuzzy_matches": {{
-        "유형1": {{
-          "definition_value": "간편심사(315)형",
-          "condition_value": "간편심사형",
-          "match_type": "fuzzy"
-        }}
-      }},
-      "reasoning": "Definition 행들의 '간편심사(315)형'은 Condition의 '간편심사형'과 의미적으로 같으므로 Condition 행 1과 매칭됩니다."
-    }}
-  ],
-  "unmatched": {{
-    "definition_indices": [15, 20],
-    "condition_indices": [5]
-  }},
-  "summary": {{
-    "total_definitions": {len(definition_data)},
-    "total_conditions": {len(condition_data)},
-    "total_groups": 2,
-    "matched_definition_count": {len(definition_data) - 2},
-    "unmatched_definition_count": 2,
-    "coverage_ratio": 0.95
-  }}
-}}
-```
-
-**필드 설명**:
-- `column_mapping`:
-  - `join_keys`: Definition과 Condition을 매칭하는 데 사용된 컬럼들
-  - `value_columns`: Condition에서 가져올 값 컬럼들 (보험기간, 납입기간 등)
-
-- `groups`: 각 그룹의 매칭 정보
-  - `id`: 그룹 고유 번호
-  - `match_condition`: 이 그룹의 매칭 조건 (JOIN 키 값들)
-  - `definition_indices`: 이 그룹에 속한 Definition 행 번호들 (0-based)
-  - `condition_index`: 매칭되는 Condition 행 번호 (0-based)
-  - `fuzzy_matches`: 각 JOIN 키의 매칭 상세 정보
-  - `reasoning`: 왜 이렇게 그룹핑했는지 설명
-
-- `unmatched`:
-  - `definition_indices`: 어떤 Condition과도 매칭되지 않은 Definition 행들
-  - `condition_indices`: 어떤 Definition과도 매칭되지 않은 Condition 행들
-
-- `summary`: 전체 통계 요약
-
----
-
-## 예시
-
-**Input Definitions**:
-```
-Index | 보종명    | 유형1        | 유형2
-------|-----------|--------------|-------
-    0 | 암보험    | 일반형       | -
-    1 | 암보험    | 간편심사형   | -
-    2 | 암보험    | 일반형       | 특정A
-```
-
-**Input Conditions**:
-```
-Index | 유형1    | 유형2 | 보험기간 | 납입기간
-------|----------|-------|----------|----------
-    0 | 일반형   | -     | 10년     | 10년
-    1 | 간편심사형 | -   | 종신     | 전기납
-    2 | 일반형   | 특정A | 20년     | 20년
-```
-
-**Correct Output**:
-```json
-{{
-  "column_mapping": {{
-    "join_keys": ["유형1", "유형2"],
-    "value_columns": ["보험기간", "납입기간"]
-  }},
-  "groups": [
-    {{
-      "id": 0,
-      "match_condition": {{"유형1": "일반형", "유형2": "-"}},
-      "definition_indices": [0],
-      "condition_index": 0,
-      "fuzzy_matches": {{
-        "유형1": {{"definition_value": "일반형", "condition_value": "일반형", "match_type": "exact"}},
-        "유형2": {{"definition_value": "-", "condition_value": "-", "match_type": "exact"}}
-      }},
-      "reasoning": "Definition 행 0은 유형1='일반형', 유형2='-'이므로 Condition 행 0과 정확히 매칭됩니다."
-    }},
-    {{
-      "id": 1,
-      "match_condition": {{"유형1": "간편심사형", "유형2": "-"}},
-      "definition_indices": [1],
-      "condition_index": 1,
-      "fuzzy_matches": {{
-        "유형1": {{"definition_value": "간편심사형", "condition_value": "간편심사형", "match_type": "exact"}},
-        "유형2": {{"definition_value": "-", "condition_value": "-", "match_type": "exact"}}
-      }},
-      "reasoning": "Definition 행 1은 유형1='간편심사형'이므로 Condition 행 1과 매칭됩니다."
-    }},
-    {{
-      "id": 2,
-      "match_condition": {{"유형1": "일반형", "유형2": "특정A"}},
-      "definition_indices": [2],
-      "condition_index": 2,
-      "fuzzy_matches": {{
-        "유형1": {{"definition_value": "일반형", "condition_value": "일반형", "match_type": "exact"}},
-        "유형2": {{"definition_value": "특정A", "condition_value": "특정A", "match_type": "exact"}}
-      }},
-      "reasoning": "Definition 행 2는 유형1='일반형', 유형2='특정A'이므로 Condition 행 2와 매칭됩니다."
-    }}
-  ],
-  "unmatched": {{
-    "definition_indices": [],
-    "condition_indices": []
-  }},
-  "summary": {{
-    "total_definitions": 3,
-    "total_conditions": 3,
-    "total_groups": 3,
-    "matched_definition_count": 3,
-    "unmatched_definition_count": 0,
-    "coverage_ratio": 1.0
-  }}
-}}
-```
-
----
-
-## 주의사항
-
-1. **인덱스는 0-based**: 첫 번째 행은 인덱스 0
-2. **중복 방지**: 한 Definition 행은 오직 하나의 그룹에만 속함
-3. **완전성**: 가능한 한 모든 Definition 행을 매칭하려고 노력 (coverage_ratio 높이기)
-4. **일관성**: 같은 조건을 가진 Definition 행들은 반드시 같은 그룹으로
-5. **정확성**: `definition_indices`, `condition_index`의 범위를 반드시 검증
-
---- 
-
-이제 위 규칙에 따라 Definition과 Condition 테이블을 분석하여 그룹핑 로직을 JSON으로 반환하세요.
-"""
-    return prompt
 
 # ------------------------------------------------------------------------------------------------------------------------------
 
 def build_intelligent_condition_extract_prompt(
     condition_sections: List[Dict[str, Any]],
+    definition_sections: List[Dict[str, Any]] = None,
     instruction: str = ""
 ) -> str:
     sections_json = json.dumps(condition_sections, ensure_ascii=False, indent=2)
+
+    definition_json = ""
+    if definition_sections:
+        definition_json = json.dumps(definition_sections, ensure_ascii=False, indent=2)
 
     extra_instruction = ""
     if instruction:
@@ -2201,6 +1654,18 @@ def build_intelligent_condition_extract_prompt(
             "**최우선 지시사항 (있는 경우 절대적으로 우선 적용)**:\n"
             f"{instruction}\n\n"
         )
+
+    definition_section = ""
+    if definition_json:
+        definition_section = f"""
+
+**Definition 섹션 (참조용)**:
+아래는 `definition_core` 및 `definition_annotation`으로 분류된 섹션들입니다.
+이 섹션들의 **주석(text paragraph)**에 조건 참조 정보가 있을 수 있습니다.
+{definition_json}
+
+---
+"""
 
     prompt = f"""
 {extra_instruction}
@@ -2211,7 +1676,7 @@ def build_intelligent_condition_extract_prompt(
 - `condition`으로 분류된 섹션들의 전체 내용입니다.
 - 각 섹션은 `title`과 `table` 같은 다양한 `type`의 content item을 포함합니다.
 {sections_json}
-
+{definition_section}
 ---
 
 **임무**:
@@ -2230,7 +1695,7 @@ def build_intelligent_condition_extract_prompt(
     - '가입 가능 조건' 테이블 바로 앞에 있는 `title` 타입의 content들을 분석하세요.
     - `가. 주계약`, `나. 특약`, `① 해약환급금 미지급형`과 같은 제목들은 **상위 계층의 유형 정보**입니다.
     - 이 제목들의 값을 추출하여, '가입 가능 조건' 테이블의 **모든 행 앞부분에 새로운 컬럼으로 추가**해야 합니다.
-    - 예: `나. 특약` → `유형0: 특약`, `① 해약환급금 미지급형` → `유형1: 해약환급금 미지급형` 과 같이 새로운 `유형` 컬럼을 생성합니다. 테이블에 이미 `유형1`이 있다면, `유형2`, `유형3` 등으로 순서를 조정하세요.
+    - 예: `나. 특약` → `유형1: 특약`, `① 해약환급금 미지급형` → `유형2: 해약환급금 미지급형` 과 같이 새로운 `유형` 컬럼을 생성합니다. 테이블에 이미 `유형1`이 있다면, `유형2`, `유형3` 등으로 순서를 조정하세요.
 
 3.  **컬럼명 정규화**:
     - 추출된 테이블의 헤더(컬럼명)를 다음 규칙에 따라 표준화하세요.
@@ -2242,6 +1707,63 @@ def build_intelligent_condition_extract_prompt(
 
 4.  **데이터 정리**:
     - 테이블 데이터에서 불필요한 줄바꿈(`\n`)이나 공백을 제거하여 값을 정제합니다.
+
+5.  **⚠️⚠️⚠️ 주석 참조 처리 (CRITICAL! 최우선 규칙!) ⚠️⚠️⚠️**:
+
+    **핵심**: Definition 섹션의 **모든 text paragraph (주석)**를 **한 문장도 빠짐없이 읽어야** 합니다!
+
+    **찾아야 할 패턴**:
+    - **"A의 경우 B와 동일"**
+    - **"A는 B와 동일한"**
+    - **"A는 B와 같은"**
+    - **"A 상품은 B 상품과 동일"**
+
+    **처리 방법**:
+    1. Definition 섹션의 **모든 text paragraph를 읽기** (여러 문장이 있으면 모두 확인!)
+    2. 위 패턴을 찾으면 → "A"와 "B"를 추출
+    3. Condition 테이블에서 "B" 유형의 모든 조건을 찾기
+    4. 각 조건을 복사하되, 유형만 "B" → "A"로 변경
+    5. 복사한 조건들을 Condition 테이블에 **추가**
+
+    **⚠️ 실제 예시 (이 케이스를 꼭 처리해야 함!):**
+    ```
+    주석 (Definition 섹션):
+    "※ 1. 다만, 'Student 플랜'의 경우 'Starter 플랜'과 동일한 기능/제한/정책을 적용한다.
+    2. Enterprise 플랜은 Pro 플랜에서 업그레이드하는 경우에 한하여 제공한다."
+
+    → 첫 번째 문장에서 "'Student 플랜'의 경우 'Starter 플랜'과 동일한" 패턴 발견!
+    → A = "Student 플랜", B = "Starter 플랜"
+
+    기존 Policy/Condition (주석 확인 전):
+    [0] 플랜=Starter 플랜, 지원=Email, SLA=99.9%, 청구주기=월간
+    [1] 플랜=Starter 플랜, 지원=Email, SLA=99.9%, 청구주기=연간
+    [2] 플랜=Pro 플랜, 지원=Chat, SLA=99.95%, 청구주기=월간
+
+    → "Starter 플랜" (B) 정책을 찾음: row 0, 1
+
+    추가할 Policy/Condition:
+    [3] 플랜=Student 플랜, 지원=Email, SLA=99.9%, 청구주기=월간
+    [4] 플랜=Student 플랜, 지원=Email, SLA=99.9%, 청구주기=연간
+
+    최종 Policy/Condition (주석 처리 후):
+    [0] Starter 플랜, Email, 99.9%, 월간
+    [1] Starter 플랜, Email, 99.9%, 연간
+    [2] Pro 플랜, Chat, 99.95%, 월간
+    [3] Student 플랜, Email, 99.9%, 월간 ← 추가됨!
+    [4] Student 플랜, Email, 99.9%, 연간 ← 추가됨!
+    ```
+
+    **⚠️⚠️ 절대 잊지 마세요 ⚠️⚠️**:
+    - 주석에 **여러 문장이 있으면 모든 문장을 확인**해야 합니다!
+    - **첫 번째 문장만 읽고 끝내지 마세요!**
+    - "Student 플랜"처럼 **정확한 키워드**를 찾으세요!
+    - **"A는 B와 동일" 패턴이 있으면 무조건 조건을 추가**해야 합니다!
+
+    **⚠️ CRITICAL: "판매하지 않는" 상품도 추가하세요! ⚠️**
+    - 주석에 "판매하지 않는다", "비교용", "안내용"이라는 말이 있어도 **무시**하세요!
+    - "A는 B와 동일" 패턴만 있으면 **반드시 추가**해야 합니다!
+    - 예: "Pro 플랜은 판매하지 않고 비교·안내용으로 운영" → **그래도 추가!**
+    - 이유: 데이터 완전성을 위해 모든 유형의 조건이 필요합니다!
 
 ---
 
@@ -2290,12 +1812,12 @@ def build_intelligent_condition_extract_prompt(
 **Correct Output**:
 ```json
 {{
-  "header": ["유형0", "유형1", "유형2", "보험기간", ...],
+  "header": ["유형1", "유형2", "유형3", "보험기간", ...],
   "data": [
     ["특약", "해약환급금 미지급형", "-", "10, 20년만기", ...],
     ["특약", "해약환급금 미지급형", "-", "60, 70세만기", ...]
   ],
-  "reasoning": "'가입가능 조건' 테이블을 선택했습니다. 테이블 앞의 title '나. 특약'과 '① 해약환급금 미지급형'에서 계층 정보를 추출하여 각각 '유형0'과 '유형1' 컬럼으로 추가했습니다. 테이블 내 기존 '유형1'은 '유형2'로 조정했습니다."
+  "reasoning": "'가입가능 조건' 테이블을 선택했습니다. 테이블 앞의 title '나. 특약'과 '① 해약환급금 미지급형'에서 계층 정보를 추출하여 각각 '유형1'과 '유형2' 컬럼으로 추가했습니다. 테이블 내 기존 '유형2'은 '유형3'로 조정했습니다."
 }}
 ```
 
@@ -2568,6 +2090,183 @@ Data: [
 # -----------------------------------------------------------------------------------------------------------
 
 def build_table_split_prompt(
+    header: List[str],
+    data: List[List[str]],
+    instruction: str = ""
+) -> str:
+    """
+    테이블 데이터의 multi-value 셀을 의미 기반으로 분리하는 프롬프트 생성 (범용)
+
+    Args:
+        header: 테이블 헤더
+        data: 테이블 데이터
+        instruction: 추가 지시사항 (optional)
+
+    Returns:
+        Table Split을 위한 LLM 프롬프트
+    """
+    # Format table for prompt
+    table_str = format_table_for_prompt(header, data, max_rows=50)
+
+    extra_instruction = ""
+    if instruction:
+        extra_instruction = f"""
+**⚠️ 추가 지시사항 (최우선 적용)**:
+{instruction}
+
+---
+
+"""
+
+    prompt = f"""
+{extra_instruction}
+
+당신은 테이블의 multi-value 셀을 “구분자 기반으로만” 원자 분리하는 작업자입니다.
+의미 기반 그룹핑/요약/재해석은 금지합니다.
+
+## 입력 데이터
+
+**테이블**:
+```
+{table_str}
+```
+
+---
+0. 형태 보존 + 헤더 표준화 규칙 (최우선)
+  - 행(row) 개수, 열(column) 개수, 열의 순서(order)는 절대 바꾸지 마세요.
+  - 새로운 컬럼(예: "Index", "RowId") 추가 금지, 행 추가/삭제 금지.
+  - 단, header의 “이름”은 표준 스키마로 반드시 변경하세요. (개수/순서는 유지)
+  
+  헤더 표준 스키마: ["보종명", "유형1", "유형2", ..., "유형K"]
+  - 입력 header 중 "상품/특약/담보/보장"의 명칭에 해당하는 컬럼 1개를 골라 그 컬럼명을 **보종명**으로 바꾸세요.
+    - 힌트(일반화): header에 명칭/상품명/특약명/담보명/보장명/플랜명/상품(명) 같은 단어가 있으면 그 컬럼이 보종명일 가능성이 큽니다.
+    - header만으로 애매하면, data 셀의 값이 “긴 한글 상품명/특약명” 형태인 컬럼을 보종명으로 선택하세요.
+  - 나머지 모든 컬럼은 왼쪽부터 순서대로 유형1, 유형2, … 로 이름을 바꾸세요.
+  - 이미 보종명, 유형1 같은 표준 이름이 있으면 그 의미를 유지하되, 최종적으로는 전체가 보종명 + 유형K 형태가 되게 맞추세요.
+  - note에는 반드시 “어떤 원본 헤더가 어떤 표준 헤더로 바뀌었는지”를 1~2줄로 요약하세요.
+
+  1. 셀 분리 규칙 (일반화 / 안전 split)
+  목표: 셀 안에 여러 “항목(option/item)”이 나열된 경우에만 리스트로 분리합니다.
+  금지: 의미 기반 재작성/요약/그룹핑은 하지 마세요. (그냥 올바르게 분리만)
+
+  1-1) “구분자 문자”가 아니라 “나열 구분자”만 분리
+  다음 문자가 있다고 해서 무조건 분리하지 마세요: /, ,, \n
+  대신 아래 조건을 만족할 때만 “나열 구분자(list separator)”로 간주하고 분리하세요.
+
+  - 반복성: 같은 패턴이 셀에서 2회 이상 반복되거나, 명백히 항목 나열 형태임
+    형태: 보통 ", "(쉼표+공백), " / "(양쪽 공백), "\n"(줄바꿈 나열)처럼 항목 경계를 나타냄
+  - 항목성: 분리했을 때 각 조각이 “독립 항목”처럼 보임(너무 짧은 조각/단독 기호만 남으면 분리하지 않음)
+    애매하면 분리하지 말고 원문 문자열 유지가 기본입니다.
+
+  1-2) 괄호/따옴표 내부 보호 (최우선)
+  아래 구간 내부에 있는 /, ,, \n은 “내용”일 수 있으므로 절대 분리 기준으로 사용하지 마세요.
+
+  괄호: (...), [...], {{...}}
+  따옴표: "...", '...'
+  즉, 괄호/따옴표 밖(깊이=0)에서만 나열 구분자를 적용해 분리하세요.
+
+  예시
+
+  입력: 유방암, (A형/B형)피부암, 위암
+  출력: ["유방암", "(A형/B형)피부암", "위암"]
+  설명: /는 괄호 내부이므로 분리 금지, 실제 나열 구분자는 ", ".
+  1-3) 단위/접미어 보존 (분리 후 항목 완결성)
+  분리로 인해 단위/접미어가 한쪽에만 남으면 안 됩니다. 각 항목이 완전한 표현이 되도록 보정하세요.
+
+  예: 80/90/100세 만기, 종신 → ["80세 만기","90세 만기","100세 만기","종신"]
+  예: S/M/L 사이즈 → ["S 사이즈","M 사이즈","L 사이즈"] (필요한 경우에만)
+  1-4) 출력 형태
+  분리한 경우: 해당 셀을 문자열 리스트로 변환
+  분리 불필요/애매한 경우: 원문 문자열 그대로 유지
+  공백 정리: 각 항목의 좌우 공백은 제거하되, 내부 공백은 보존
+
+```json
+{{
+  "header": ["컬럼1", "컬럼2", ...],
+  "data": [
+    ["값1", ["분리된값1", "분리된값2"], "값3", ...],
+    ...
+  ],
+  "note": "어떤 셀을 어떻게 분리했는지 간략히 설명"
+}}
+```
+
+**필드 설명**:
+- `header`: 개수/순서는 동일, 이름은 표준화된 header 반환
+- `data`: 각 셀은 문자열 또는 리스트
+  - 문자열: 분리 불필요한 경우
+  - 리스트: 의미 기반으로 분리한 경우
+- `note`: 처리 내용 요약
+
+---
+
+## 예시
+
+### Example 1: SaaS 요금제/플랜 테이블
+
+**Input**:
+
+```
+{{
+  "header": ["플랜명", "배포채널", "청구주기"],
+  "data": [
+    ["Pro", "web/mobile/desktop", "월/연"],
+    ["Enterprise", "web, mobile", "연"]
+  ]
+}}
+
+```
+
+**Output**:
+```json
+{{
+  "header": ["보종명", "유형1", "유형2"],
+  "data": [
+    ["Pro", ["web", "mobile", "desktop"], ["월", "연"]],
+    ["Enterprise", ["web", "mobile"], "연"]
+  ],
+  "note": "헤더 표준화: 플랜명→보종명, 배포채널→유형1, 청구주기→유형2. 유형1/유형2는 '/' ',' 기준으로 원자 분리."
+}}
+```
+
+Example 2: 전자상거래 상품 옵션 테이블
+
+**Input**:
+```
+{{
+  "header": ["상품명", "색상", "사이즈"],
+  "data": [
+    ["오프화이트 티셔츠", "black/white, navy", "S/M/L"],
+    ["러닝화", "red/blue", "260/270/280"]
+  ]
+}}
+
+```
+
+**Output**:
+```json
+{{
+  "header": ["보종명", "유형1", "유형2"],
+  "data": [
+    ["오프화이트 티셔츠", ["black", "white", "navy"], ["S", "M", "L"]],
+    ["러닝화", ["red", "blue"], ["260", "270", "280"]]
+  ],
+  "note": "헤더 표준화: 상품명→보종명, 색상→유형1, 사이즈→유형2. '/' ',' 기준으로 원자 분리."
+}}
+```
+
+---
+
+이제 위 규칙에 따라 입력 테이블을 처리하여 JSON으로 반환하세요.
+"""
+    return prompt
+
+
+# -----------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------기존----------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------
+
+def build_table_split_prompt_2(
     header: List[str],
     data: List[List[str]],
     instruction: str = ""
@@ -2927,9 +2626,9 @@ def build_condition_transform_prompt(
 컬럼명에서 성별 정보를 추출하여 리스트로 생성하세요.
 
 **규칙**:
-- 남성에 대한 가입나이와 여성에 대한 가입나이 둘 다 존재 → ["남", "여"]
-- 남성에 대한 가입나이만 존재 → ["남"]
-- 여성에 대한 가입나이만 존재 → ["여"]
+- 남성에 대한 가입나이와 여성에 대한 가입나이 둘 다 존재 → ["(1)남자", "(2)여자"]
+- 남성에 대한 가입나이만 존재 → ["(1)남자"]
+- 여성에 대한 가입나이만 존재 → ["(2)여자"]
 - 둘 다 없으면 → ["-"] (기본값)
 
 ### 5. 컬럼명 변환
@@ -2937,7 +2636,7 @@ def build_condition_transform_prompt(
 최종 스키마 컬럼명으로 변환하세요.
 
 **매핑**:
-- 원본 컬럼 유지: "유형0", "유형1", "유형2" 등
+- 원본 컬럼 유지: "유형1", "유형2", "유형3" 등
 - "보험기간" → "보험기간" (리스트)
 - "납입기간" → "납입기간" (리스트)
 -  가입나이  → 다음 5개 컬럼으로 분리:
@@ -2979,7 +2678,7 @@ def build_condition_transform_prompt(
       "min[세만기 - 년납, 90 - 년납, 70] 세",
       "(2)만연령",
       "(1)보험연령",
-      ["남", "여"]
+      ["(1)남자", "(2)여자"]
     ]
   ],
   "notes": "변환 과정 설명 (선택)"
@@ -3002,7 +2701,7 @@ def build_condition_transform_prompt(
 
 **Input**:
 ```
-Header: ["유형0", "유형1", "가입나이_남", "가입나이_여", "보험기간", "납입기간"]
+Header: ["유형1", "유형2", "가입나이_남", "가입나이_여", "보험기간", "납입기간"]
 Data: [
   ["해약환급금 미지급형", "간편심사형", "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세",
    "만15세 - min[세만기 - 년납, 90 - 년납, 80] 세", "80/90/100세 만기, 종신", "10/15/20/25/30년납"]
@@ -3012,7 +2711,7 @@ Data: [
 **Output**:
 ```json
 {{
-  "header": ["유형0", "유형1", "유형2", "보험기간", "납입기간",
+  "header": ["유형1", "유형2", "유형3", "보험기간", "납입기간",
              "주피보험자최소가입연령", "주피보험자최대가입연령",
              "주피보험자최소가입연령구분코드", "주피보험자최대가입연령구분코드",
              "주피보험자가입성별"],
@@ -3027,7 +2726,7 @@ Data: [
       "min[세만기 - 년납, 90 - 년납, 80] 세",
       "(2)만연령",
       "(1)보험연령",
-      ["남", "여"]
+      ["(1)남자", "(2)여자"]
     ]
   ]
 }}
@@ -3329,6 +3028,7 @@ def build_next_task_prompt(
    - 의존성 있는 작업: `"dependencies": ["task0", "task1"]`
    - ❌ 절대 "none"이나 null 사용 금지
 4. **종료 조건**: '조건' 추출, '그룹핑', '최종 조합' 단계 중 **미수행된 단계가 있다면 절대 `END` 하지 마세요.** 최종 결과까지 모든 단계가 완료되어야 합니다.
+    - 중요 : combination_generation의 “마지막 validation이 is_valid=true”가 아니면 END 금지
 5. task_type 는 다음 값 중 하나여야 한다:
 
 - "classify_sections"        # 섹션 분류 (section_classifier)
@@ -3420,11 +3120,11 @@ def get_task_validation_criteria(task_type: str) -> str:
 **기대 출력**:
 - groups: 그룹 리스트 (최소 1개)
 - column_mapping: join_keys, value_columns 명시
-- 각 그룹에 definition_indices, condition_index 존재
+- 각 그룹에 definition_indices, condition_indices 존재
 
 **검증 항목**:
 1. 필수 키 존재 (groups, column_mapping)
-2. 인덱스 범위 검증 (definition_indices, condition_index)
+2. 인덱스 범위 검증 (definition_indices, condition_indices)
 3. 커버리지 검증 (50% 이상의 definitions 매칭)
 4. JOIN 키 명시됨
 """,
@@ -3488,24 +3188,32 @@ def build_validate_grouping_logic_llm_prompt(
 
     # Format groups
     groups_str = ""
-    for i, group in enumerate(groups_detail):
+    for group in groups_detail:
         group_id = group.get("id")
         match_condition = group.get("match_condition", {})
         def_rows = group.get("definition_rows", [])
-        cond_row = group.get("condition_row")
+        cond_rows = group.get("condition_row")  # list[dict] or dict or None
 
         groups_str += f"\n### Group {group_id}\n"
         groups_str += f"**Match Condition**: {json.dumps(match_condition, ensure_ascii=False)}\n\n"
 
         groups_str += f"**Definition Rows ({len(def_rows)}):**\n"
         for dr in def_rows:
-            groups_str += f"  - row{dr['index']}: {json.dumps(dr['data'], ensure_ascii=False)}\n"
+            groups_str += f"  - row{dr.get('index')}: {json.dumps(dr.get('data'), ensure_ascii=False)}\n"
 
-        if cond_row:
-            groups_str += f"\n**Condition Row:**\n"
-            groups_str += f"  - row{cond_row['index']}: {json.dumps(cond_row['data'], ensure_ascii=False)}\n"
+        # ✅ Condition rows (multi-row 지원)
+        if cond_rows:
+            groups_str += f"\n**Condition Rows:**\n"
+
+            # cond_rows가 dict면 list로 통일
+            if isinstance(cond_rows, dict):
+                cond_rows = [cond_rows]
+
+            for cr in cond_rows:
+                groups_str += f"  - row{cr.get('index')}: {json.dumps(cr.get('data'), ensure_ascii=False)}\n"
         else:
-            groups_str += f"\n**Condition Row:** None (unmatched)\n"
+            groups_str += f"\n**Condition Rows:** None (unmatched)\n"
+
 
     # Format unmatched
     unmatched_str = ""
@@ -3561,12 +3269,15 @@ def build_validate_grouping_logic_llm_prompt(
 ### 핵심 원칙
 
 - 목표: Definition/Condition 매칭이 **논리적으로 말이 되는지** 검증하고,
-  명백한 매칭 오류나 조합 누락이 있을 때만 is_valid: false 로 표시합니다.
+  **제공된 데이터로 근거(인덱스/행)가 확인되는 경우에만** is_valid=false 를 사용합니다.
 - fuzzy matching, 표기 차이, multi-value 셀은 넉넉하게 허용합니다.
-- 다만, 다음 두 경우에는 충분히 명확한 오류로 보고 is_valid: false 를 사용해도 됩니다.
-  1) 단일값 join_key가 완전히 다른 카테고리에 매칭된 경우
-  2) join_key 조합이 Condition에는 존재하는데, 특정 조합들만 일관되게 어떤 그룹에도 매칭되지 않은 경우
-     (명백히 있어야 할 조합이 빠진 것처럼 보이는 상황)
+- is_valid=false 를 사용할 수 있는 대표 케이스는 아래 2가지뿐입니다(추측 금지, 증거 필수):
+  1) 단일값 join_key가 정규화/퍼지 규칙(4.1)을 적용해도 전혀 match되지 않는 경우
+     (증거: group_id + definition_rows.index/condition_row.index 제시)
+  2) 특정 join_key 조합이 Condition에 **명시적으로 존재**하고, Definition에도 존재하는데,
+     그 조합이 어떤 그룹에도 매칭되지 않은 것이 **인덱스로 확인**되는 경우
+     (증거: 해당 condition row index + definition row index 제시)
+
 
 ## 데이터 구조
 
@@ -3590,96 +3301,103 @@ def build_validate_grouping_logic_llm_prompt(
 {summary_str}
 
 ---
-## 4. 검증 기준 (critical / warning 기준)
-
-### 4.1 match_condition vs definition_rows
-
-각 그룹 g에 대해 g.match_condition 의 각 키-값 쌍이
-실제 definition_rows 와 모순되지 않는지 확인합니다.
-
-### 4.1.3 Fuzzy Matching 규칙 (공통)
-
-두 문자열이 다음 중 하나라도 만족하면 match 로 간주합니다.
-
-1. 정확 일치 (대소문자/공백 차이만 있는 경우 포함)
-2. 한쪽이 다른 한쪽을 포함하는 경우 (substring)
-3. 괄호와 그 안의 숫자/코드를 제거한 뒤 일치
-   - 예: "간편심사(315)형" → "간편심사형"
-4. 공백/특수문자를 제거한 뒤 일치
-   - 예: "해약환급금 미지급형" → "해약환급금미지급형"
-
-이 규칙들을 모두 고려했을 때에도 전혀 겹치는 부분이 없고,
-상식적으로도 완전히 다른 카테고리처럼 보이면 "명백한 모순"입니다.
+4. 검증 기준 (CRITICAL / 규칙만)
+4.0 출력 강제 규칙 (최우선)
+- 당신은 “검증기”입니다. 추측/상상/상식으로 errors를 만들지 마세요.
+- errors에 항목을 추가하려면 반드시 아래 증거 중 하나를 포함해야 합니다(인덱스 필수):
+  - group_id, condition_row.index, definition_rows의 row index 목록
+  - unmatched_conds의 row index
+  - unmatched_defs의 row index
+- 위 증거를 제시할 수 없으면:
+  - errors에는 쓰지 말고 suggestions에만 적고, is_valid=true를 유지하세요.
+- errors에서 금지 표현: “명백히 있어야”, “가능성이 높다”, “상식적으로”.
 
 ---
 
-### 4.2 match_condition vs condition_row
+4.1 문자열 동일성/유사성 판단 (정규화 후 비교)
+모든 비교는 아래 정규화 후 수행합니다.
 
-Condition row 가 있는 경우에도 위와 동일한 fuzzy 규칙을 적용합니다.
+정규화 규칙:
 
-- Condition row 의 join_keys 관련 컬럼 값에도 구분자가 있다면 split 후 비교합니다.
-- 하나라도 의미적으로 match되면 정상입니다.
-- 단지 "다른 옵션이 함께 있다"는 이유로는 절대 오류로 보지 마세요.
+- 양끝 공백 제거, 연속 공백 1칸으로 축약
+- 모든 공백 제거 버전도 함께 비교(공백 깨짐 대응)
+- 괄호 접미는 “동일 범주”로 허용: X ↔ X(전환형) ↔ X(간편) ↔ X(TC) 등
+- 특수문자 제거 버전도 함께 비교(·, -, /, 괄호 등)
 
----
+match로 간주(하나라도 만족하면 match):
+- 정규화 후 정확 일치
+- 한쪽이 다른쪽을 포함(substring)
+- 괄호 내용 제거 후 일치
+- 공백/특수문자 제거 후 일치
 
-### 4.3 동일 Definition index의 다중 그룹 포함
-
-- 하나의 Definition index 가 여러 그룹에 포함되는 것은 **허용**됩니다.
-  (한 Definition 행이 여러 심사형/조건 조합을 포괄하는 경우 등)
-
-- 다음과 같은 경우에만 critical error 로 간주합니다.
-  1) 어떤 join_key 컬럼이 단일값 컬럼으로 보이고,
-  2) Definition row 의 그 컬럼 값은 명확하게 한 가지인데,
-  3) 서로 다른 그룹에서 이 컬럼에 대해 서로 완전히 다른 match_condition 값을 주장하는 경우
-     (예: definition 은 "해약환급금 미지급형"인데,
-      어떤 그룹은 "해약환급금 미지급형", 다른 그룹은 "일반형"이라고 주장하는 경우)
-
----
-
-### 4.4 unmatched_defs 타당성
-
-- Definition Coverage 가 지나치게 낮을 경우
-  (예: coverage_ratio < 0.7)는 추출 로직에 문제가 있을 수 있으므로
-  warning 또는 상황에 따라 critical 로 간주할 수 있습니다.
-
-- 특히, 어떤 Definition 행이 특정 Condition 조합과 거의 동일한
-  join_key + 기간/연령 구조를 가지고 있는데도
-  어떤 그룹에도 포함되지 않은 경우는 critical error 후보입니다.
+예시(모두 정상 match):
+- 적립형 계약 ↔ 적립형 계약(전환형)
+- 적립형 계약 ↔ 적립형 계 약(전환형)
+- 치매간병전환형 계약 ↔ 치매간병전환형 계약(전환형)
 
 ---
 
-### 4.5 unmatched condition rows 타당성
+4.2 와일드카드/미기재 처리 (매우 중요)
+다음 값들은 **ANY로 단정하지 말고 기본적으로 “비교 제외(unknown/omitted)”**로 처리합니다:
 
-- Condition Table 의 행(가입조건)이 특정 상품/유형 조합을 분명히 나타내는데,
-  어떤 그룹에도 포함되지 않은 경우, 가입조건 누락일 가능성이 있습니다.
+- "-", "—", "", null, "해당없음", "미기재"
+검증 규칙:
 
-- 특히, 다음 조건을 모두 만족하면 critical 로 판단해도 좋습니다.
-  1) 해당 condition row 의 join_key 컬럼들
-     (예: 유형0, 유형1, 또는 column_mapping.join_keys 에 지정된 컬럼들)이
-     Definition Table 에도 반복적으로 등장하는 값이고,
-  2) 같은 상품/특약 맥락에서, 유사한 join_key 조합들은 이미 그룹으로 매칭되어 있는데,
-  3) 특정 join_key 조합들만 일관되게 어떤 그룹에도 포함되지 않고
-     unmatched condition 으로 남아 있는 경우
-
-- 단, 일부 condition row 가 매칭되지 않았다는 사실만으로
-  무조건 critical 로 보지는 마세요.
-  "이 조합은 상식적으로 반드시 있어야 하는데 빠졌다" 라고 확신될 때만
-  is_valid: false 로 설정하는 것이 좋습니다.
+- match_condition의 join_key 값이 위 값이면 → 그 키는 검증에서 제외(그 키로 모순 판정 금지)
+- condition_row의 join_key 값이 위 값이어도 → 오류로 보지 않음
+- "-" 자체만으로 is_valid=false를 주지 마세요.
 
 ---
 
-### 4.6 동일 컬럼 내 다중값 처리
-  하나의 컬럼 내에 여러 값들이 존재할 경우 의미없는 값이 있는지 파악하세요
-  예시 1
-  - "definition_value": "환급(A)형 /환급(B)형 /환급(C)형 /일반형,
-  - "condition_value": "환급형",
-    definition_value의 '일반형은 condition_value의 '환급형'과 의미적으로 맞지 않음으로 false
+4.3 그룹 내부 정합성 (핵심)
+각 그룹 g에 대해:
 
-  예시 2
-  - "definition_value": "환급(A)형 /환급(B)형 /환급(C)형"
-  - "condition_value": "환급형",
-    definition_value의 "환급(A)형 /환급(B)형 /환급(C)형" 들은 condition_value의 '환급형'과 의미적으로 맞음으로 True
+(1) match_condition vs definition_rows
+
+- match_condition의 각 join_key에 대해, 해당 값이 와일드카드/미기재가 아니라면 definition_rows의 해당 컬럼 값과 4.1 규칙으로 match되어야 합니다.
+- 하나라도 “정규화 후에도 전혀 match되지 않으면” 오류 후보입니다. (증거 인덱스 포함 필수)
+
+(2) match_condition vs condition_row
+
+- condition_row가 존재하면 동일하게 검사합니다.
+- condition_row의 값이 와일드카드/미기재면 그 키는 검사에서 제외합니다.
+
+(3) 다중값(any-match) 규칙
+
+- definition 또는 condition 값이 리스트이거나 "A/B/C" 형태라면:
+  - 요소 중 하나라도 match되면 정상입니다.
+  - "다른 값이 함께 있다"는 이유만으로 오류로 보지 마세요.
+
+---
+
+4.4 unmatched_defs 처리 (기본 정상)
+- unmatched_defs(Definition에만 있고 Condition에 없는 조합)은 기본적으로 정상입니다.
+- 아래를 만족하지 않으면 unmatched_defs 때문에 is_valid=false를 주면 안 됩니다.
+
+unmatched_defs를 오류로 볼 수 있는 최소 조건(모두 만족해야 함):
+
+- 같은 join_key 조합이 Condition 쪽에서 “명시적으로” 존재함
+  (증거: unmatched_conds/condition_row.index 또는 condition_data에서 해당 조합 행 index 제시)
+- Definition에도 같은 join_key 조합이 존재함 (증거: unmatched_defs row index 제시)
+- 그런데도 그 조합이 어떤 그룹에도 매칭되지 않음(증거: groups에서 누락을 인덱스로 제시)
+
+---
+
+4.5 unmatched_conds 처리 (더 중요)
+- unmatched_conds(Condition 행이 어떤 그룹에도 매칭되지 않음)는 상대적으로 중요한 오류 후보입니다.
+- 다만 아래를 모두 만족할 때만 is_valid=false를 고려하세요:
+
+오류 조건(모두 만족):
+
+- 해당 condition row의 join_key 중 와일드카드/미기재가 아닌 값이 있음
+- 그 값(또는 조합)이 Definition에 실제로 존재함 (증거 인덱스)
+- 그런데도 어떤 그룹에도 매칭되지 않음 (unmatched_conds row index 증거)
+
+---
+
+이 규칙만으로 판단하여 JSON을 반환하세요.
+(규칙을 어기는 오류 문장은 errors에 쓰지 마세요.)
+
 ## 출력 형식 (JSON)
 
 반드시 다음 형식으로 응답하세요:
