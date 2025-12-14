@@ -112,7 +112,7 @@ class DefinitionExtractToolV2:
     def __init__(self):
         self.name = "definition_extract_v2"
         # Initialize OpenAI client for LLM helper
-        load_dotenv(dotenv_path=r"c:\Users\NT-165\Desktop\Project\Toy\.env")
+        load_dotenv()
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     def _rule_extract_helper(self, content: Dict, content_type: str) -> tuple:
@@ -585,7 +585,7 @@ class LLMCartesianTool:
 
     def __init__(self):
         self.name = "llm_cartesian"
-        load_dotenv(dotenv_path=r"c:\Users\NT-165\Desktop\Project\Toy\.env")
+        load_dotenv()
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     def execute(self, doc: Any, params: Dict[str, Any]) -> ToolResult:
@@ -885,7 +885,7 @@ class LLMTableSplitTool:
 
     def __init__(self):
         self.name = "llm_table_split"
-        load_dotenv(dotenv_path=r"c:\Users\NT-165\Desktop\Project\Toy\.env")
+        load_dotenv()
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     def execute(self, doc: Any, params: Dict[str, Any]) -> ToolResult:
@@ -1167,7 +1167,7 @@ class ConditionTransformTool:
 
     def __init__(self):
         self.name = "condition_transform"
-        load_dotenv(dotenv_path=r"c:\Users\NT-165\Desktop\Project\Toy\.env")
+        load_dotenv()
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     def execute(self, doc: Any, params: Dict[str, Any]) -> ToolResult:
@@ -1285,7 +1285,7 @@ class IntelligentConditionExtractTool:
 
     def __init__(self):
         self.name = "intelligent_condition_extract"
-        load_dotenv(dotenv_path=r"c:\Users\NT-165\Desktop\Project\Toy\.env")
+        load_dotenv()
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     def execute(self, doc: Any, params: Dict[str, Any]) -> ToolResult:
@@ -1386,7 +1386,7 @@ class GroupingLogicExtractorTool:
 
     def __init__(self):
         self.name = "grouping_logic_extractor"
-        load_dotenv(dotenv_path=r"c:\Users\NT-165\Desktop\Project\Toy\.env")
+        load_dotenv()
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     def execute(self, doc: Any, params: Dict[str, Any]) -> ToolResult:
@@ -1545,7 +1545,7 @@ class CombinationGeneratorTool:
 
     def __init__(self):
         self.name = "combination_generator"
-        load_dotenv(dotenv_path=r"c:\Users\NT-165\Desktop\Project\Toy\.env")
+        load_dotenv()
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         # CRITICAL: Cache for LLM formula evaluation to prevent repeated API calls
         self._formula_cache = {}
@@ -1748,6 +1748,17 @@ class CombinationGeneratorTool:
         groups = grouping_logic.get("groups", [])
         join_keys = set(column_mapping.get("join_keys", []))
 
+        def _fallback_num(value: Any) -> Optional[int]:
+            if value is None:
+                return None
+            match = re.search(r"(\d+)", str(value))
+            return int(match.group(1)) if match else None
+
+        try:
+            whole_life_semangi_default = int(os.getenv("P8_WHOLE_LIFE_SEMANGI", "99"))
+        except ValueError:
+            whole_life_semangi_default = 99
+
         for group in groups:
             definition_indices = group.get("definition_indices", [])
             matched_list_items = group.get("matched_list_items", [])
@@ -1790,55 +1801,68 @@ class CombinationGeneratorTool:
                 definition_row = def_data[def_idx]
                 matched_item_idx = matched_list_items[idx] if idx < len(matched_list_items) else None
 
-                # Build definition dict, handling list selection
-                processed_def_row = {}
-                for i, col in enumerate(def_header):
-                    if i < len(definition_row):
-                        value = definition_row[i]
-                        # If value is a list and we have matched_item_idx, select that element
-                        if isinstance(value, list) and matched_item_idx is not None:
-                            if matched_item_idx < len(value):
-                                processed_def_row[col] = value[matched_item_idx]
+                # CRITICAL FIX: Handle matched_item_idx being either int or list[int]
+                # - Single int: 0 → extract one value
+                # - List of ints: [0, 1, 2] → extract multiple values (fuzzy matching)
+                if isinstance(matched_item_idx, list):
+                    # Multiple matched items - need to expand into multiple combinations
+                    matched_indices = matched_item_idx
+                else:
+                    # Single matched item (or None)
+                    matched_indices = [matched_item_idx] if matched_item_idx is not None else [None]
+
+                # For each matched index, build a definition row
+                for single_idx in matched_indices:
+                    # Build definition dict, handling list selection
+                    processed_def_row = {}
+                    for i, col in enumerate(def_header):
+                        if i < len(definition_row):
+                            value = definition_row[i]
+                            # If value is a list and we have single_idx, select that element
+                            if isinstance(value, list) and single_idx is not None:
+                                if single_idx < len(value):
+                                    processed_def_row[col] = value[single_idx]
+                                else:
+                                    print(f"[WARNING] matched_item_idx {single_idx} out of range for list {value}")
+                                    processed_def_row[col] = value[0] if value else None
                             else:
-                                print(f"[WARNING] matched_item_idx {matched_item_idx} out of range for list {value}")
-                                processed_def_row[col] = value[0] if value else None
+                                processed_def_row[col] = value
                         else:
-                            processed_def_row[col] = value
-                    else:
-                        processed_def_row[col] = None
+                            processed_def_row[col] = None
 
-                # Cartesian product for list fields
-                for 보험기간, 납입기간, 성별 in product(보험기간_list, 납입기간_list, 성별_list):
-                    # CRITICAL FIX: Build comprehensive context for formula evaluation
-                    # Extract numeric value from period strings
-                    보험기간_숫자 = parse_period(보험기간) if 보험기간 else None
-                    납입기간_숫자 = parse_period(납입기간) if 납입기간 else None
+                    # Cartesian product for list fields (INDENTED: runs for EACH matched index)
+                    for 보험기간, 납입기간, 성별 in product(보험기간_list, 납입기간_list, 성별_list):
+                        # CRITICAL FIX: Build comprehensive context for formula evaluation
+                        # Extract numeric value from period strings
+                        보험기간_숫자 = parse_period(보험기간) if 보험기간 else None
+                        if 보험기간_숫자 is None:
+                            보험기간_숫자 = _fallback_num(보험기간)
+                        납입기간_숫자 = parse_period(납입기간) if 납입기간 else None
+                        if 납입기간_숫자 is None:
+                            납입기간_숫자 = _fallback_num(납입기간)
 
-                    # Determine if 보험기간 is age-based (세) or year-based (년)
-                    세만기 = None
-                    년만기 = None
-                    if 보험기간_숫자 is not None:
-                        if "세" in str(보험기간):
-                            세만기 = 보험기간_숫자
-                        elif "년" in str(보험기간):
-                            년만기 = 보험기간_숫자
-                        else:
-                            # Default: treat as age-based if no explicit marker
-                            세만기 = 보험기간_숫자
+                        # Determine if 보험기간 is age-based (세) or year-based (년)
+                        세만기 = None
+                        년만기 = None
+                        if 보험기간_숫자 is not None:
+                            if "세" in str(보험기간):
+                                세만기 = 보험기간_숫자
+                            elif "년" in str(보험기간):
+                                년만기 = 보험기간_숫자
+                            else:
+                                # Default: treat as age-based if no explicit marker
+                                세만기 = 보험기간_숫자
 
-                    # 납입기간도 동일하게 처리 (대부분 년납이지만 안전하게)
-                    년납 = 납입기간_숫자
-                    납입기간_년 = 납입기간_숫자
+                        # Policy: whole life ("종신") needs a default 세만기 for formula evaluation
+                        if 보험기간 and "종신" in str(보험기간) and 세만기 is None:
+                            세만기 = whole_life_semangi_default
 
-                    # Parse/evaluate ages
-                    최소나이_raw = cond_row.get("주피보험자최소가입연령", "")
-                    최대나이_raw = cond_row.get("주피보험자최대가입연령", "")
+                        # 납입기간도 동일하게 처리 (대부분 년납이지만 안전하게)
+                        년납 = 납입기간_숫자
+                        납입기간_년 = 납입기간_숫자
 
-                    # Try parse as simple age first
-                    최소나이 = parse_age(최소나이_raw) if 최소나이_raw else None
-                    if 최소나이 is None and 최소나이_raw:
-                        # Build comprehensive context with all possible variable names
-                        formula_context = {}
+                        # Build formula evaluation context ONCE per (보험기간, 납입기간) pair
+                        formula_context: Dict[str, Any] = {}
                         if 세만기 is not None:
                             formula_context["세만기"] = 세만기
                         if 년만기 is not None:
@@ -1849,66 +1873,71 @@ class CombinationGeneratorTool:
                         if 납입기간_년 is not None:
                             formula_context["납입기간_년"] = 납입기간_년
 
-                        # CRITICAL FIX: Rule-based evaluation with LLM fallback
-                        최소나이 = evaluate_formula(최소나이_raw, **formula_context)
-                        if 최소나이 is None and formula_context:
-                            # LLM fallback
-                            print(f"[WARN] Rule-based eval failed for 최소나이: '{최소나이_raw}', trying LLM fallback")
-                            최소나이 = self._llm_evaluate_age_formula(최소나이_raw, formula_context)
+                        # Parse/evaluate ages
+                        최소나이_raw = cond_row.get("주피보험자최소가입연령", "")
+                        최대나이_raw = cond_row.get("주피보험자최대가입연령", "")
 
-                    최대나이 = parse_age(최대나이_raw) if 최대나이_raw else None
-                    if 최대나이 is None and 최대나이_raw:
-                        # Build comprehensive context
-                        formula_context = {}
-                        if 세만기 is not None:
-                            formula_context["세만기"] = 세만기
-                        if 년만기 is not None:
-                            formula_context["년만기"] = 년만기
-                        if 년납 is not None:
-                            formula_context["년납"] = 년납
-                            formula_context["납입기간"] = 년납
-                        if 납입기간_년 is not None:
-                            formula_context["납입기간_년"] = 납입기간_년
+                        if (
+                            최대나이_raw
+                            and "세만기" in str(최대나이_raw)
+                            and "세만기" not in formula_context
+                        ):
+                            print(
+                                "[WARN] 세만기 needed but missing; 보험기간 파싱/정책 확인 필요: "
+                                f"보험기간='{보험기간}', 보험기간_숫자='{보험기간_숫자}'"
+                            )
 
-                        # CRITICAL FIX: Rule-based evaluation with LLM fallback
-                        최대나이 = evaluate_formula(최대나이_raw, **formula_context)
-                        if 최대나이 is None and formula_context:
-                            # LLM fallback
-                            print(f"[WARN] Rule-based eval failed for 최대나이: '{최대나이_raw}', trying LLM fallback")
-                            최대나이 = self._llm_evaluate_age_formula(최대나이_raw, formula_context)
+                        # Try parse as simple age first
+                        최소나이 = parse_age(최소나이_raw) if 최소나이_raw else None
+                        if 최소나이 is None and 최소나이_raw:
+                            # CRITICAL FIX: Rule-based evaluation with LLM fallback
+                            최소나이 = evaluate_formula(최소나이_raw, **formula_context)
+                            if 최소나이 is None and formula_context:
+                                # LLM fallback
+                                print(f"[WARN] Rule-based eval failed for 최소나이: '{최소나이_raw}', trying LLM fallback")
+                                최소나이 = self._llm_evaluate_age_formula(최소나이_raw, formula_context)
 
-                    # Build final combination
-                    merged: Dict[str, Any] = {}
+                        최대나이 = parse_age(최대나이_raw) if 최대나이_raw else None
+                        if 최대나이 is None and 최대나이_raw:
+                            # CRITICAL FIX: Rule-based evaluation with LLM fallback
+                            최대나이 = evaluate_formula(최대나이_raw, **formula_context)
+                            if 최대나이 is None and formula_context:
+                                # LLM fallback
+                                print(f"[WARN] Rule-based eval failed for 최대나이: '{최대나이_raw}', trying LLM fallback")
+                                최대나이 = self._llm_evaluate_age_formula(최대나이_raw, formula_context)
 
-                    # 1) Copy definition columns
-                    for col, value in processed_def_row.items():
-                        merged[col] = value
+                        # Build final combination
+                        merged: Dict[str, Any] = {}
 
-                    # 2) Add JOIN key category columns
+                        # 1) Copy definition columns
+                        for col, value in processed_def_row.items():
+                            merged[col] = value
 
-                    # for jk in join_keys:
-                    #     if jk in match_condition:
-                    #         category_col = f"{jk}_category"
-                    #         merged[category_col] = match_condition[jk]
+                        # 2) Add JOIN key category columns
 
-                    # 3) Add condition value columns (expanded)
-                    merged["보험기간"] = 보험기간
-                    merged["납입기간"] = 납입기간
-                    merged["주피보험자최소가입연령"] = 최소나이
-                    merged["주피보험자최대가입연령"] = 최대나이
-                    merged["주피보험자최소가입연령구분코드"] = cond_row.get("주피보험자최소가입연령구분코드")
-                    merged["주피보험자최대가입연령구분코드"] = cond_row.get("주피보험자최대가입연령구분코드")
-                    merged["주피보험자가입성별"] = 성별
+                        # for jk in join_keys:
+                        #     if jk in match_condition:
+                        #         category_col = f"{jk}_category"
+                        #         merged[category_col] = match_condition[jk]
 
-                    # 4) Add any other value columns not explicitly handled
-                    for col in value_columns:
-                        # 가입나이 제거
-                        if col in ("가입나이_남", "가입나이_여"):
-                            continue
-                        if col not in merged and col in cond_row:
-                            merged[col] = cond_row[col]
+                        # 3) Add condition value columns (expanded)
+                        merged["보험기간"] = 보험기간
+                        merged["납입기간"] = 납입기간
+                        merged["주피보험자최소가입연령"] = 최소나이
+                        merged["주피보험자최대가입연령"] = 최대나이
+                        merged["주피보험자최소가입연령구분코드"] = cond_row.get("주피보험자최소가입연령구분코드")
+                        merged["주피보험자최대가입연령구분코드"] = cond_row.get("주피보험자최대가입연령구분코드")
+                        merged["주피보험자가입성별"] = 성별
 
-                    final_definitions.append(merged)
+                        # 4) Add any other value columns not explicitly handled
+                        for col in value_columns:
+                            # 가입나이 제거
+                            if col in ("가입나이_남", "가입나이_여"):
+                                continue
+                            if col not in merged and col in cond_row:
+                                merged[col] = cond_row[col]
+
+                        final_definitions.append(merged)
 
         # Handle unmatched definitions
         unmatched_def_indices = grouping_logic.get("unmatched", {}).get("definition_indices", [])

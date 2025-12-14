@@ -30,7 +30,7 @@ class LLMValidator:
 
     def __init__(self):
         """Initialize OpenAI client"""
-        load_dotenv(dotenv_path=r"c:\Users\NT-165\Desktop\Project\Toy\.env")
+        load_dotenv()
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     def validate(
@@ -349,32 +349,33 @@ class LLMValidator:
             annotation_sections = context.get("annotation_sections", [])
 
             # core 섹션들의 내용 미리보기 준비
-            core_sections_preview = []
-            for idx, section in enumerate(core_sections[:]):  # 최대 3개 샘플
-                title = section.get("title", "(제목 없음)")
-                content = section.get("content", [])
-                content_str = json.dumps(content, ensure_ascii=False)[:]
-                core_sections_preview.append({
-                    "index": idx,
-                    "title": title,
-                    "content_preview": content_str
-                })
+            # core_sections_preview = []
+            # for idx, section in enumerate(core_sections[:]):  # 최대 3개 샘플
+            #     title = section.get("title", "(제목 없음)")
+            #     content = section.get("content", [])
+            #     content_str = json.dumps(content, ensure_ascii=False)[:]
+            #     core_sections_preview.append({
+            #         "index": idx,
+            #         "title": title,
+            #         "content_preview": content_str
+            #     })
 
-            # annotation 섹션들의 내용 미리보기 준비
-            annotation_sections_preview = []
-            for idx, section in enumerate(annotation_sections[:]):  # 최대 3개 샘플
-                title = section.get("title", "(제목 없음)")
-                content = section.get("content", [])
-                content_str = json.dumps(content, ensure_ascii=False)[:]
-                annotation_sections_preview.append({
-                    "index": idx,
-                    "title": title,
-                    "content_preview": content_str
-                })
-            definition_sections = context.get("definition_sections", [])
+            # # annotation 섹션들의 내용 미리보기 준비
+            # annotation_sections_preview = []
+            # for idx, section in enumerate(annotation_sections[:]):  # 최대 3개 샘플
+            #     title = section.get("title", "(제목 없음)")
+            #     content = section.get("content", [])
+            #     content_str = json.dumps(content, ensure_ascii=False)[:]
+            #     annotation_sections_preview.append({
+            #         "index": idx,
+            #         "title": title,
+            #         "content_preview": content_str
+            #     })
+            # definition_sections = context.get("definition_sections", [])
 
             prompt = build_validate_definition_extract_v2_llm(
-                        definition_sections=definition_sections,
+                        core_sections_preview = core_sections,
+                        annotation_sections_preview=annotation_sections,
                         header=header,
                         data=data,
                         )

@@ -104,6 +104,7 @@ class AgentState(TypedDict):
     error_type: Optional[str]                     # Type of error: "task_definition_error" or "execution_error"
     error_suggestion: Optional[str]               # Suggestion for fixing the error
     failed_task_id: Optional[str]                 # ID of task that failed
+    event_history: List[Dict[str, Any]]           # Persistent event log (not truncated on backtracking)
 
     # NEW: Dependency-aware backtracking and recoverable errors
     all_task_definitions: Dict[str, Any]          # Store all task definitions for dependency tracking

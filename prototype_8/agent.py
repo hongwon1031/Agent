@@ -157,6 +157,49 @@ class Plan(BaseModel):
 
 MAX_REPLAN_COUNT = 3
 MAX_TASK_RETRIES = 5  # NEW: Maximum retries per task (allow more with better backtracking)
+MAX_EVENT_HISTORY = 2000
+
+
+def _safe_preview(
+    value: Any,
+    max_str: int = 300,
+    max_list: int = 30,
+    max_depth: int = 4,
+    _depth: int = 0,
+) -> Any:
+    if _depth >= max_depth:
+        return "<max_depth>"
+    if value is None or isinstance(value, (int, float, bool)):
+        return value
+    if isinstance(value, str):
+        s = value.replace("\r\n", "\n")
+        return s if len(s) <= max_str else s[:max_str] + "...(truncated)"
+    if isinstance(value, list):
+        if len(value) > max_list:
+            return [_safe_preview(v, max_str, max_list, max_depth, _depth + 1) for v in value[:max_list]] + [
+                f"...(+{len(value) - max_list} items)"
+            ]
+        return [_safe_preview(v, max_str, max_list, max_depth, _depth + 1) for v in value]
+    if isinstance(value, dict):
+        out: Dict[str, Any] = {}
+        for k, v in list(value.items())[:50]:
+            out[str(k)] = _safe_preview(v, max_str, max_list, max_depth, _depth + 1)
+        if len(value) > 50:
+            out["..."] = f"+{len(value) - 50} keys"
+        return out
+    return str(value)
+
+
+def _append_event(state: AgentState, event: Dict[str, Any]) -> None:
+    history = state.get("event_history")
+    if not isinstance(history, list):
+        history = []
+    event = dict(event)
+    event.setdefault("ts", time.time())
+    history.append(event)
+    if len(history) > MAX_EVENT_HISTORY:
+        history[:] = history[-MAX_EVENT_HISTORY:]
+    state["event_history"] = history
 
 # ============================================================================
 # PROTOTYPE 7: TEMPLATE RESOLUTION
@@ -334,6 +377,15 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
     # 백트래킹
     backtrack_instruction = ""
     if backtrack_to:
+        _append_event(
+            state,
+            {
+                "event": "backtrack_requested",
+                "backtrack_to_task_id": backtrack_to,
+                "backtrack_reasoning": state.get("backtrack_reasoning", ""),
+                "task_results_count_before": len(task_results),
+            },
+        )
         ids = [r.get("task_id") for r in task_results]
         if backtrack_to in ids:
             idx = ids.index(backtrack_to)
@@ -367,6 +419,15 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
 
             # task_result를 min_idx 이전까지만 남기고 전부 삭제
             task_results = task_results[:min_idx]
+            _append_event(
+                state,
+                {
+                    "event": "backtrack_applied",
+                    "backtrack_to_task_id": backtrack_to,
+                    "tasks_to_rerun": sorted(tasks_to_rerun),
+                    "kept_task_results_count": len(task_results),
+                },
+            )
 
             # NEW: 되돌릴 task들의 retry count 초기화
             retry_counts = dict(state.get("retry_counts", {}))
@@ -374,6 +435,10 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
                 if task_id in retry_counts:
                     old_count = retry_counts.pop(task_id)
                     print(f"[P7 NODE] Resetting retry count for {task_id} (was {old_count})")
+                    _append_event(
+                        state,
+                        {"event": "retry_reset", "task_id": task_id, "previous_retry_count": old_count},
+                    )
 
             # CRITICAL:backtrack_reasoning 있으면 플래너에게 줄 추가 지시문 생성
             backtrack_reasoning = state.get("backtrack_reasoning", "")
@@ -437,6 +502,15 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
         return {"error": f"Task generation failed: {result['error']}"}
 
     action = result.get("action")
+    _append_event(
+        state,
+        {
+            "event": "planner_response",
+            "action": action,
+            "reasoning_preview": _safe_preview(result.get("reasoning", ""), max_str=400),
+            "task_results_count": len(task_results),
+        },
+    )
 
 
     # 종료
@@ -450,7 +524,8 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
             "task_results": task_results,
             "backtrack_to_task_id": None,
             "backtrack_reasoning": "",
-            "retry_counts": retry_counts  # Propagate updated retry_counts
+            "retry_counts": retry_counts,  # Propagate updated retry_counts
+            "event_history": state.get("event_history", []),
         }
 
     # 다음 task 진행
@@ -477,6 +552,18 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
         all_task_definitions = state.get("all_task_definitions", {})
         all_task_definitions[task_id] = task
         print(f"[DEBUG] Saved task definition for {task_id} (dependencies: {task.get('dependencies', [])})")
+        _append_event(
+            state,
+            {
+                "event": "task_scheduled",
+                "task_id": task_id,
+                "task_type": task.get("task_type"),
+                "tool_name": task.get("tool_name"),
+                "fallback_tool": task.get("fallback_tool"),
+                "dependencies": task.get("dependencies", []),
+                "parameters_preview": _safe_preview(task.get("parameters", {})),
+            },
+        )
 
         return {
             "current_task": task,
@@ -485,7 +572,8 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
             "backtrack_to_task_id": None,
             "backtrack_reasoning": "",
             "all_task_definitions": all_task_definitions,  # NEW
-            "retry_counts": retry_counts  # Propagate updated retry_counts
+            "retry_counts": retry_counts,  # Propagate updated retry_counts
+            "event_history": state.get("event_history", []),
         }
 
     else:
@@ -511,6 +599,15 @@ def execute_task_node(state: AgentState) -> Dict[str, Any]:
 
     task_id = current_task.get('task_id')
     print(f"[INFO] Executing {task_id}: {current_task.get('description', 'N/A')}")
+    _append_event(
+        state,
+        {
+            "event": "task_execute_start",
+            "task_id": task_id,
+            "task_type": current_task.get("task_type"),
+            "tool_name": current_task.get("tool_name"),
+        },
+    )
 
     # ========== STEP 1: Task Definition Validation ==========
     print(f"[VALIDATE] Checking task definition for {task_id}...")
@@ -608,6 +705,20 @@ def execute_task_node(state: AgentState) -> Dict[str, Any]:
     }
     task_results.append(task_result)
     task_history.append(task_result)   
+    _append_event(
+        state,
+        {
+            "event": "task_execute_end",
+            "task_id": task_id,
+            "task_type": current_task.get("task_type"),
+            "tool_used": tool_name,
+            "success": bool(result.success),
+            "execution_time": round(execution_time, 4),
+            "error_preview": _safe_preview(result.error, max_str=500) if not result.success else None,
+            "resolved_params_preview": _safe_preview(resolved_params),
+            "output_preview": _safe_preview(result.data),
+        },
+    )
     
     if result.success:
         print(f"🚨[OK] Task {task_id} completed successfully ({execution_time:.2f}s)")
@@ -620,7 +731,8 @@ def execute_task_node(state: AgentState) -> Dict[str, Any]:
     return {
         "task_results": task_results,
         "task_history": task_history,
-        "current_task_output": result.data
+        "current_task_output": result.data,
+        "event_history": state.get("event_history", []),
     }
 
 def validate_task_node(state: AgentState) -> Dict[str, Any]:
@@ -769,6 +881,20 @@ def validate_task_node(state: AgentState) -> Dict[str, Any]:
         print(f"  - condition_header: {context.get('condition_header', 'NOT FOUND')}")
 
     validation_result = validator.validate(task_type=task_type, task_output=current_task_output, context=context)
+    _append_event(
+        state,
+        {
+            "event": "task_validated",
+            "task_id": task_id,
+            "task_type": task_type,
+            "is_valid": bool(validation_result.get("is_valid")),
+            "confidence": validation_result.get("confidence"),
+            "errors": _safe_preview(validation_result.get("errors", []), max_str=400),
+            "suggestions": _safe_preview(validation_result.get("suggestions", []), max_str=400),
+            "root_cause_task_id": validation_result.get("root_cause_task_id"),
+            "root_cause_reasoning_preview": _safe_preview(validation_result.get("root_cause_reasoning", ""), max_str=400),
+        },
+    )
 
     if validation_result.get("is_valid"):
         print(f"[OK] Validation passed (confidence: {validation_result.get('confidence', 0):.2f})")
@@ -808,7 +934,17 @@ def validate_task_node(state: AgentState) -> Dict[str, Any]:
                 root_cause_reasoning = validation_result.get("root_cause_reasoning", "")
                 updates["backtrack_reasoning"] = root_cause_reasoning
                 print(f"[P7 VALIDATE] Backtrack reasoning saved: {root_cause_reasoning[:]}...")
+                _append_event(
+                    state,
+                    {
+                        "event": "backtrack_marked",
+                        "from_task_id": task_id,
+                        "to_task_id": root_cause,
+                        "reasoning_preview": _safe_preview(root_cause_reasoning, max_str=500),
+                    },
+                )
 
+    updates["event_history"] = state.get("event_history", [])
     return updates
 
 def p7_router(state: AgentState) -> str:
@@ -929,6 +1065,7 @@ class Prototype7Agent:
             "sections": sections, # 섹션 단위로 분해된 문서
             "task_results": [], # 지금까지 task 결과
             "task_history": [], # 디버깅용
+            "event_history": [], # Persistent event log (not truncated on backtracking)
             "current_task": None, # 현재 실행중인 task
             "current_task_output": None, # 현재 task의 결과
             "is_complete": False, # 완료 플래그
@@ -967,6 +1104,7 @@ class Prototype7Agent:
             # 성공 case 처리
             task_results = final_state.get("task_results", [])
             task_history = final_state.get("task_history", [])
+            event_history = final_state.get("event_history", [])
             # final_data는 마지막 task의 data를 최종 산출물로 가져옴
             final_data = task_results[-1].get("data") if task_results else None
             task_log = self._build_task_log(final_state)
@@ -977,6 +1115,7 @@ class Prototype7Agent:
                 "task_log": task_log,
                 "task_results": task_results,
                 "task_history": task_history,
+                "event_history": event_history,
                 "error": None,
             }
         except Exception as e:
@@ -995,4 +1134,3 @@ class Prototype7Agent:
              "error": r.get("error")}
             for idx, r in enumerate(state.get("task_results", []))
         ]
-

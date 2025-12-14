@@ -38,7 +38,7 @@ class LLMPlanner:
 
     def __init__(self):
         """Initialize OpenAI client"""
-        load_dotenv(dotenv_path=r"c:\Users\NT-165\Desktop\Project\Toy\.env")
+        load_dotenv()
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     

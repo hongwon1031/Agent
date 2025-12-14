@@ -44,7 +44,8 @@ def main():
 
     print("\n🚀 Using Prototype 7: Dynamic Task Execution Agent")
     agent = Prototype7Agent()
-    results_dir = Path(r"C:\Users\NT-165\Desktop\Project\Toy\prototype_8\new_results")
+    #results_dir = Path(r"C:\Users\NT-165\Desktop\Project\Toy\prototype_8\new_results")
+    results_dir = Path(r"E:\work\work\Agent\prototype_8\new_results")
 
 
     results_dir.mkdir(parents=True, exist_ok=True)

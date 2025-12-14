@@ -245,7 +245,8 @@ def build_validate_section_classifier_llm(
 # ==================================================================================================
 
 def build_validate_definition_extract_v2_llm(
-    definition_sections: List[Dict[str, Any]],
+    core_sections_preview : List[Dict[str, Any]],
+    annotation_sections_preview : List[Dict[str, Any]],
     header: List[str],
     data: List[List[str]],
 ) -> str:
@@ -256,7 +257,10 @@ def build_validate_definition_extract_v2_llm(
 - 정의 관련 섹션들(테이블 + 텍스트)를 보고, DefinitinoExtractV2가 추출한 테이블이 이 섹션들의 정의 + 주석/예외를 대체로 잘 반영했는지 확인하세요
 
 **원본 정의 관련 섹션들 (샘플)**:
-{json.dumps(definition_sections, ensure_ascii=False, indent=2)}
+주요 정의 섹션
+{json.dumps(core_sections_preview, ensure_ascii=False, indent=2)}
+정의 보조 섹션(추가 설명/주석 등)
+{json.dumps(annotation_sections_preview, ensure_ascii=False, indent=2)}
 
 **추출된 테이블**:
 Header: {json.dumps(header, ensure_ascii=False)}
@@ -1444,16 +1448,18 @@ Definition과 Condition 테이블에서 **같은 개념을 담고 있는 컬럼�
 한 컬럼 내에 여러값들이 존재할 경우 판단해서 의미적으로 매칭되지 않는 값은 지우세요
 - `"환급(A)형 / 환급(B)형 / 일반형"` ≈ `"환급형"` →  "환급(A)형 / 환급(B)형" 만 매칭
 
-### 6. 리스트 값 매칭 (NEW)
+### 6. 리스트 값 매칭 (CRITICAL)
 
 Definitions 테이블의 셀 값이 리스트인 경우:
 
 - 각 리스트 요소를 독립적인 후보값으로 간주합니다.
 - 같은 Definition 행이라도, 리스트의 서로 다른 요소가 서로 다른 Condition 행과 매칭될 수 있습니다.
-- 각 그룹에서, `definition_indices[i]`에 해당하는 Definition 행이 어떤 리스트 요소를 사용했는지 `matched_list_items[i]`에 **0-based 인덱스**로 기록하세요.
+- **Fuzzy matching 적용 시**, 하나의 Condition 값이 **여러 리스트 요소와 동시에 매칭**될 수 있습니다.
+  - 이 경우 `matched_list_items`에 **모든 매칭되는 인덱스를 리스트로** 포함하세요.
+- 각 그룹에서, `definition_indices[i]`에 해당하는 Definition 행이 어떤 리스트 요소를 사용했는지 `matched_list_items[i]`에 **0-based 인덱스 (또는 인덱스 리스트)**로 기록하세요.
 
 
-**예시**:
+**예시 1: 서로 다른 Condition에 매칭**:
 
 - Definition 행 0: `{{"유형": ["일반", "특약(A,B,C)"]}}`
 - Condition 행 0: `{{"유형": "일반"}}`
@@ -1475,8 +1481,33 @@ Definitions 테이블의 셀 값이 리스트인 경우:
 }}
 ```
 
+**예시 2: Fuzzy matching으로 여러 리스트 요소가 동시에 매칭 (IMPORTANT!)**:
+
+- Definition 행 0: `{{"유형2": ["간편심사(315)형", "간편심사(335)형", "간편심사(355)형", "일반심사형"]}}`
+- Condition 행 0: `{{"유형1": "간편심사형"}}`  ← "간편심사"로 fuzzy 매칭
+- Condition 행 1: `{{"유형1": "일반심사형"}}`
+
+**출력**:
+```json
+{{
+  "id": 0,
+  "definition_indices": [0],
+  "matched_list_items": [[0, 1, 2]],  ← 315, 335, 355 모두 "간편심사형"과 매칭!
+  "condition_index": 0,
+  "reasoning": "'간편심사형'은 fuzzy matching으로 '간편심사(315)형', '간편심사(335)형', '간편심사(355)형' 모두와 매칭됩니다."
+}},
+{{
+  "id": 1,
+  "definition_indices": [0],
+  "matched_list_items": [3],
+  "condition_index": 1
+}}
+```
+
 **주의**:
 - matched_list_items의 길이는 definition_indices 길이와 같아야 합니다.
+- **Fuzzy matching으로 여러 요소가 매칭되면**, 해당 위치에 **인덱스 리스트** `[0, 1, 2]`를 넣습니다.
+- **정확히 하나만 매칭되면**, 단일 정수 `0` 또는 `[0]` 형태로 넣습니다 (둘 다 허용).
 - Definition 셀이 리스트가 아닌 문자열인 경우, 해당 위치에 null을 넣습니다.
 
 ---
@@ -1539,10 +1570,11 @@ Definitions 테이블의 셀 값이 리스트인 경우:
 
 ## 주의사항
 1. **인덱스는 0-based**: 첫 번째 행은 인덱스 0
-2. **중복 방지**: 한 Definition 행은 오직 하나의 그룹에만 속함
+2. **중복 허용 (리스트 값의 경우)**: Definition 행이 리스트 값을 가진 경우, **여러 그룹에 속할 수 있습니다** (각 그룹은 서로 다른 리스트 요소 또는 요소 조합과 매칭).
 3. **완전성**: 가능한 한 모든 Definition 행을 매칭하려고 노력 (coverage_ratio 높이기)
 4. **일관성**: 같은 조건을 가진 Definition 행들은 반드시 같은 그룹으로
 5. **정확성**: `definition_indices`, `condition_index`의 범위를 반드시 검증
+6. **Fuzzy matching 우선**: 정확히 일치하지 않아도 의미적으로 같으면 매칭 (예: "간편심사형" ↔ "간편심사(315)형")
 
 --- 
 
