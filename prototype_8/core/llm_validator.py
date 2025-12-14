@@ -61,37 +61,22 @@ class LLMValidator:
         if context is None:
             context = {}
 
+        # CRITICAL FIX: Normalize task_type (Planner → Validator mapping)
+        TASK_TYPE_ALIASES = {
+            "classify_sections": "classify",
+            "extract_definitions": "extract",
+            "condition_extraction": "extract_condition",
+            "combination_generation": "generate",
+        }
+        task_type = TASK_TYPE_ALIASES.get(task_type, task_type)
+
         # Route to appropriate validation method
         if task_type == "search" or task_type == "classify":
             result = self.validate_classify(task_output, context)
         elif task_type == "extract":
-            # V2: definition_extract_v2 결과 (extraction_method로 구분)
-            if isinstance(task_output, dict) and task_output.get("extraction_method") == "v2_classifier_based":
-                # LLM 기반 상세 검증 수행
-                result = self.validate_definition_extract_v2_llm(task_output, context)
-            # V1: definition_extract 결과(core_candidate 포함)는 구조만 확인하고 통과
-            elif isinstance(task_output, dict) and "core_candidate" in task_output:
-                header = task_output.get("header") or []
-                data = task_output.get("data") or []
-                if not header or not data:
-                    result = {
-                        "is_valid": False,
-                        "confidence": 0.8,
-                        "errors": ["Definition extract returned empty header or data"],
-                        "suggestions": ["Check definition_search/definition_extract rules"],
-                        "reasoning": "definition_extract produced empty table"
-                    }
-                else:
-                    result = {
-                        "is_valid": True,
-                        "confidence": 0.9,
-                        "errors": [],
-                        "suggestions": [],
-                        "reasoning": "definition_extract output schema is valid (header/data/core_candidate present)"
-                    }
-            else:
-                # 그 외 extract는 기존 definition-aware validator 사용
-                result = self.validate_extract_definitions(task_output, context)
+            # FIXED: V2가 기본이므로, 모든 extract는 V2 validator 사용
+            # (V1 definition_extract는 deprecated)
+            result = self.validate_definition_extract_v2_llm(task_output, context)
         elif task_type == "extract_condition":
             # NEW: LLM-based validation for condition_extract
             result = self.validate_condition_extract_llm(task_output, context)

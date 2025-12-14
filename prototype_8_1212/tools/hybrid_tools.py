@@ -45,57 +45,6 @@ class ToolResult:
 
 
 # ============================================================================
-# SHARED UTILITY FUNCTIONS
-# ============================================================================
-
-def normalize_definition_header(header: List[str]) -> List[str]:
-    """
-    Normalize raw Definition table header to standard schema
-
-    Standard schema: ["보종명", "유형1", "유형2", ...]
-
-    Args:
-        header: Raw header (e.g., ["명칭", "보험종목", "보험종목_1"])
-
-    Returns:
-        Normalized header (e.g., ["보종명", "유형1", "유형2"])
-    """
-    # Mapping table: raw column name → standard column name
-    HEADER_MAPPING = {
-        "명칭": "보종명",
-        "상품명": "보종명",
-        "보장명칭": "보종명",
-        "보험종목": "유형1",
-        "보험종목_1": "유형2",
-        "보험종목_2": "유형3",
-        "구분": "유형1",
-        "유형": "유형1",
-        "종류": "유형1",
-        "형태": "유형1",
-        "심사형": "유형1",
-        "가입형": "유형1",
-    }
-
-    normalized = []
-    for col in header:
-        # Try exact match first
-        if col in HEADER_MAPPING:
-            normalized.append(HEADER_MAPPING[col])
-        # Check if already in standard format (보종명, 유형1, etc.)
-        elif col in ["보종명", "유형1", "유형2", "유형3", "유형4"]:
-            normalized.append(col)
-        # Keep as-is if no mapping found
-        else:
-            normalized.append(col)
-
-    print(f"\n[HEADER NORMALIZATION]")
-    print(f"  Raw:    {header}")
-    print(f"  Normalized: {normalized}")
-
-    return normalized
-
-
-# ============================================================================
 # SEARCH TOOLS
 # ============================================================================
 
@@ -1005,13 +954,10 @@ class LLMTableSplitTool:
                 print(f"\n[LLM TABLE SPLIT] [OK] Split all {len(normalized)} rows")
 
 
-            # CRITICAL: Normalize Definition header to standard schema
-            normalized_header = normalize_definition_header(header)
-
             return ToolResult(
                 success=True,
                 data={
-                    "header": normalized_header,  # Normalized to standard schema
+                    "header": header,  # Header unchanged
                     "data": final_data,
                     "notes": result.get("notes", "")
                 },
@@ -1132,13 +1078,10 @@ class RuleTableSplitTool:
 
             print(f"[RULE TABLE SPLIT] [OK] Split {len(row_indices)} rows")
 
-            # CRITICAL: Normalize Definition header to standard schema
-            normalized_header = normalize_definition_header(header)
-
             return ToolResult(
                 success=True,
                 data={
-                    "header": normalized_header,
+                    "header": header,
                     "data": final_data
                 },
                 tool_name=self.name
@@ -1545,88 +1488,6 @@ class CombinationGeneratorTool:
 
     def __init__(self):
         self.name = "combination_generator"
-        load_dotenv(dotenv_path=r"c:\Users\NT-165\Desktop\Project\Toy\.env")
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        # CRITICAL: Cache for LLM formula evaluation to prevent repeated API calls
-        self._formula_cache = {}
-
-    def _llm_evaluate_age_formula(self, formula_str: str, context: Dict[str, Any]) -> Optional[int]:
-        """
-        LLM-based fallback for formula evaluation (with caching)
-
-        Args:
-            formula_str: Age formula (e.g., "만15세 ~ min{80-년만기, 70}세")
-            context: Variable context (e.g., {"년만기": 20, "세만기": 80})
-
-        Returns:
-            Evaluated age or None if LLM fails
-        """
-        # CRITICAL: Check cache first to avoid repeated API calls
-        cache_key = (formula_str, frozenset(context.items()))
-        if cache_key in self._formula_cache:
-            cached_value = self._formula_cache[cache_key]
-            print(f"[LLM FORMULA EVAL] [CACHED] '{formula_str}' → {cached_value}")
-            return cached_value
-
-        try:
-            import json as json_module
-
-            prompt = f"""다음 나이 조건 수식을 해석하여 정수 값을 반환하세요.
-
-**수식**: {formula_str}
-**컨텍스트**: {json_module.dumps(context, ensure_ascii=False)}
-
-**예시**:
-- "만15세" → 15
-- "min{{80-년만기, 70}}세" + {{"년만기": 20}} → min{{80-20, 70}} = 60
-- "만20세 ~ 65세" (최소나이 요청) → 20
-- "만20세 ~ 65세" (최대나이 요청) → 65
-
-**중요**:
-- 수식에 "~"가 있으면 범위 표현입니다. 최소값만 추출하세요 (앞부분).
-- min, max, 사칙연산을 올바르게 계산하세요.
-- 결과는 반드시 정수여야 합니다.
-
-**JSON 형식으로만 반환**:
-{{
-  "value": <정수>
-}}"""
-
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[{"role": "user", "content": prompt}],
-                response_format={"type": "json_object"},
-                temperature=0,
-                max_tokens=200
-            )
-
-            result = json_module.loads(response.choices[0].message.content)
-            value = result.get("value")
-
-            # Sanity check
-            if value is not None and isinstance(value, (int, float)):
-                value = int(value)
-                if 0 <= value <= 120:  # Valid age range
-                    print(f"[LLM FORMULA EVAL] '{formula_str}' → {value}")
-                    # CRITICAL: Store in cache for future reuse
-                    self._formula_cache[cache_key] = value
-                    return value
-                else:
-                    print(f"[LLM FORMULA EVAL] Invalid age range: {value}")
-                    # Cache None for invalid results too (avoid repeated failures)
-                    self._formula_cache[cache_key] = None
-                    return None
-            else:
-                print(f"[LLM FORMULA EVAL] Failed: {formula_str} → {result}")
-                # Cache None for failed results
-                self._formula_cache[cache_key] = None
-                return None
-
-        except Exception as e:
-            print(f"[LLM FORMULA EVAL] Error: {e}")
-            # Cache None for errors too
-            self._formula_cache[cache_key] = None
-            return None
 
     def execute(self, doc: Any, params: Dict[str, Any]) -> ToolResult:
         """
@@ -1809,26 +1670,9 @@ class CombinationGeneratorTool:
 
                 # Cartesian product for list fields
                 for 보험기간, 납입기간, 성별 in product(보험기간_list, 납입기간_list, 성별_list):
-                    # CRITICAL FIX: Build comprehensive context for formula evaluation
-                    # Extract numeric value from period strings
-                    보험기간_숫자 = parse_period(보험기간) if 보험기간 else None
-                    납입기간_숫자 = parse_period(납입기간) if 납입기간 else None
-
-                    # Determine if 보험기간 is age-based (세) or year-based (년)
-                    세만기 = None
-                    년만기 = None
-                    if 보험기간_숫자 is not None:
-                        if "세" in str(보험기간):
-                            세만기 = 보험기간_숫자
-                        elif "년" in str(보험기간):
-                            년만기 = 보험기간_숫자
-                        else:
-                            # Default: treat as age-based if no explicit marker
-                            세만기 = 보험기간_숫자
-
-                    # 납입기간도 동일하게 처리 (대부분 년납이지만 안전하게)
-                    년납 = 납입기간_숫자
-                    납입기간_년 = 납입기간_숫자
+                    # Get context for formula evaluation
+                    세만기 = parse_period(보험기간) if 보험기간 else None
+                    년납 = parse_period(납입기간) if 납입기간 else None
 
                     # Parse/evaluate ages
                     최소나이_raw = cond_row.get("주피보험자최소가입연령", "")
@@ -1836,46 +1680,12 @@ class CombinationGeneratorTool:
 
                     # Try parse as simple age first
                     최소나이 = parse_age(최소나이_raw) if 최소나이_raw else None
-                    if 최소나이 is None and 최소나이_raw:
-                        # Build comprehensive context with all possible variable names
-                        formula_context = {}
-                        if 세만기 is not None:
-                            formula_context["세만기"] = 세만기
-                        if 년만기 is not None:
-                            formula_context["년만기"] = 년만기
-                        if 년납 is not None:
-                            formula_context["년납"] = 년납
-                            formula_context["납입기간"] = 년납
-                        if 납입기간_년 is not None:
-                            formula_context["납입기간_년"] = 납입기간_년
-
-                        # CRITICAL FIX: Rule-based evaluation with LLM fallback
-                        최소나이 = evaluate_formula(최소나이_raw, **formula_context)
-                        if 최소나이 is None and formula_context:
-                            # LLM fallback
-                            print(f"[WARN] Rule-based eval failed for 최소나이: '{최소나이_raw}', trying LLM fallback")
-                            최소나이 = self._llm_evaluate_age_formula(최소나이_raw, formula_context)
+                    if 최소나이 is None and 최소나이_raw and 세만기 is not None and 년납 is not None:
+                        최소나이 = evaluate_formula(최소나이_raw, 세만기=세만기, 년납=년납)
 
                     최대나이 = parse_age(최대나이_raw) if 최대나이_raw else None
-                    if 최대나이 is None and 최대나이_raw:
-                        # Build comprehensive context
-                        formula_context = {}
-                        if 세만기 is not None:
-                            formula_context["세만기"] = 세만기
-                        if 년만기 is not None:
-                            formula_context["년만기"] = 년만기
-                        if 년납 is not None:
-                            formula_context["년납"] = 년납
-                            formula_context["납입기간"] = 년납
-                        if 납입기간_년 is not None:
-                            formula_context["납입기간_년"] = 납입기간_년
-
-                        # CRITICAL FIX: Rule-based evaluation with LLM fallback
-                        최대나이 = evaluate_formula(최대나이_raw, **formula_context)
-                        if 최대나이 is None and formula_context:
-                            # LLM fallback
-                            print(f"[WARN] Rule-based eval failed for 최대나이: '{최대나이_raw}', trying LLM fallback")
-                            최대나이 = self._llm_evaluate_age_formula(최대나이_raw, formula_context)
+                    if 최대나이 is None and 최대나이_raw and 세만기 is not None and 년납 is not None:
+                        최대나이 = evaluate_formula(최대나이_raw, 세만기=세만기, 년납=년납)
 
                     # Build final combination
                     merged: Dict[str, Any] = {}
