@@ -114,6 +114,11 @@ class DefinitionExtractToolV2:
         # Initialize OpenAI client for LLM helper
         load_dotenv()
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        # LLM usage tracking
+        self._llm_stats = {
+            "extract": {"call_count": 0, "total_prompt_tokens": 0, "total_completion_tokens": 0, "total_tokens": 0, "total_time_ms": 0},
+            "merge": {"call_count": 0, "total_prompt_tokens": 0, "total_completion_tokens": 0, "total_tokens": 0, "total_time_ms": 0}
+        }
 
     def _rule_extract_helper(self, content: Dict, content_type: str) -> tuple:
         """
@@ -231,6 +236,12 @@ class DefinitionExtractToolV2:
             (header, rows, notes) or ([], [], "") on failure
         """
         try:
+            import time
+
+            # Track LLM call
+            self._llm_stats["extract"]["call_count"] += 1
+            start_time = time.time()
+
             # Convert content to string
             if isinstance(content, str):
                 content_str = content
@@ -247,6 +258,15 @@ class DefinitionExtractToolV2:
                 max_tokens=3000
             )
 
+            # Track time and tokens
+            elapsed_ms = (time.time() - start_time) * 1000
+            self._llm_stats["extract"]["total_time_ms"] += elapsed_ms
+
+            if hasattr(response, 'usage') and response.usage:
+                self._llm_stats["extract"]["total_prompt_tokens"] += response.usage.prompt_tokens
+                self._llm_stats["extract"]["total_completion_tokens"] += response.usage.completion_tokens
+                self._llm_stats["extract"]["total_tokens"] += response.usage.total_tokens
+
             result = json.loads(response.choices[0].message.content)
             print(f'❗result : {result}')
             if not result.get("header") or not result.get("data"):
@@ -262,9 +282,15 @@ class DefinitionExtractToolV2:
         Private helper for LLM-based merging of table and annotations.
         """
         try:
+            import time
+
+            # Track LLM call
+            self._llm_stats["merge"]["call_count"] += 1
+            start_time = time.time()
+
             content_str = json.dumps(content, ensure_ascii=False)
 
-            
+
             prompt = build_llm_merge_prompt(content_str, instruction)
 
             response = self.client.chat.completions.create(
@@ -274,6 +300,15 @@ class DefinitionExtractToolV2:
                 temperature=0,
                 max_tokens=3000
             )
+
+            # Track time and tokens
+            elapsed_ms = (time.time() - start_time) * 1000
+            self._llm_stats["merge"]["total_time_ms"] += elapsed_ms
+
+            if hasattr(response, 'usage') and response.usage:
+                self._llm_stats["merge"]["total_prompt_tokens"] += response.usage.prompt_tokens
+                self._llm_stats["merge"]["total_completion_tokens"] += response.usage.completion_tokens
+                self._llm_stats["merge"]["total_tokens"] += response.usage.total_tokens
 
             result = json.loads(response.choices[0].message.content)
 
@@ -354,12 +389,25 @@ class DefinitionExtractToolV2:
                     sections, merge_indices, header, rows, doc, instruction
                 )
 
+            # Calculate LLM stats
+            for op_name in ["extract", "merge"]:
+                op_stats = self._llm_stats[op_name]
+                if op_stats["call_count"] > 0:
+                    op_stats["average_time_ms"] = op_stats["total_time_ms"] / op_stats["call_count"]
+                    input_cost = (op_stats["total_prompt_tokens"] / 1_000_000) * 2.50
+                    output_cost = (op_stats["total_completion_tokens"] / 1_000_000) * 10.00
+                    op_stats["estimated_cost_usd"] = round(input_cost + output_cost, 6)
+                else:
+                    op_stats["average_time_ms"] = 0
+                    op_stats["estimated_cost_usd"] = 0
+
             return ToolResult(
                 success=True,
                 data={
                     "header": header,
                     "data": rows,
-                    "extraction_method": "v2_classifier_based"
+                    "extraction_method": "v2_classifier_based",
+                    "llm_usage_stats": self._llm_stats
                 },
                 tool_name=self.name
             )
@@ -587,6 +635,7 @@ class LLMCartesianTool:
         self.name = "llm_cartesian"
         load_dotenv()
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self._llm_stats = {"split_values": {"call_count": 0, "total_prompt_tokens": 0, "total_completion_tokens": 0, "total_tokens": 0, "total_time_ms": 0}}
 
     def execute(self, doc: Any, params: Dict[str, Any]) -> ToolResult:
         """
@@ -615,7 +664,11 @@ class LLMCartesianTool:
                 )
 
             # Step 1: LLM으로 값 분리
-            
+            import time
+
+            self._llm_stats["split_values"]["call_count"] += 1
+            start_time = time.time()
+
             prompt = build_llm_cartesian_prompt(header, data, instruction)
 
             response = self.client.chat.completions.create(
@@ -625,6 +678,13 @@ class LLMCartesianTool:
                 temperature=0,
                 max_tokens=4000
             )
+
+            elapsed_ms = (time.time() - start_time) * 1000
+            self._llm_stats["split_values"]["total_time_ms"] += elapsed_ms
+            if hasattr(response, 'usage') and response.usage:
+                self._llm_stats["split_values"]["total_prompt_tokens"] += response.usage.prompt_tokens
+                self._llm_stats["split_values"]["total_completion_tokens"] += response.usage.completion_tokens
+                self._llm_stats["split_values"]["total_tokens"] += response.usage.total_tokens
 
             llm_result = json.loads(response.choices[0].message.content)
 
@@ -656,12 +716,24 @@ class LLMCartesianTool:
                         definition[f"유형{i}"] = value
                     all_definitions.append(definition)
 
+            # Calculate LLM stats
+            stats = self._llm_stats["split_values"]
+            if stats["call_count"] > 0:
+                stats["average_time_ms"] = stats["total_time_ms"] / stats["call_count"]
+                input_cost = (stats["total_prompt_tokens"] / 1_000_000) * 2.50
+                output_cost = (stats["total_completion_tokens"] / 1_000_000) * 10.00
+                stats["estimated_cost_usd"] = round(input_cost + output_cost, 6)
+            else:
+                stats["average_time_ms"] = 0
+                stats["estimated_cost_usd"] = 0
+
             return ToolResult(
                 success=True,
                 data={
                     "definitions": all_definitions,
                     "total_count": len(all_definitions),
-                    "notes": f"LLM parsing + Python Cartesian. {llm_result.get('notes', '')}"
+                    "notes": f"LLM parsing + Python Cartesian. {llm_result.get('notes', '')}",
+                    "llm_usage_stats": self._llm_stats
                 },
                 tool_name=self.name
             )
@@ -690,6 +762,7 @@ class SectionClassifierTool:
     def __init__(self):
         self.name = "section_classifier"
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self._llm_stats = {"classify": {"call_count": 0, "total_prompt_tokens": 0, "total_completion_tokens": 0, "total_tokens": 0, "total_time_ms": 0}}
 
     def execute(self, doc: Any, params: Dict[str, Any]) -> ToolResult:
         """
@@ -743,6 +816,10 @@ class SectionClassifierTool:
             prompt = self._build_classification_prompt(summaries, instruction)
 
             # Step 3: Call LLM
+            import time
+            self._llm_stats["classify"]["call_count"] += 1
+            start_time = time.time()
+
             response = self.client.chat.completions.create(
                 model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
@@ -750,6 +827,13 @@ class SectionClassifierTool:
                 temperature=0,
                 max_tokens=4000
             )
+
+            elapsed_ms = (time.time() - start_time) * 1000
+            self._llm_stats["classify"]["total_time_ms"] += elapsed_ms
+            if hasattr(response, 'usage') and response.usage:
+                self._llm_stats["classify"]["total_prompt_tokens"] += response.usage.prompt_tokens
+                self._llm_stats["classify"]["total_completion_tokens"] += response.usage.completion_tokens
+                self._llm_stats["classify"]["total_tokens"] += response.usage.total_tokens
 
             result = json.loads(response.choices[0].message.content)
 
@@ -769,7 +853,17 @@ class SectionClassifierTool:
                         tool_name=self.name
                     )
 
-            # Step 5: Return classification
+            # Step 5: Calculate stats and return
+            stats = self._llm_stats["classify"]
+            if stats["call_count"] > 0:
+                stats["average_time_ms"] = stats["total_time_ms"] / stats["call_count"]
+                input_cost = (stats["total_prompt_tokens"] / 1_000_000) * 2.50
+                output_cost = (stats["total_completion_tokens"] / 1_000_000) * 10.00
+                stats["estimated_cost_usd"] = round(input_cost + output_cost, 6)
+            else:
+                stats["average_time_ms"] = 0
+                stats["estimated_cost_usd"] = 0
+
             return ToolResult(
                 success=True,
                 data={
@@ -777,7 +871,8 @@ class SectionClassifierTool:
                     "definition_annotation": result["definition_annotation"],
                     "condition": result["condition"],
                     "other": result["other"],
-                    "reasoning": result.get("reasoning", "")
+                    "reasoning": result.get("reasoning", ""),
+                    "llm_usage_stats": self._llm_stats
                 },
                 tool_name=self.name
             )
@@ -887,6 +982,7 @@ class LLMTableSplitTool:
         self.name = "llm_table_split"
         load_dotenv()
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self._llm_stats = {"split": {"call_count": 0, "total_prompt_tokens": 0, "total_completion_tokens": 0, "total_tokens": 0, "total_time_ms": 0}}
 
     def execute(self, doc: Any, params: Dict[str, Any]) -> ToolResult:
         """
@@ -947,6 +1043,10 @@ class LLMTableSplitTool:
             )
 
             # Call LLM
+            import time
+            self._llm_stats["split"]["call_count"] += 1
+            start_time = time.time()
+
             response = self.client.chat.completions.create(
                 model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
@@ -954,6 +1054,13 @@ class LLMTableSplitTool:
                 temperature=0,
                 max_tokens=4000
             )
+
+            elapsed_ms = (time.time() - start_time) * 1000
+            self._llm_stats["split"]["total_time_ms"] += elapsed_ms
+            if hasattr(response, 'usage') and response.usage:
+                self._llm_stats["split"]["total_prompt_tokens"] += response.usage.prompt_tokens
+                self._llm_stats["split"]["total_completion_tokens"] += response.usage.completion_tokens
+                self._llm_stats["split"]["total_tokens"] += response.usage.total_tokens
 
             raw = response.choices[0].message.content
             print("=== LLM TABLE SPLIT RAW RESPONSE ===")
@@ -1018,13 +1125,24 @@ class LLMTableSplitTool:
             # CRITICAL: Normalize Definition header to standard schema
             #normalized_header = normalize_definition_header(header)
 
+            # Calculate stats
+            stats = self._llm_stats["split"]
+            if stats["call_count"] > 0:
+                stats["average_time_ms"] = stats["total_time_ms"] / stats["call_count"]
+                input_cost = (stats["total_prompt_tokens"] / 1_000_000) * 2.50
+                output_cost = (stats["total_completion_tokens"] / 1_000_000) * 10.00
+                stats["estimated_cost_usd"] = round(input_cost + output_cost, 6)
+            else:
+                stats["average_time_ms"] = 0
+                stats["estimated_cost_usd"] = 0
 
             return ToolResult(
                 success=True,
                 data={
                     "header": normalized_header,  # Normalized to standard schema
                     "data": final_data,
-                    "notes": result.get("notes", "")
+                    "notes": result.get("notes", ""),
+                    "llm_usage_stats": self._llm_stats
                 },
                 tool_name=self.name
             )
@@ -1180,6 +1298,7 @@ class ConditionTransformTool:
         self.name = "condition_transform"
         load_dotenv()
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self._llm_stats = {"transform": {"call_count": 0, "total_prompt_tokens": 0, "total_completion_tokens": 0, "total_tokens": 0, "total_time_ms": 0}}
 
     def execute(self, doc: Any, params: Dict[str, Any]) -> ToolResult:
         """
@@ -1222,6 +1341,10 @@ class ConditionTransformTool:
             )
 
             # Call LLM
+            import time
+            self._llm_stats["transform"]["call_count"] += 1
+            start_time = time.time()
+
             response = self.client.chat.completions.create(
                 model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
@@ -1229,6 +1352,13 @@ class ConditionTransformTool:
                 temperature=0,
                 max_tokens=4000
             )
+
+            elapsed_ms = (time.time() - start_time) * 1000
+            self._llm_stats["transform"]["total_time_ms"] += elapsed_ms
+            if hasattr(response, 'usage') and response.usage:
+                self._llm_stats["transform"]["total_prompt_tokens"] += response.usage.prompt_tokens
+                self._llm_stats["transform"]["total_completion_tokens"] += response.usage.completion_tokens
+                self._llm_stats["transform"]["total_tokens"] += response.usage.total_tokens
 
             raw = response.choices[0].message.content
             print("=== CONDITION TRANSFORM RAW RESPONSE ===")
@@ -1259,12 +1389,24 @@ class ConditionTransformTool:
             print(f"  - Output columns: {len(transformed_header)}")
             print(f"  - Final schema: {transformed_header[:5]}...")
 
+            # Calculate stats
+            stats = self._llm_stats["transform"]
+            if stats["call_count"] > 0:
+                stats["average_time_ms"] = stats["total_time_ms"] / stats["call_count"]
+                input_cost = (stats["total_prompt_tokens"] / 1_000_000) * 2.50
+                output_cost = (stats["total_completion_tokens"] / 1_000_000) * 10.00
+                stats["estimated_cost_usd"] = round(input_cost + output_cost, 6)
+            else:
+                stats["average_time_ms"] = 0
+                stats["estimated_cost_usd"] = 0
+
             return ToolResult(
                 success=True,
                 data={
                     "header": transformed_header,
                     "data": transformed_data,
-                    "notes": result.get("notes", "")
+                    "notes": result.get("notes", ""),
+                    "llm_usage_stats": self._llm_stats
                 },
                 tool_name=self.name
             )
@@ -1298,6 +1440,7 @@ class IntelligentConditionExtractTool:
         self.name = "intelligent_condition_extract"
         load_dotenv()
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self._llm_stats = {"extract": {"call_count": 0, "total_prompt_tokens": 0, "total_completion_tokens": 0, "total_tokens": 0, "total_time_ms": 0}}
 
     def execute(self, doc: Any, params: Dict[str, Any]) -> ToolResult:
         """
@@ -1355,6 +1498,10 @@ class IntelligentConditionExtractTool:
             )
 
             # Call the LLM
+            import time
+            self._llm_stats["extract"]["call_count"] += 1
+            start_time = time.time()
+
             response = self.client.chat.completions.create(
                 model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
@@ -1362,6 +1509,13 @@ class IntelligentConditionExtractTool:
                 temperature=0,
                 max_tokens=4095
             )
+
+            elapsed_ms = (time.time() - start_time) * 1000
+            self._llm_stats["extract"]["total_time_ms"] += elapsed_ms
+            if hasattr(response, 'usage') and response.usage:
+                self._llm_stats["extract"]["total_prompt_tokens"] += response.usage.prompt_tokens
+                self._llm_stats["extract"]["total_completion_tokens"] += response.usage.completion_tokens
+                self._llm_stats["extract"]["total_tokens"] += response.usage.total_tokens
 
             result_data = json.loads(response.choices[0].message.content)
 
@@ -1372,7 +1526,21 @@ class IntelligentConditionExtractTool:
                     error="LLM response is missing required keys: 'header' or 'data'.",
                     tool_name=self.name
                 )
-            
+
+            # Calculate stats
+            stats = self._llm_stats["extract"]
+            if stats["call_count"] > 0:
+                stats["average_time_ms"] = stats["total_time_ms"] / stats["call_count"]
+                input_cost = (stats["total_prompt_tokens"] / 1_000_000) * 2.50
+                output_cost = (stats["total_completion_tokens"] / 1_000_000) * 10.00
+                stats["estimated_cost_usd"] = round(input_cost + output_cost, 6)
+            else:
+                stats["average_time_ms"] = 0
+                stats["estimated_cost_usd"] = 0
+
+            # Add stats to result_data
+            result_data["llm_usage_stats"] = self._llm_stats
+
             return ToolResult(
                 success=True,
                 data=result_data,
@@ -1410,6 +1578,7 @@ class GroupingLogicExtractorTool:
         self.name = "grouping_logic_extractor"
         load_dotenv()
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self._llm_stats = {"grouping": {"call_count": 0, "total_prompt_tokens": 0, "total_completion_tokens": 0, "total_tokens": 0, "total_time_ms": 0}}
 
     def execute(self, doc: Any, params: Dict[str, Any]) -> ToolResult:
         """
@@ -1482,6 +1651,10 @@ class GroupingLogicExtractorTool:
             )
 
             # Call LLM
+            import time
+            self._llm_stats["grouping"]["call_count"] += 1
+            start_time = time.time()
+
             response = self.client.chat.completions.create(
                 model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
@@ -1489,6 +1662,13 @@ class GroupingLogicExtractorTool:
                 temperature=0,
                 max_tokens=4000  # 그룹 수만큼만 출력되므로 충분
             )
+
+            elapsed_ms = (time.time() - start_time) * 1000
+            self._llm_stats["grouping"]["total_time_ms"] += elapsed_ms
+            if hasattr(response, 'usage') and response.usage:
+                self._llm_stats["grouping"]["total_prompt_tokens"] += response.usage.prompt_tokens
+                self._llm_stats["grouping"]["total_completion_tokens"] += response.usage.completion_tokens
+                self._llm_stats["grouping"]["total_tokens"] += response.usage.total_tokens
 
             raw = response.choices[0].message.content
             print("=== GROUPING RAW RESPONSE ===")
@@ -1513,6 +1693,43 @@ class GroupingLogicExtractorTool:
 
             # Basic range validation
             for group in grouping_logic.get("groups", []):
+                group_id = group.get("id", "unknown")
+
+                # Validate join_mappings structure
+                join_mappings = group.get("join_mappings")
+                if join_mappings is None:
+                    return ToolResult(
+                        success=False,
+                        error=f"Group {group_id}: missing 'join_mappings' field",
+                        tool_name=self.name
+                    )
+
+                if not isinstance(join_mappings, list):
+                    return ToolResult(
+                        success=False,
+                        error=f"Group {group_id}: 'join_mappings' must be a list, got {type(join_mappings).__name__}",
+                        tool_name=self.name
+                    )
+
+                # Validate each mapping object
+                for i, mapping in enumerate(join_mappings):
+                    if not isinstance(mapping, dict):
+                        return ToolResult(
+                            success=False,
+                            error=f"Group {group_id}: join_mappings[{i}] must be a dict, got {type(mapping).__name__}",
+                            tool_name=self.name
+                        )
+
+                    required_keys = ["def_col", "cond_col", "value"]
+                    for key in required_keys:
+                        if key not in mapping:
+                            return ToolResult(
+                                success=False,
+                                error=f"Group {group_id}: join_mappings[{i}] missing required key '{key}'",
+                                tool_name=self.name
+                            )
+
+                # Validate definition indices
                 for def_idx in group.get("definition_indices", []):
                     if def_idx < 0 or def_idx >= len(definition_data):
                         return ToolResult(
@@ -1521,6 +1738,7 @@ class GroupingLogicExtractorTool:
                             tool_name=self.name
                         )
 
+                # Validate condition indices
                 cond_indices = group.get("condition_indices", None)
 
                 if cond_indices is None:
@@ -1543,6 +1761,20 @@ class GroupingLogicExtractorTool:
             print(f"  - Matched definitions: {matched_defs}/{len(definition_data)} ({coverage:.1%})")
             print(f"  - JOIN keys: {grouping_logic.get('column_mapping', {}).get('join_keys', [])}")
             print(f"  - Value columns: {grouping_logic.get('column_mapping', {}).get('value_columns', [])}")
+
+            # Calculate LLM usage stats
+            stats = self._llm_stats["grouping"]
+            if stats["call_count"] > 0:
+                stats["average_time_ms"] = stats["total_time_ms"] / stats["call_count"]
+                input_cost = (stats["total_prompt_tokens"] / 1_000_000) * 2.50
+                output_cost = (stats["total_completion_tokens"] / 1_000_000) * 10.00
+                stats["estimated_cost_usd"] = round(input_cost + output_cost, 6)
+            else:
+                stats["average_time_ms"] = 0
+                stats["estimated_cost_usd"] = 0
+
+            # Add LLM stats to the grouping_logic data
+            grouping_logic["llm_usage_stats"] = self._llm_stats
 
             return ToolResult(
                 success=True,
@@ -1577,6 +1809,17 @@ class CombinationGeneratorTool:
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         # CRITICAL: Cache for LLM formula evaluation to prevent repeated API calls
         self._formula_cache = {}
+        # LLM usage tracking
+        self._llm_stats = {
+            "formula_evaluation": {
+                "call_count": 0,
+                "cache_hits": 0,
+                "total_prompt_tokens": 0,
+                "total_completion_tokens": 0,
+                "total_tokens": 0,
+                "total_time_ms": 0
+            }
+        }
 
     def _llm_evaluate_age_formula(self, formula_str: str, context: Dict[str, Any]) -> Optional[int]:
         """
@@ -1593,11 +1836,17 @@ class CombinationGeneratorTool:
         cache_key = (formula_str, frozenset(context.items()))
         if cache_key in self._formula_cache:
             cached_value = self._formula_cache[cache_key]
+            self._llm_stats["formula_evaluation"]["cache_hits"] += 1
             print(f"[LLM FORMULA EVAL] [CACHED] '{formula_str}' → {cached_value}")
             return cached_value
 
         try:
             import json as json_module
+            import time
+
+            # Track LLM call
+            self._llm_stats["formula_evaluation"]["call_count"] += 1
+            start_time = time.time()
 
             prompt = f"""다음 나이 조건 수식을 해석하여 정수 값을 반환하세요.
 
@@ -1627,6 +1876,15 @@ class CombinationGeneratorTool:
                 temperature=0,
                 max_tokens=200
             )
+
+            # Track time and tokens
+            elapsed_ms = (time.time() - start_time) * 1000
+            self._llm_stats["formula_evaluation"]["total_time_ms"] += elapsed_ms
+
+            if hasattr(response, 'usage') and response.usage:
+                self._llm_stats["formula_evaluation"]["total_prompt_tokens"] += response.usage.prompt_tokens
+                self._llm_stats["formula_evaluation"]["total_completion_tokens"] += response.usage.completion_tokens
+                self._llm_stats["formula_evaluation"]["total_tokens"] += response.usage.total_tokens
 
             result = json_module.loads(response.choices[0].message.content)
             value = result.get("value")
@@ -1737,12 +1995,31 @@ class CombinationGeneratorTool:
             print(f"  - From {len(groups)} groups")
             print(f"  - Matched: {matched_def_count}, Unmatched: {unmatched_def_count}")
 
+            # Calculate LLM usage stats
+            formula_stats = self._llm_stats["formula_evaluation"]
+            if formula_stats["call_count"] > 0:
+                formula_stats["average_time_ms"] = formula_stats["total_time_ms"] / formula_stats["call_count"]
+
+                # Estimate cost (GPT-4o pricing: $2.50/1M input, $10.00/1M output)
+                input_cost = (formula_stats["total_prompt_tokens"] / 1_000_000) * 2.50
+                output_cost = (formula_stats["total_completion_tokens"] / 1_000_000) * 10.00
+                formula_stats["estimated_cost_usd"] = round(input_cost + output_cost, 6)
+            else:
+                formula_stats["average_time_ms"] = 0
+                formula_stats["estimated_cost_usd"] = 0
+
+            print(f"\n[LLM USAGE]")
+            print(f"  - Formula evaluations: {formula_stats['call_count']} calls ({formula_stats['cache_hits']} cached)")
+            print(f"  - Total tokens: {formula_stats['total_tokens']} (prompt: {formula_stats['total_prompt_tokens']}, completion: {formula_stats['total_completion_tokens']})")
+            print(f"  - Estimated cost: ${formula_stats['estimated_cost_usd']:.6f}")
+
             return ToolResult(
                 success=True,
                 data={
                     "definitions": final_definitions,
                     "total_count": len(final_definitions),
-                    "generation_stats": stats
+                    "generation_stats": stats,
+                    "llm_usage_stats": self._llm_stats
                 },
                 tool_name=self.name
             )
@@ -1762,14 +2039,6 @@ class CombinationGeneratorTool:
         cond_data: List[List[str]],
         grouping_logic: Dict[str, Any],
     ) -> List[Dict[str, str]]:
-        """
-        Generate final combinations with Cartesian products and formula evaluation
-
-        Handles:
-        - List values in Definition (via matched_list_items)
-        - List values in Condition (Cartesian product)
-        - Formula evaluation with context (세만기, 년납)
-        """
         final_definitions = []
         column_mapping = grouping_logic.get("column_mapping", {})
         value_columns = column_mapping.get("value_columns", [])
@@ -1781,6 +2050,48 @@ class CombinationGeneratorTool:
                 return None
             match = re.search(r"(\d+)", str(value))
             return int(match.group(1)) if match else None
+        
+        def _pick_formula_line(raw: Any, *, has_semangi: bool, has_yeonmangi: bool) -> Any:
+            """
+            raw가 멀티라인이면(\\n) 보험기간 컨텍스트에 맞는 라인을 선택해서 반환.
+            - 세만기 컨텍스트면 '세만기' 포함 라인 우선
+            - 년만기 컨텍스트면 '년만기' 포함 라인 우선
+            - 둘 다 없거나 못찾으면 첫 줄
+            """
+            if not isinstance(raw, str):
+                return raw
+
+            s = raw.strip()
+            if "\n" not in s:
+                return s
+
+            lines = [ln.strip() for ln in s.splitlines() if ln.strip()]
+            if not lines:
+                return s
+
+            # 우선순위: 컨텍스트에 맞는 키워드 포함 라인
+            if has_yeonmangi:
+                for ln in lines:
+                    if "년만기" in ln:
+                        return ln
+                # 어떤 문서는 '년 만기'로 표현될 수도 있어 방어
+                for ln in lines:
+                    if "년 만기" in ln or "년만" in ln:
+                        return ln
+
+            if has_semangi:
+                for ln in lines:
+                    if "세만기" in ln:
+                        return ln
+                for ln in lines:
+                    if "세 만기" in ln or "세만" in ln:
+                        return ln
+
+            # fallback
+            return lines[0]
+
+
+
 
         try:
             whole_life_semangi_default = int(os.getenv("P8_WHOLE_LIFE_SEMANGI", "99"))
@@ -1791,10 +2102,8 @@ class CombinationGeneratorTool:
             definition_indices = group.get("definition_indices", [])
             matched_list_items = group.get("matched_list_items", [])
 
-            # CRITICAL FIX: Handle both old (condition_index) and new (condition_indices) format
             condition_indices = group.get("condition_indices", [])
             if not condition_indices:
-                # Fallback to old format for backward compatibility
                 condition_index = group.get("condition_index")
                 if condition_index is not None:
                     condition_indices = [condition_index]
@@ -1803,7 +2112,6 @@ class CombinationGeneratorTool:
                 print(f"[WARNING] Group {group.get('id')} has no condition_indices")
                 continue
 
-            # Validate all condition indices
             valid_condition_indices = []
             for cond_idx in condition_indices:
                 if cond_idx is None or cond_idx >= len(cond_data):
@@ -1815,20 +2123,15 @@ class CombinationGeneratorTool:
                 print(f"[WARNING] Group {group.get('id')} has no valid condition_indices")
                 continue
 
-            match_condition = group.get("match_condition", {}) or {}
+            # Get join_mappings for this group (replaces old match_condition)
+            join_mappings = group.get("join_mappings", [])
 
-            # CRITICAL: Process each condition row in the group
             for condition_index in valid_condition_indices:
-                # Get condition row as dict
                 condition_row = cond_data[condition_index]
                 cond_row = {}
                 for i, col in enumerate(cond_header):
-                    if i < len(condition_row):
-                        cond_row[col] = condition_row[i]
-                    else:
-                        cond_row[col] = None
+                    cond_row[col] = condition_row[i] if i < len(condition_row) else None
 
-                # Extract list fields for Cartesian product
                 보험기간_list = cond_row.get("보험기간", [])
                 if not isinstance(보험기간_list, list):
                     보험기간_list = [보험기간_list] if 보험기간_list else [None]
@@ -1841,48 +2144,85 @@ class CombinationGeneratorTool:
                 if not isinstance(성별_list, list):
                     성별_list = [성별_list] if 성별_list else [None]
 
-                # Process each definition in this group
                 for idx, def_idx in enumerate(definition_indices):
                     if def_idx >= len(def_data):
                         print(f"[WARNING] Invalid definition_index: {def_idx}")
                         continue
 
                     definition_row = def_data[def_idx]
-                    matched_item_idx = matched_list_items[idx] if idx < len(matched_list_items) else None
 
-                    # CRITICAL FIX: Handle matched_item_idx being either int or list[int]
-                    # - Single int: 0 → extract one value
-                    # - List of ints: [0, 1, 2] → extract multiple values (fuzzy matching)
-                    if isinstance(matched_item_idx, list):
-                        # Multiple matched items - need to expand into multiple combinations
-                        matched_indices = matched_item_idx
+                    # ✅ NEW: matched_list_items element can be:
+                    # - None
+                    # - dict: {"유형2": [0,1,2], "유형3": 4, ...}
+                    # - (legacy) int or list[int]  <-- if old prompt output still comes sometimes
+                    matched_item = matched_list_items[idx] if idx < len(matched_list_items) else None
+
+                    selection_map = {}
+                    if matched_item is None:
+                        selection_map = {}
+                    elif isinstance(matched_item, dict):
+                        selection_map = matched_item
                     else:
-                        # Single matched item (or None)
-                        matched_indices = [matched_item_idx] if matched_item_idx is not None else [None]
+                        # legacy fallback: int or list[int]
+                        # ⚠️ ambiguous which column it refers to, so we apply it ONLY to list-columns in join_keys if possible,
+                        # else apply to the first list column we find.
+                        legacy_indices = matched_item if isinstance(matched_item, list) else [matched_item]
+                        legacy_indices = [x for x in legacy_indices if isinstance(x, int)]
+                        target_cols = [c for c in def_header if c in join_keys]  # prefer join_key list columns
+                        # find first list col among target_cols
+                        chosen_col = None
+                        for c in target_cols:
+                            ci = def_header.index(c)
+                            if ci < len(definition_row) and isinstance(definition_row[ci], list):
+                                chosen_col = c
+                                break
+                        if chosen_col is None:
+                            # fallback: any first list column
+                            for c in def_header:
+                                ci = def_header.index(c)
+                                if ci < len(definition_row) and isinstance(definition_row[ci], list):
+                                    chosen_col = c
+                                    break
+                        if chosen_col is not None:
+                            selection_map = {chosen_col: legacy_indices}
+                        else:
+                            selection_map = {}
 
-                    # For each matched index, build a definition row
-                    for single_idx in matched_indices:
-                        # Build definition dict, handling list selection
-                        processed_def_row = {}
-                        for i, col in enumerate(def_header):
-                            if i < len(definition_row):
-                                value = definition_row[i]
-                                # If value is a list and we have single_idx, select that element
-                                if isinstance(value, list) and single_idx is not None:
-                                    if single_idx < len(value):
-                                        processed_def_row[col] = value[single_idx]
-                                    else:
-                                        print(f"[WARNING] matched_item_idx {single_idx} out of range for list {value}")
-                                        processed_def_row[col] = value[0] if value else None
-                                else:
-                                    processed_def_row[col] = value
+                    # ✅ 1) build options per column
+                    options_by_col = {}
+                    for i, col in enumerate(def_header):
+                        value = definition_row[i] if i < len(definition_row) else None
+
+                        if isinstance(value, list):
+                            # 선택 지정이 있으면 그 인덱스만
+                            if col in selection_map:
+                                sel = selection_map[col]
+                                sel_indices = sel if isinstance(sel, list) else [sel]
+                                sel_indices = [x for x in sel_indices if isinstance(x, int)]
+                                opts = []
+                                for si in sel_indices:
+                                    if 0 <= si < len(value):
+                                        opts.append(value[si])
+                                if not opts:
+                                    opts = [value[0]] if value else [None]
+                                options_by_col[col] = opts
                             else:
-                                processed_def_row[col] = None
+                                # 선택 지정이 없으면 전체 펼침
+                                options_by_col[col] = value if value else [None]
+                        else:
+                            options_by_col[col] = [value]
 
-                        # Cartesian product for list fields (INDENTED: runs for EACH matched index)
+                    # ✅ 2) expand definition row itself (cartesian product across list columns)
+                    cols_in_order = def_header
+                    option_lists = [options_by_col[c] for c in cols_in_order]
+
+                    for chosen_values in product(*option_lists):
+                        processed_def_row = dict(zip(cols_in_order, chosen_values))
+
+                        # ✅ 3) now expand by condition lists (보험기간/납입기간/성별)
                         for 보험기간, 납입기간, 성별 in product(보험기간_list, 납입기간_list, 성별_list):
-                            # CRITICAL FIX: Build comprehensive context for formula evaluation
-                            # Extract numeric value from period strings
+                            # --- 이하 기존 로직 그대로 (formula_context/age eval/merged 생성) ---
+                            # (여기부터는 네 기존 코드 유지)
                             보험기간_숫자 = parse_period(보험기간) if 보험기간 else None
                             if 보험기간_숫자 is None:
                                 보험기간_숫자 = _fallback_num(보험기간)
@@ -1890,7 +2230,6 @@ class CombinationGeneratorTool:
                             if 납입기간_숫자 is None:
                                 납입기간_숫자 = _fallback_num(납입기간)
 
-                            # Determine if 보험기간 is age-based (세) or year-based (년)
                             세만기 = None
                             년만기 = None
                             if 보험기간_숫자 is not None:
@@ -1899,19 +2238,15 @@ class CombinationGeneratorTool:
                                 elif "년" in str(보험기간):
                                     년만기 = 보험기간_숫자
                                 else:
-                                    # Default: treat as age-based if no explicit marker
                                     세만기 = 보험기간_숫자
 
-                            # Policy: whole life ("종신") needs a default 세만기 for formula evaluation
                             if 보험기간 and "종신" in str(보험기간) and 세만기 is None:
                                 세만기 = whole_life_semangi_default
 
-                            # 납입기간도 동일하게 처리 (대부분 년납이지만 안전하게)
                             년납 = 납입기간_숫자
                             납입기간_년 = 납입기간_숫자
 
-                            # Build formula evaluation context ONCE per (보험기간, 납입기간) pair
-                            formula_context: Dict[str, Any] = {}
+                            formula_context = {}
                             if 세만기 is not None:
                                 formula_context["세만기"] = 세만기
                             if 년만기 is not None:
@@ -1922,52 +2257,34 @@ class CombinationGeneratorTool:
                             if 납입기간_년 is not None:
                                 formula_context["납입기간_년"] = 납입기간_년
 
-                            # Parse/evaluate ages
                             최소나이_raw = cond_row.get("주피보험자최소가입연령", "")
                             최대나이_raw = cond_row.get("주피보험자최대가입연령", "")
 
-                            if (
-                                최대나이_raw
-                                and "세만기" in str(최대나이_raw)
-                                and "세만기" not in formula_context
-                            ):
-                                print(
-                                    "[WARN] 세만기 needed but missing; 보험기간 파싱/정책 확인 필요: "
-                                    f"보험기간='{보험기간}', 보험기간_숫자='{보험기간_숫자}'"
-                                )
+                            has_semangi = (세만기 is not None)
+                            has_yeonmangi = (년만기 is not None)
 
-                            # Try parse as simple age first
+                            최소나이_raw = _pick_formula_line(최소나이_raw, has_semangi=has_semangi, has_yeonmangi=has_yeonmangi)
+                            최대나이_raw = _pick_formula_line(최대나이_raw, has_semangi=has_semangi, has_yeonmangi=has_yeonmangi)
+
+
                             최소나이 = parse_age(최소나이_raw) if 최소나이_raw else None
                             if 최소나이 is None and 최소나이_raw:
-                                # CRITICAL FIX: Rule-based evaluation with LLM fallback
                                 최소나이 = evaluate_formula(최소나이_raw, **formula_context)
                                 if 최소나이 is None and formula_context:
-                                    # LLM fallback
                                     print(f"[WARN] Rule-based eval failed for 최소나이: '{최소나이_raw}', trying LLM fallback")
                                     최소나이 = self._llm_evaluate_age_formula(최소나이_raw, formula_context)
 
                             최대나이 = parse_age(최대나이_raw) if 최대나이_raw else None
                             if 최대나이 is None and 최대나이_raw:
-                                # CRITICAL FIX: Rule-based evaluation with LLM fallback
                                 최대나이 = evaluate_formula(최대나이_raw, **formula_context)
                                 if 최대나이 is None and formula_context:
-                                    # LLM fallback
                                     print(f"[WARN] Rule-based eval failed for 최대나이: '{최대나이_raw}', trying LLM fallback")
                                     최대나이 = self._llm_evaluate_age_formula(최대나이_raw, formula_context)
 
-                            # Build final combination
-                            merged: Dict[str, Any] = {}
-
+                            merged = {}
                             # 1) Copy definition columns
                             for col, value in processed_def_row.items():
                                 merged[col] = value
-
-                            # 2) Add JOIN key category columns
-
-                            # for jk in join_keys:
-                            #     if jk in match_condition:
-                            #         category_col = f"{jk}_category"
-                            #         merged[category_col] = match_condition[jk]
 
                             # 3) Add condition value columns (expanded)
                             merged["보험기간"] = 보험기간
@@ -1978,9 +2295,7 @@ class CombinationGeneratorTool:
                             merged["주피보험자최대가입연령구분코드"] = cond_row.get("주피보험자최대가입연령구분코드")
                             merged["주피보험자가입성별"] = 성별
 
-                            # 4) Add any other value columns not explicitly handled
                             for col in value_columns:
-                                # 가입나이 제거
                                 if col in ("가입나이_남", "가입나이_여"):
                                     continue
                                 if col not in merged and col in cond_row:
@@ -1988,7 +2303,6 @@ class CombinationGeneratorTool:
 
                             final_definitions.append(merged)
 
-        # Handle unmatched definitions
         unmatched_def_indices = grouping_logic.get("unmatched", {}).get("definition_indices", [])
         for def_idx in unmatched_def_indices:
             if def_idx >= len(def_data):
@@ -1996,15 +2310,10 @@ class CombinationGeneratorTool:
             definition_row = def_data[def_idx]
             merged = {}
             for i, col in enumerate(def_header):
-                if i < len(definition_row):
-                    merged[col] = definition_row[i]
-                else:
-                    merged[col] = None
+                merged[col] = definition_row[i] if i < len(definition_row) else None
             for col in value_columns:
-                # 가입나이 제거
                 if col in ("가입나이_남", "가입나이_여"):
                     continue
-
                 merged[col] = None
             final_definitions.append(merged)
 

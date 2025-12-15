@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python main.py:*)",
+      "Bash(Remove-Item -Recurse -Force -ErrorAction SilentlyContinue core__pycache__, tools__pycache__, __pycache__)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

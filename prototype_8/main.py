@@ -21,6 +21,82 @@ def load_document(doc_path: str):
         return None
 
 
+def aggregate_llm_stats(task_history: list) -> dict:
+    """
+    Aggregate LLM usage statistics from task_history
+
+    Returns a dictionary with aggregated stats by tool and operation
+    """
+    aggregated = {}
+
+    for task in task_history:
+        if not task.get("success"):
+            continue
+
+        task_data = task.get("data", {})
+        llm_stats = task_data.get("llm_usage_stats", {})
+
+        tool_name = task.get("tool_name", "unknown")
+
+        if tool_name not in aggregated:
+            aggregated[tool_name] = {}
+
+        for operation, stats in llm_stats.items():
+            if operation not in aggregated[tool_name]:
+                aggregated[tool_name][operation] = {
+                    "call_count": 0,
+                    "total_prompt_tokens": 0,
+                    "total_completion_tokens": 0,
+                    "total_tokens": 0,
+                    "total_time_ms": 0,
+                    "estimated_cost_usd": 0
+                }
+
+            agg = aggregated[tool_name][operation]
+            agg["call_count"] += stats.get("call_count", 0)
+            agg["total_prompt_tokens"] += stats.get("total_prompt_tokens", 0)
+            agg["total_completion_tokens"] += stats.get("total_completion_tokens", 0)
+            agg["total_tokens"] += stats.get("total_tokens", 0)
+            agg["total_time_ms"] += stats.get("total_time_ms", 0)
+
+            # For cache_hits (CombinationGeneratorTool)
+            if "cache_hits" in stats:
+                if "cache_hits" not in agg:
+                    agg["cache_hits"] = 0
+                agg["cache_hits"] += stats.get("cache_hits", 0)
+
+    # Calculate averages and costs for aggregated stats
+    total_cost = 0
+    total_time = 0
+    total_calls = 0
+
+    for tool_name, operations in aggregated.items():
+        for operation, stats in operations.items():
+            if stats["call_count"] > 0:
+                stats["average_time_ms"] = round(stats["total_time_ms"] / stats["call_count"], 2)
+                input_cost = (stats["total_prompt_tokens"] / 1_000_000) * 2.50
+                output_cost = (stats["total_completion_tokens"] / 1_000_000) * 10.00
+                stats["estimated_cost_usd"] = round(input_cost + output_cost, 6)
+            else:
+                stats["average_time_ms"] = 0
+                stats["estimated_cost_usd"] = 0
+
+            total_cost += stats["estimated_cost_usd"]
+            total_time += stats["total_time_ms"]
+            total_calls += stats["call_count"]
+
+    # Add summary
+    summary = {
+        "total_llm_calls": total_calls,
+        "total_time_ms": total_time,
+        "total_time_seconds": round(total_time / 1000, 2),
+        "total_estimated_cost_usd": round(total_cost, 6),
+        "by_tool": aggregated
+    }
+
+    return summary
+
+
 def save_result(result: dict, output_path: str):
     """Save result to JSON file"""
     try:
@@ -44,8 +120,8 @@ def main():
 
     print("\n🚀 Using Prototype 7: Dynamic Task Execution Agent")
     agent = Prototype7Agent()
-    #results_dir = Path(r"C:\Users\NT-165\Desktop\Project\Toy\prototype_8\new_results")
-    results_dir = Path(r"E:\work\work\Agent\prototype_8\new_results")
+    results_dir = Path(r"C:\Users\NT-165\Desktop\Project\Toy\prototype_8\4o")
+    #results_dir = Path(r"E:\work\work\Agent\prototype_8\new_results")
 
 
     results_dir.mkdir(parents=True, exist_ok=True)
@@ -72,6 +148,16 @@ def main():
                 result["task_results"] = getattr(agent, "task_results", [])
                 result["task_history"] = getattr(agent, "task_history", [])
                 result["debug_logs"] = agent.debug_logs  # 필요하다면
+
+            # Aggregate LLM usage stats from task_history
+            task_history = getattr(agent, "task_history", [])
+            if task_history:
+                llm_usage_summary = aggregate_llm_stats(task_history)
+                result["llm_usage_summary"] = llm_usage_summary
+                print(f"\n💰 Total LLM Cost: ${llm_usage_summary['total_estimated_cost_usd']:.6f}")
+                print(f"⏱️  Total LLM Time: {llm_usage_summary['total_time_seconds']:.2f}s")
+                print(f"📞 Total LLM Calls: {llm_usage_summary['total_llm_calls']}")
+
             output_path = results_dir / f"{doc_path.stem}_new_result.json"
             save_result(result, str(output_path))
 
@@ -93,6 +179,16 @@ def main():
             result["task_results"] = getattr(agent, "task_results", [])
             result["task_history"] = getattr(agent, "task_history", [])
             result["debug_logs"] = agent.debug_logs  # 필요하다면
+
+        # Aggregate LLM usage stats from task_history
+        task_history = getattr(agent, "task_history", [])
+        if task_history:
+            llm_usage_summary = aggregate_llm_stats(task_history)
+            result["llm_usage_summary"] = llm_usage_summary
+            print(f"\n💰 Total LLM Cost: ${llm_usage_summary['total_estimated_cost_usd']:.6f}")
+            print(f"⏱️  Total LLM Time: {llm_usage_summary['total_time_seconds']:.2f}s")
+            print(f"📞 Total LLM Calls: {llm_usage_summary['total_llm_calls']}")
+
         output_path = results_dir / f"{doc_path.stem}_single_result.json"
         save_result(result, str(output_path))
 
