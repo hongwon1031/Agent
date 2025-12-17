@@ -1,0 +1,85 @@
+{
+  "success": false,
+  "error": "Execution exception: 'NoneType' object has no attribute 'get'",
+  "task_log": [],
+  "final_data": null,
+  "task_results": [],
+  "task_history": [],
+  "event_history": [],
+  "planner_llm_stats": {
+    "generate_next_task": {
+      "call_count": 0,
+      "total_prompt_tokens": 0,
+      "total_completion_tokens": 0,
+      "total_tokens": 0,
+      "total_time_ms": 0,
+      "estimated_cost_usd": 0.0
+    }
+  },
+  "validator_llm_stats": {
+    "validate_section_classifier": {
+      "call_count": 0,
+      "total_prompt_tokens": 0,
+      "total_completion_tokens": 0,
+      "total_tokens": 0,
+      "total_time_ms": 0,
+      "estimated_cost_usd": 0.0
+    },
+    "validate_definition_extract_v2": {
+      "call_count": 0,
+      "total_prompt_tokens": 0,
+      "total_completion_tokens": 0,
+      "total_tokens": 0,
+      "total_time_ms": 0,
+      "estimated_cost_usd": 0.0
+    },
+    "validate_table_split": {
+      "call_count": 0,
+      "total_prompt_tokens": 0,
+      "total_completion_tokens": 0,
+      "total_tokens": 0,
+      "total_time_ms": 0,
+      "estimated_cost_usd": 0.0
+    },
+    "validate_condition_transform": {
+      "call_count": 0,
+      "total_prompt_tokens": 0,
+      "total_completion_tokens": 0,
+      "total_tokens": 0,
+      "total_time_ms": 0,
+      "estimated_cost_usd": 0.0
+    },
+    "validate_transform": {
+      "call_count": 0,
+      "total_prompt_tokens": 0,
+      "total_completion_tokens": 0,
+      "total_tokens": 0,
+      "total_time_ms": 0,
+      "estimated_cost_usd": 0.0
+    },
+    "validate_condition_extract": {
+      "call_count": 0,
+      "total_prompt_tokens": 0,
+      "total_completion_tokens": 0,
+      "total_tokens": 0,
+      "total_time_ms": 0,
+      "estimated_cost_usd": 0.0
+    },
+    "validate_grouping_logic": {
+      "call_count": 0,
+      "total_prompt_tokens": 0,
+      "total_completion_tokens": 0,
+      "total_tokens": 0,
+      "total_time_ms": 0,
+      "estimated_cost_usd": 0.0
+    },
+    "analyze_root_cause": {
+      "call_count": 0,
+      "total_prompt_tokens": 0,
+      "total_completion_tokens": 0,
+      "total_tokens": 0,
+      "total_time_ms": 0,
+      "estimated_cost_usd": 0.0
+    }
+  }
+}

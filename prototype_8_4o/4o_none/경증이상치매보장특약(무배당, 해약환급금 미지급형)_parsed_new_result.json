@@ -1,0 +1,2977 @@
+{
+  "success": false,
+  "error": "Template resolution failed: Template resolution failed for '{task5.data.groups}': 'field path not found: task5.groups'",
+  "task_log": [
+    {
+      "step": 1,
+      "task_id": "task0",
+      "success": true,
+      "tool_used": "section_classifier",
+      "execution_time": 4.39,
+      "error": null
+    },
+    {
+      "step": 2,
+      "task_id": "task1",
+      "success": true,
+      "tool_used": "definition_extract_v2",
+      "execution_time": 2.31,
+      "error": null
+    },
+    {
+      "step": 3,
+      "task_id": "task2",
+      "success": true,
+      "tool_used": "condition_extract",
+      "execution_time": 6.35,
+      "error": null
+    },
+    {
+      "step": 4,
+      "task_id": "task3",
+      "success": true,
+      "tool_used": "condition_transform",
+      "execution_time": 6.83,
+      "error": null
+    },
+    {
+      "step": 5,
+      "task_id": "task4",
+      "success": true,
+      "tool_used": "grouping_logic_extractor",
+      "execution_time": 7.79,
+      "error": null
+    },
+    {
+      "step": 6,
+      "task_id": "task5",
+      "success": true,
+      "tool_used": "definition_extract_v2",
+      "execution_time": 2.33,
+      "error": null
+    },
+    {
+      "step": 7,
+      "task_id": "task6",
+      "success": true,
+      "tool_used": "llm_table_split",
+      "execution_time": 7.31,
+      "error": null
+    }
+  ],
+  "final_data": null,
+  "task_results": [
+    {
+      "task_id": "task0",
+      "success": true,
+      "data": {
+        "definition_core": [
+          0
+        ],
+        "definition_annotation": [],
+        "condition": [
+          2
+        ],
+        "other": [
+          1,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16
+        ],
+        "reasoning": "Section 0은 보험종목의 명칭을 정의하는 테이블이므로 definition_core로 분류됩니다. Section 2는 보험기간, 납입기간, 가입나이 등의 조건을 나열하고 있으므로 condition으로 분류됩니다. 나머지 섹션들은 특정한 정의, 조건, 주석에 해당하지 않으며, 대부분 '해당사항 없음' 또는 기타 사항에 관한 내용이므로 other로 분류됩니다.",
+        "llm_usage_stats": {
+          "classify": {
+            "call_count": 2,
+            "total_prompt_tokens": 6321,
+            "total_completion_tokens": 365,
+            "total_tokens": 6686,
+            "total_time_ms": 8586.501598358154,
+            "average_time_ms": 4293.250799179077,
+            "estimated_cost_usd": 0.019453
+          }
+        }
+      },
+      "tool_used": "section_classifier",
+      "execution_time": 4.389183282852173,
+      "error": null
+    },
+    {
+      "task_id": "task1",
+      "success": true,
+      "data": {
+        "header": [
+          "명칭",
+          "명칭_1",
+          "보험종목"
+        ],
+        "data": [
+          [
+            "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "경증이상치매 보장계약",
+            "해약환급금 미지급형"
+          ],
+          [
+            "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "중등도이상치매 보장계약",
+            "해약환급금 미지급형"
+          ],
+          [
+            "경증이상치매보장특약(무배당)",
+            "경증이상치매 보장계약",
+            "일반형"
+          ],
+          [
+            "경증이상치매보장특약(무배당)",
+            "중등도이상치매 보장계약",
+            "일반형"
+          ]
+        ],
+        "extraction_method": "v2_classifier_based",
+        "llm_usage_stats": {
+          "extract": {
+            "call_count": 0,
+            "total_prompt_tokens": 0,
+            "total_completion_tokens": 0,
+            "total_tokens": 0,
+            "total_time_ms": 0,
+            "average_time_ms": 0,
+            "estimated_cost_usd": 0
+          },
+          "merge": {
+            "call_count": 3,
+            "total_prompt_tokens": 8475,
+            "total_completion_tokens": 1053,
+            "total_tokens": 9528,
+            "total_time_ms": 12469.419717788696,
+            "average_time_ms": 4156.4732392628985,
+            "estimated_cost_usd": 0.031717
+          }
+        }
+      },
+      "tool_used": "definition_extract_v2",
+      "execution_time": 2.312912940979004,
+      "error": null
+    },
+    {
+      "task_id": "task2",
+      "success": true,
+      "data": {
+        "header": [
+          "유형1",
+          "유형2",
+          "유형3",
+          "보험기간",
+          "납입기간",
+          "가입나이_남",
+          "가입나이_여",
+          "납입주기"
+        ],
+        "data": [
+          [
+            "해약환급금 미지급형",
+            "-",
+            "-",
+            "90/100세만기, 종신",
+            "10/15/20/25/30년납",
+            "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+            "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+            "월납"
+          ],
+          [
+            "일반형",
+            "-",
+            "-",
+            "90/100세만기, 종신",
+            "10/15/20/25/30년납",
+            "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+            "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+            "월납"
+          ]
+        ],
+        "reasoning": "두 개의 '가입가능 조건' 테이블을 선택했습니다. 각 테이블 앞의 title '가. 해약환급금 미지급형'과 '나. 일반형'에서 계층 정보를 추출하여 각각 '유형1' 컬럼으로 추가했습니다. 테이블 내 기존 '유형1', '유형2'는 '유형2', '유형3'로 조정했습니다. 컬럼명은 규칙에 따라 표준화했습니다.",
+        "llm_usage_stats": {
+          "extract": {
+            "call_count": 2,
+            "total_prompt_tokens": 5237,
+            "total_completion_tokens": 439,
+            "total_tokens": 5676,
+            "total_time_ms": 9191.240310668945,
+            "average_time_ms": 4595.620155334473,
+            "estimated_cost_usd": 0.017482
+          }
+        }
+      },
+      "tool_used": "condition_extract",
+      "execution_time": 6.346845626831055,
+      "error": null
+    },
+    {
+      "task_id": "task3",
+      "success": true,
+      "data": {
+        "header": [
+          "유형1",
+          "유형2",
+          "유형3",
+          "보험기간",
+          "납입기간",
+          "주피보험자최소가입연령",
+          "주피보험자최대가입연령",
+          "주피보험자최소가입연령구분코드",
+          "주피보험자최대가입연령구분코드",
+          "주피보험자가입성별"
+        ],
+        "data": [
+          [
+            "해약환급금 미지급형",
+            "-",
+            "-",
+            [
+              "90세 만기",
+              "100세 만기",
+              "종신"
+            ],
+            [
+              "10년납",
+              "15년납",
+              "20년납",
+              "25년납",
+              "30년납"
+            ],
+            "만 15세",
+            "min[세만기 - 년납, 90 - 년납, 70] 세",
+            "(2)만연령",
+            "(1)보험연령",
+            [
+              "(1)남자",
+              "(2)여자"
+            ]
+          ],
+          [
+            "일반형",
+            "-",
+            "-",
+            [
+              "90세 만기",
+              "100세 만기",
+              "종신"
+            ],
+            [
+              "10년납",
+              "15년납",
+              "20년납",
+              "25년납",
+              "30년납"
+            ],
+            "만 15세",
+            "min[세만기 - 년납, 90 - 년납, 70] 세",
+            "(2)만연령",
+            "(1)보험연령",
+            [
+              "(1)남자",
+              "(2)여자"
+            ]
+          ]
+        ],
+        "notes": "보험기간과 납입기간은 슬래시(/)와 쉼표(,)를 구분자로 사용하여 리스트로 분리하였습니다. 가입나이 관련 수식은 계산하지 않고 문자열로 보존하였습니다.",
+        "llm_usage_stats": {
+          "transform": {
+            "call_count": 1,
+            "total_prompt_tokens": 2513,
+            "total_completion_tokens": 408,
+            "total_tokens": 2921,
+            "total_time_ms": 6823.835134506226,
+            "average_time_ms": 6823.835134506226,
+            "estimated_cost_usd": 0.010363
+          }
+        }
+      },
+      "tool_used": "condition_transform",
+      "execution_time": 6.8258607387542725,
+      "error": null
+    },
+    {
+      "task_id": "task4",
+      "success": true,
+      "data": {
+        "column_mapping": {
+          "join_keys": [
+            "보험종목"
+          ],
+          "value_columns": [
+            "보험기간",
+            "납입기간",
+            "주피보험자최소가입연령",
+            "주피보험자최대가입연령",
+            "주피보험자최소가입연령구분코드",
+            "주피보험자최대가입연령구분코드",
+            "주피보험자가입성별"
+          ]
+        },
+        "groups": [
+          {
+            "id": 0,
+            "join_mappings": [
+              {
+                "def_col": "보험종목",
+                "cond_col": "유형1",
+                "value": "해약환급금 미지급형"
+              }
+            ],
+            "definition_indices": [
+              0,
+              1
+            ],
+            "matched_list_items": [
+              null,
+              null
+            ],
+            "condition_indices": [
+              0
+            ],
+            "reasoning": "해약환급금 미지급형이라는 동일한 보험종목을 기준으로 매칭되었습니다."
+          },
+          {
+            "id": 1,
+            "join_mappings": [
+              {
+                "def_col": "보험종목",
+                "cond_col": "유형1",
+                "value": "일반형"
+              }
+            ],
+            "definition_indices": [
+              2,
+              3
+            ],
+            "matched_list_items": [
+              null,
+              null
+            ],
+            "condition_indices": [
+              1
+            ],
+            "reasoning": "일반형이라는 동일한 보험종목을 기준으로 매칭되었습니다."
+          }
+        ],
+        "unmatched": {
+          "definition_indices": [],
+          "condition_indices": []
+        },
+        "summary": {
+          "total_definitions": 4,
+          "total_conditions": 2,
+          "total_groups": 2,
+          "matched_definition_count": 4,
+          "unmatched_definition_count": 0,
+          "coverage_ratio": 1.0
+        },
+        "llm_usage_stats": {
+          "grouping": {
+            "call_count": 1,
+            "total_prompt_tokens": 4472,
+            "total_completion_tokens": 395,
+            "total_tokens": 4867,
+            "total_time_ms": 7789.902925491333,
+            "average_time_ms": 7789.902925491333,
+            "estimated_cost_usd": 0.01513
+          }
+        }
+      },
+      "tool_used": "grouping_logic_extractor",
+      "execution_time": 7.792396306991577,
+      "error": null
+    },
+    {
+      "task_id": "task5",
+      "success": true,
+      "data": {
+        "header": [
+          "명칭",
+          "명칭_1",
+          "보험종목"
+        ],
+        "data": [
+          [
+            "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "경증이상치매 보장계약",
+            "해약환급금 미지급형"
+          ],
+          [
+            "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "중등도이상치매 보장계약",
+            "해약환급금 미지급형"
+          ],
+          [
+            "경증이상치매보장특약(무배당)",
+            "경증이상치매 보장계약",
+            "일반형"
+          ],
+          [
+            "경증이상치매보장특약(무배당)",
+            "중등도이상치매 보장계약",
+            "일반형"
+          ]
+        ],
+        "extraction_method": "v2_classifier_based",
+        "llm_usage_stats": {
+          "extract": {
+            "call_count": 0,
+            "total_prompt_tokens": 0,
+            "total_completion_tokens": 0,
+            "total_tokens": 0,
+            "total_time_ms": 0,
+            "average_time_ms": 0,
+            "estimated_cost_usd": 0
+          },
+          "merge": {
+            "call_count": 3,
+            "total_prompt_tokens": 8475,
+            "total_completion_tokens": 1053,
+            "total_tokens": 9528,
+            "total_time_ms": 12469.419717788696,
+            "average_time_ms": 4156.4732392628985,
+            "estimated_cost_usd": 0.031717
+          }
+        }
+      },
+      "tool_used": "definition_extract_v2",
+      "execution_time": 2.3333728313446045,
+      "error": null
+    },
+    {
+      "task_id": "task6",
+      "success": true,
+      "data": {
+        "header": [
+          "보종명",
+          "유형1",
+          "유형2"
+        ],
+        "data": [
+          [
+            "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "경증이상치매 보장계약",
+            "해약환급금 미지급형"
+          ],
+          [
+            "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "중등도이상치매 보장계약",
+            "해약환급금 미지급형"
+          ],
+          [
+            "경증이상치매보장특약(무배당)",
+            "경증이상치매 보장계약",
+            "일반형"
+          ],
+          [
+            "경증이상치매보장특약(무배당)",
+            "중등도이상치매 보장계약",
+            "일반형"
+          ]
+        ],
+        "notes": "",
+        "llm_usage_stats": {
+          "split": {
+            "call_count": 1,
+            "total_prompt_tokens": 1912,
+            "total_completion_tokens": 244,
+            "total_tokens": 2156,
+            "total_time_ms": 7311.6114139556885,
+            "average_time_ms": 7311.6114139556885,
+            "estimated_cost_usd": 0.00722
+          }
+        }
+      },
+      "tool_used": "llm_table_split",
+      "execution_time": 7.314270734786987,
+      "error": null
+    }
+  ],
+  "task_history": [],
+  "event_history": [
+    {
+      "event": "planner_response",
+      "action": "next_task",
+      "reasoning_preview": "첫 번째 단계로 문서의 섹션을 '정의', '조건', '기타'로 분류하여 이후 작업에서 필요한 데이터를 정확히 추출할 수 있도록 준비합니다.",
+      "task_results_count": 0,
+      "ts": 1765930229.7380679
+    },
+    {
+      "event": "task_scheduled",
+      "task_id": "task0",
+      "task_type": "classify_sections",
+      "tool_name": "section_classifier",
+      "fallback_tool": null,
+      "dependencies": [],
+      "parameters_preview": {
+        "sections": "$sections",
+        "instruction": ""
+      },
+      "ts": 1765930229.7380679
+    },
+    {
+      "event": "task_execute_start",
+      "task_id": "task0",
+      "task_type": "classify_sections",
+      "tool_name": "section_classifier",
+      "ts": 1765930229.7390714
+    },
+    {
+      "event": "task_execute_end",
+      "task_id": "task0",
+      "task_type": "classify_sections",
+      "tool_used": "section_classifier",
+      "success": true,
+      "execution_time": 4.3892,
+      "error_preview": null,
+      "resolved_params_preview": {
+        "sections": [
+          {
+            "index": 0,
+            "title": "1. 보험종목의 명칭",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 1,
+            "title": "2. 특약의 부가대상",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 2,
+            "title": "3. 보험기간, 보험료 납입기간, 피보험자 가입나이 및 보험료 납입주기",
+            "content": [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 3,
+            "title": "4. 의무가입에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 4,
+            "title": "5. 배당에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 5,
+            "title": "6. 보험료에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 6,
+            "title": "7. 보험료 할인에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 7,
+            "title": "8. 보험료 선납에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 8,
+            "title": "9. 해지특약의 부활(효력회복)에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 9,
+            "title": "10. 연체이율에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 10,
+            "title": "11. 중도인출에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 11,
+            "title": "12. 공시이율에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 12,
+            "title": "13. 보험계약대출에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 13,
+            "title": "14. “해약환급금 미지급형”의 해약환급금에 관한 사항",
+            "content": [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 14,
+            "title": "15. 보험금 대리청구에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 15,
+            "title": "16. 특약의 중도 가입에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 16,
+            "title": "17. 기   타",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          }
+        ],
+        "instruction": ""
+      },
+      "output_preview": {
+        "definition_core": [
+          0
+        ],
+        "definition_annotation": [],
+        "condition": [
+          2
+        ],
+        "other": [
+          1,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16
+        ],
+        "reasoning": "Section 0은 보험종목의 명칭을 정의하는 테이블이므로 definition_core로 분류됩니다. Section 2는 보험기간, 납입기간, 가입나이 등의 조건을 나열하고 있으므로 condition으로 분류됩니다. 나머지 섹션들은 특정한 정의, 조건, 주석에 해당하지 않으며, 대부분 '해당사항 없음' 또는 기타 사항에 관한 내용이므로 other로 분류됩니다.",
+        "llm_usage_stats": {
+          "classify": {
+            "call_count": 2,
+            "total_prompt_tokens": 6321,
+            "total_completion_tokens": 365,
+            "total_tokens": 6686,
+            "total_time_ms": 8586.501598358154,
+            "average_time_ms": 4293.250799179077,
+            "estimated_cost_usd": 0.019453
+          }
+        }
+      },
+      "ts": 1765930234.1296604
+    },
+    {
+      "event": "task_validated",
+      "task_id": "task0",
+      "task_type": "classify_sections",
+      "is_valid": true,
+      "confidence": 0.8,
+      "errors": [],
+      "suggestions": [],
+      "root_cause_task_id": null,
+      "root_cause_reasoning_preview": "",
+      "ts": 1765930238.4694703
+    },
+    {
+      "event": "planner_response",
+      "action": "next_task",
+      "reasoning_preview": "섹션 분류가 성공적으로 완료되었으므로, 다음 단계는 정의 섹션에서 데이터를 추출하는 것입니다. 이는 최종 보험 상품 목록 생성을 위한 필수 단계입니다.",
+      "task_results_count": 1,
+      "ts": 1765930244.2764032
+    },
+    {
+      "event": "task_scheduled",
+      "task_id": "task1",
+      "task_type": "extract_definitions",
+      "tool_name": "definition_extract_v2",
+      "fallback_tool": null,
+      "dependencies": [
+        "task0"
+      ],
+      "parameters_preview": {
+        "sections": "$sections",
+        "core_indices": "{task0.data.definition_core}",
+        "annotation_indices": "{task0.data.definition_annotation}"
+      },
+      "ts": 1765930244.2774534
+    },
+    {
+      "event": "task_execute_start",
+      "task_id": "task1",
+      "task_type": "extract_definitions",
+      "tool_name": "definition_extract_v2",
+      "ts": 1765930244.2784996
+    },
+    {
+      "event": "task_execute_end",
+      "task_id": "task1",
+      "task_type": "extract_definitions",
+      "tool_used": "definition_extract_v2",
+      "success": true,
+      "execution_time": 2.3129,
+      "error_preview": null,
+      "resolved_params_preview": {
+        "sections": [
+          {
+            "index": 0,
+            "title": "1. 보험종목의 명칭",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 1,
+            "title": "2. 특약의 부가대상",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 2,
+            "title": "3. 보험기간, 보험료 납입기간, 피보험자 가입나이 및 보험료 납입주기",
+            "content": [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 3,
+            "title": "4. 의무가입에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 4,
+            "title": "5. 배당에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 5,
+            "title": "6. 보험료에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 6,
+            "title": "7. 보험료 할인에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 7,
+            "title": "8. 보험료 선납에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 8,
+            "title": "9. 해지특약의 부활(효력회복)에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 9,
+            "title": "10. 연체이율에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 10,
+            "title": "11. 중도인출에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 11,
+            "title": "12. 공시이율에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 12,
+            "title": "13. 보험계약대출에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 13,
+            "title": "14. “해약환급금 미지급형”의 해약환급금에 관한 사항",
+            "content": [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 14,
+            "title": "15. 보험금 대리청구에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 15,
+            "title": "16. 특약의 중도 가입에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 16,
+            "title": "17. 기   타",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          }
+        ],
+        "core_indices": [
+          0
+        ],
+        "annotation_indices": []
+      },
+      "output_preview": {
+        "header": [
+          "명칭",
+          "명칭_1",
+          "보험종목"
+        ],
+        "data": [
+          [
+            "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "경증이상치매 보장계약",
+            "해약환급금 미지급형"
+          ],
+          [
+            "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "중등도이상치매 보장계약",
+            "해약환급금 미지급형"
+          ],
+          [
+            "경증이상치매보장특약(무배당)",
+            "경증이상치매 보장계약",
+            "일반형"
+          ],
+          [
+            "경증이상치매보장특약(무배당)",
+            "중등도이상치매 보장계약",
+            "일반형"
+          ]
+        ],
+        "extraction_method": "v2_classifier_based",
+        "llm_usage_stats": {
+          "extract": {
+            "call_count": 0,
+            "total_prompt_tokens": 0,
+            "total_completion_tokens": 0,
+            "total_tokens": 0,
+            "total_time_ms": 0,
+            "average_time_ms": 0,
+            "estimated_cost_usd": 0
+          },
+          "merge": {
+            "call_count": 2,
+            "total_prompt_tokens": 7373,
+            "total_completion_tokens": 825,
+            "total_tokens": 8198,
+            "total_time_ms": 10136.046886444092,
+            "average_time_ms": 5068.023443222046,
+            "estimated_cost_usd": 0.026683
+          }
+        }
+      },
+      "ts": 1765930246.592545
+    },
+    {
+      "event": "task_validated",
+      "task_id": "task1",
+      "task_type": "extract_definitions",
+      "is_valid": true,
+      "confidence": 0.95,
+      "errors": [],
+      "suggestions": [],
+      "root_cause_task_id": null,
+      "root_cause_reasoning_preview": "",
+      "ts": 1765930249.8479085
+    },
+    {
+      "event": "planner_response",
+      "action": "next_task",
+      "reasoning_preview": "Since the definition extraction was successful, the next step is to extract conditions from the identified condition sections. This will allow us to proceed with grouping and final combination generation.",
+      "task_results_count": 2,
+      "ts": 1765930254.8005092
+    },
+    {
+      "event": "task_scheduled",
+      "task_id": "task2",
+      "task_type": "condition_extraction",
+      "tool_name": "condition_extract",
+      "fallback_tool": null,
+      "dependencies": [
+        "task0"
+      ],
+      "parameters_preview": {
+        "sections": "$sections",
+        "condition_indices": "{task0.data.condition}",
+        "definition_core_indices": "{task0.data.definition_core}",
+        "definition_annotation_indices": "{task0.data.definition_annotation}",
+        "instruction": "Ensure all relevant condition sections are included and accurately extracted."
+      },
+      "ts": 1765930254.8005092
+    },
+    {
+      "event": "task_execute_start",
+      "task_id": "task2",
+      "task_type": "condition_extraction",
+      "tool_name": "condition_extract",
+      "ts": 1765930254.8015227
+    },
+    {
+      "event": "task_execute_end",
+      "task_id": "task2",
+      "task_type": "condition_extraction",
+      "tool_used": "condition_extract",
+      "success": true,
+      "execution_time": 6.3468,
+      "error_preview": null,
+      "resolved_params_preview": {
+        "sections": [
+          {
+            "index": 0,
+            "title": "1. 보험종목의 명칭",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 1,
+            "title": "2. 특약의 부가대상",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 2,
+            "title": "3. 보험기간, 보험료 납입기간, 피보험자 가입나이 및 보험료 납입주기",
+            "content": [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 3,
+            "title": "4. 의무가입에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 4,
+            "title": "5. 배당에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 5,
+            "title": "6. 보험료에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 6,
+            "title": "7. 보험료 할인에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 7,
+            "title": "8. 보험료 선납에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 8,
+            "title": "9. 해지특약의 부활(효력회복)에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 9,
+            "title": "10. 연체이율에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 10,
+            "title": "11. 중도인출에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 11,
+            "title": "12. 공시이율에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 12,
+            "title": "13. 보험계약대출에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 13,
+            "title": "14. “해약환급금 미지급형”의 해약환급금에 관한 사항",
+            "content": [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 14,
+            "title": "15. 보험금 대리청구에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 15,
+            "title": "16. 특약의 중도 가입에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 16,
+            "title": "17. 기   타",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          }
+        ],
+        "condition_indices": [
+          2
+        ],
+        "definition_core_indices": [
+          0
+        ],
+        "definition_annotation_indices": [],
+        "instruction": "Ensure all relevant condition sections are included and accurately extracted."
+      },
+      "output_preview": {
+        "header": [
+          "유형1",
+          "유형2",
+          "유형3",
+          "보험기간",
+          "납입기간",
+          "가입나이_남",
+          "가입나이_여",
+          "납입주기"
+        ],
+        "data": [
+          [
+            "해약환급금 미지급형",
+            "-",
+            "-",
+            "90/100세만기, 종신",
+            "10/15/20/25/30년납",
+            "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+            "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+            "월납"
+          ],
+          [
+            "일반형",
+            "-",
+            "-",
+            "90/100세만기, 종신",
+            "10/15/20/25/30년납",
+            "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+            "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+            "월납"
+          ]
+        ],
+        "reasoning": "두 개의 '가입가능 조건' 테이블을 선택했습니다. 각 테이블 앞의 title '가. 해약환급금 미지급형'과 '나. 일반형'에서 계층 정보를 추출하여 각각 '유형1' 컬럼으로 추가했습니다. 테이블 내 기존 '유형1', '유형2'는 '유형2', '유형3'로 조정했습니다. 컬럼명은 규칙에 따라 표준화했습니다.",
+        "llm_usage_stats": {
+          "extract": {
+            "call_count": 2,
+            "total_prompt_tokens": 5237,
+            "total_completion_tokens": 439,
+            "total_tokens": 5676,
+            "total_time_ms": 9191.240310668945,
+            "average_time_ms": 4595.620155334473,
+            "estimated_cost_usd": 0.017482
+          }
+        }
+      },
+      "ts": 1765930261.1503892
+    },
+    {
+      "event": "task_validated",
+      "task_id": "task2",
+      "task_type": "condition_extraction",
+      "is_valid": true,
+      "confidence": 0.8,
+      "errors": [],
+      "suggestions": [],
+      "root_cause_task_id": null,
+      "root_cause_reasoning_preview": "",
+      "ts": 1765930261.1516876
+    },
+    {
+      "event": "planner_response",
+      "action": "next_task",
+      "reasoning_preview": "The condition extraction has been successfully completed, and now the extracted condition data needs to be transformed into a standardized format to facilitate further processing and combination with definition data.",
+      "task_results_count": 3,
+      "ts": 1765930268.813795
+    },
+    {
+      "event": "task_scheduled",
+      "task_id": "task3",
+      "task_type": "condition_transform",
+      "tool_name": "condition_transform",
+      "fallback_tool": null,
+      "dependencies": [
+        "task2"
+      ],
+      "parameters_preview": {
+        "header": "{task2.data.header}",
+        "data": "{task2.data.data}",
+        "instruction": "Ensure that all condition columns are transformed to the standard schema, including splitting values and parsing any age-related formulas."
+      },
+      "ts": 1765930268.813795
+    },
+    {
+      "event": "task_execute_start",
+      "task_id": "task3",
+      "task_type": "condition_transform",
+      "tool_name": "condition_transform",
+      "ts": 1765930268.8158498
+    },
+    {
+      "event": "task_execute_end",
+      "task_id": "task3",
+      "task_type": "condition_transform",
+      "tool_used": "condition_transform",
+      "success": true,
+      "execution_time": 6.8259,
+      "error_preview": null,
+      "resolved_params_preview": {
+        "header": [
+          "유형1",
+          "유형2",
+          "유형3",
+          "보험기간",
+          "납입기간",
+          "가입나이_남",
+          "가입나이_여",
+          "납입주기"
+        ],
+        "data": [
+          [
+            "해약환급금 미지급형",
+            "-",
+            "-",
+            "90/100세만기, 종신",
+            "10/15/20/25/30년납",
+            "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+            "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+            "월납"
+          ],
+          [
+            "일반형",
+            "-",
+            "-",
+            "90/100세만기, 종신",
+            "10/15/20/25/30년납",
+            "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+            "만15세 - min[세만기 - 년납, 90 - 년납, 70] 세",
+            "월납"
+          ]
+        ],
+        "instruction": "Ensure that all condition columns are transformed to the standard schema, including splitting values and parsing any age-related formulas."
+      },
+      "output_preview": {
+        "header": [
+          "유형1",
+          "유형2",
+          "유형3",
+          "보험기간",
+          "납입기간",
+          "주피보험자최소가입연령",
+          "주피보험자최대가입연령",
+          "주피보험자최소가입연령구분코드",
+          "주피보험자최대가입연령구분코드",
+          "주피보험자가입성별"
+        ],
+        "data": [
+          [
+            "해약환급금 미지급형",
+            "-",
+            "-",
+            [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "만 15세",
+            "min[세만기 - 년납, 90 - 년납, 70] 세",
+            "(2)만연령",
+            "(1)보험연령",
+            [
+              "<max_depth>",
+              "<max_depth>"
+            ]
+          ],
+          [
+            "일반형",
+            "-",
+            "-",
+            [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "만 15세",
+            "min[세만기 - 년납, 90 - 년납, 70] 세",
+            "(2)만연령",
+            "(1)보험연령",
+            [
+              "<max_depth>",
+              "<max_depth>"
+            ]
+          ]
+        ],
+        "notes": "보험기간과 납입기간은 슬래시(/)와 쉼표(,)를 구분자로 사용하여 리스트로 분리하였습니다. 가입나이 관련 수식은 계산하지 않고 문자열로 보존하였습니다.",
+        "llm_usage_stats": {
+          "transform": {
+            "call_count": 1,
+            "total_prompt_tokens": 2513,
+            "total_completion_tokens": 408,
+            "total_tokens": 2921,
+            "total_time_ms": 6823.835134506226,
+            "average_time_ms": 6823.835134506226,
+            "estimated_cost_usd": 0.010363
+          }
+        }
+      },
+      "ts": 1765930275.6433914
+    },
+    {
+      "event": "task_validated",
+      "task_id": "task3",
+      "task_type": "condition_transform",
+      "is_valid": true,
+      "confidence": 1.0,
+      "errors": [],
+      "suggestions": [],
+      "root_cause_task_id": null,
+      "root_cause_reasoning_preview": "",
+      "ts": 1765930283.4346194
+    },
+    {
+      "event": "planner_response",
+      "action": "next_task",
+      "reasoning_preview": "The next step is to extract the grouping logic to match definitions with conditions. This is crucial for generating the final combinations of insurance products.",
+      "task_results_count": 4,
+      "ts": 1765930289.618394
+    },
+    {
+      "event": "task_scheduled",
+      "task_id": "task4",
+      "task_type": "grouping",
+      "tool_name": "grouping_logic_extractor",
+      "fallback_tool": null,
+      "dependencies": [
+        "task1",
+        "task3"
+      ],
+      "parameters_preview": {
+        "definition_header": "{task1.data.header}",
+        "definition_data": "{task1.data.data}",
+        "condition_header": "{task3.data.header}",
+        "condition_data": "{task3.data.data}",
+        "instruction": "Ensure accurate mapping between definitions and conditions for effective grouping."
+      },
+      "ts": 1765930289.6193988
+    },
+    {
+      "event": "task_execute_start",
+      "task_id": "task4",
+      "task_type": "grouping",
+      "tool_name": "grouping_logic_extractor",
+      "ts": 1765930289.6204593
+    },
+    {
+      "event": "task_execute_end",
+      "task_id": "task4",
+      "task_type": "grouping",
+      "tool_used": "grouping_logic_extractor",
+      "success": true,
+      "execution_time": 7.7924,
+      "error_preview": null,
+      "resolved_params_preview": {
+        "definition_header": [
+          "명칭",
+          "명칭_1",
+          "보험종목"
+        ],
+        "definition_data": [
+          [
+            "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "경증이상치매 보장계약",
+            "해약환급금 미지급형"
+          ],
+          [
+            "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "중등도이상치매 보장계약",
+            "해약환급금 미지급형"
+          ],
+          [
+            "경증이상치매보장특약(무배당)",
+            "경증이상치매 보장계약",
+            "일반형"
+          ],
+          [
+            "경증이상치매보장특약(무배당)",
+            "중등도이상치매 보장계약",
+            "일반형"
+          ]
+        ],
+        "condition_header": [
+          "유형1",
+          "유형2",
+          "유형3",
+          "보험기간",
+          "납입기간",
+          "주피보험자최소가입연령",
+          "주피보험자최대가입연령",
+          "주피보험자최소가입연령구분코드",
+          "주피보험자최대가입연령구분코드",
+          "주피보험자가입성별"
+        ],
+        "condition_data": [
+          [
+            "해약환급금 미지급형",
+            "-",
+            "-",
+            [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "만 15세",
+            "min[세만기 - 년납, 90 - 년납, 70] 세",
+            "(2)만연령",
+            "(1)보험연령",
+            [
+              "<max_depth>",
+              "<max_depth>"
+            ]
+          ],
+          [
+            "일반형",
+            "-",
+            "-",
+            [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "만 15세",
+            "min[세만기 - 년납, 90 - 년납, 70] 세",
+            "(2)만연령",
+            "(1)보험연령",
+            [
+              "<max_depth>",
+              "<max_depth>"
+            ]
+          ]
+        ],
+        "instruction": "Ensure accurate mapping between definitions and conditions for effective grouping."
+      },
+      "output_preview": {
+        "column_mapping": {
+          "join_keys": [
+            "보험종목"
+          ],
+          "value_columns": [
+            "보험기간",
+            "납입기간",
+            "주피보험자최소가입연령",
+            "주피보험자최대가입연령",
+            "주피보험자최소가입연령구분코드",
+            "주피보험자최대가입연령구분코드",
+            "주피보험자가입성별"
+          ]
+        },
+        "groups": [
+          {
+            "id": 0,
+            "join_mappings": [
+              "<max_depth>"
+            ],
+            "definition_indices": [
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "matched_list_items": [
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "condition_indices": [
+              "<max_depth>"
+            ],
+            "reasoning": "해약환급금 미지급형이라는 동일한 보험종목을 기준으로 매칭되었습니다."
+          },
+          {
+            "id": 1,
+            "join_mappings": [
+              "<max_depth>"
+            ],
+            "definition_indices": [
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "matched_list_items": [
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "condition_indices": [
+              "<max_depth>"
+            ],
+            "reasoning": "일반형이라는 동일한 보험종목을 기준으로 매칭되었습니다."
+          }
+        ],
+        "unmatched": {
+          "definition_indices": [],
+          "condition_indices": []
+        },
+        "summary": {
+          "total_definitions": 4,
+          "total_conditions": 2,
+          "total_groups": 2,
+          "matched_definition_count": 4,
+          "unmatched_definition_count": 0,
+          "coverage_ratio": 1.0
+        },
+        "llm_usage_stats": {
+          "grouping": {
+            "call_count": 1,
+            "total_prompt_tokens": 4472,
+            "total_completion_tokens": 395,
+            "total_tokens": 4867,
+            "total_time_ms": 7789.902925491333,
+            "average_time_ms": 7789.902925491333,
+            "estimated_cost_usd": 0.01513
+          }
+        }
+      },
+      "ts": 1765930297.4128556
+    },
+    {
+      "event": "task_validated",
+      "task_id": "task4",
+      "task_type": "grouping",
+      "is_valid": true,
+      "confidence": 0.95,
+      "errors": [],
+      "suggestions": [],
+      "root_cause_task_id": null,
+      "root_cause_reasoning_preview": "",
+      "ts": 1765930303.7403598
+    },
+    {
+      "event": "planner_response",
+      "action": "next_task",
+      "reasoning_preview": "The previous tasks have successfully extracted definitions, conditions, and grouping logic. The next logical step is to generate the final combinations using the extracted grouping logic to achieve the goal of creating a comprehensive insurance product list.",
+      "task_results_count": 5,
+      "ts": 1765930307.3057184
+    },
+    {
+      "event": "task_scheduled",
+      "task_id": "task5",
+      "task_type": "combination_generation",
+      "tool_name": "combination_generator",
+      "fallback_tool": null,
+      "dependencies": [
+        "task1",
+        "task3",
+        "task4"
+      ],
+      "parameters_preview": {
+        "definition_header": "{task1.data.header}",
+        "definition_data": "{task1.data.data}",
+        "condition_header": "{task3.data.header}",
+        "condition_data": "{task3.data.data}",
+        "grouping_logic": "{task4.data.groups}"
+      },
+      "ts": 1765930307.3064907
+    },
+    {
+      "event": "task_execute_start",
+      "task_id": "task5",
+      "task_type": "combination_generation",
+      "tool_name": "combination_generator",
+      "ts": 1765930307.3064907
+    },
+    {
+      "event": "task_execute_end",
+      "task_id": "task5",
+      "task_type": "combination_generation",
+      "tool_used": "combination_generator",
+      "success": true,
+      "execution_time": 0.0067,
+      "error_preview": null,
+      "resolved_params_preview": {
+        "definition_header": [
+          "명칭",
+          "명칭_1",
+          "보험종목"
+        ],
+        "definition_data": [
+          [
+            "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "경증이상치매 보장계약",
+            "해약환급금 미지급형"
+          ],
+          [
+            "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "중등도이상치매 보장계약",
+            "해약환급금 미지급형"
+          ],
+          [
+            "경증이상치매보장특약(무배당)",
+            "경증이상치매 보장계약",
+            "일반형"
+          ],
+          [
+            "경증이상치매보장특약(무배당)",
+            "중등도이상치매 보장계약",
+            "일반형"
+          ]
+        ],
+        "condition_header": [
+          "유형1",
+          "유형2",
+          "유형3",
+          "보험기간",
+          "납입기간",
+          "주피보험자최소가입연령",
+          "주피보험자최대가입연령",
+          "주피보험자최소가입연령구분코드",
+          "주피보험자최대가입연령구분코드",
+          "주피보험자가입성별"
+        ],
+        "condition_data": [
+          [
+            "해약환급금 미지급형",
+            "-",
+            "-",
+            [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "만 15세",
+            "min[세만기 - 년납, 90 - 년납, 70] 세",
+            "(2)만연령",
+            "(1)보험연령",
+            [
+              "<max_depth>",
+              "<max_depth>"
+            ]
+          ],
+          [
+            "일반형",
+            "-",
+            "-",
+            [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "만 15세",
+            "min[세만기 - 년납, 90 - 년납, 70] 세",
+            "(2)만연령",
+            "(1)보험연령",
+            [
+              "<max_depth>",
+              "<max_depth>"
+            ]
+          ]
+        ],
+        "grouping_logic": [
+          {
+            "id": 0,
+            "join_mappings": [
+              "<max_depth>"
+            ],
+            "definition_indices": [
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "matched_list_items": [
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "condition_indices": [
+              "<max_depth>"
+            ],
+            "reasoning": "해약환급금 미지급형이라는 동일한 보험종목을 기준으로 매칭되었습니다."
+          },
+          {
+            "id": 1,
+            "join_mappings": [
+              "<max_depth>"
+            ],
+            "definition_indices": [
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "matched_list_items": [
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "condition_indices": [
+              "<max_depth>"
+            ],
+            "reasoning": "일반형이라는 동일한 보험종목을 기준으로 매칭되었습니다."
+          }
+        ]
+      },
+      "output_preview": {
+        "definitions": [
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "90세 만기",
+            "납입기간": "10년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 70,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(1)남자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "90세 만기",
+            "납입기간": "10년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 70,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(2)여자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "90세 만기",
+            "납입기간": "15년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 70,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(1)남자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "90세 만기",
+            "납입기간": "15년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 70,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(2)여자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "90세 만기",
+            "납입기간": "20년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 70,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(1)남자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "90세 만기",
+            "납입기간": "20년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 70,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(2)여자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "90세 만기",
+            "납입기간": "25년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 65,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(1)남자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "90세 만기",
+            "납입기간": "25년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 65,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(2)여자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "90세 만기",
+            "납입기간": "30년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 60,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(1)남자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "90세 만기",
+            "납입기간": "30년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 60,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(2)여자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "100세 만기",
+            "납입기간": "10년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 70,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(1)남자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "100세 만기",
+            "납입기간": "10년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 70,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(2)여자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "100세 만기",
+            "납입기간": "15년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 70,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(1)남자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "100세 만기",
+            "납입기간": "15년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 70,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(2)여자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "100세 만기",
+            "납입기간": "20년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 70,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(1)남자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "100세 만기",
+            "납입기간": "20년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 70,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(2)여자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "100세 만기",
+            "납입기간": "25년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 65,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(1)남자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "100세 만기",
+            "납입기간": "25년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 65,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(2)여자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "100세 만기",
+            "납입기간": "30년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 60,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(1)남자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "100세 만기",
+            "납입기간": "30년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 60,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(2)여자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "종신",
+            "납입기간": "10년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 70,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(1)남자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "종신",
+            "납입기간": "10년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 70,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(2)여자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "종신",
+            "납입기간": "15년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 70,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(1)남자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "종신",
+            "납입기간": "15년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 70,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(2)여자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "종신",
+            "납입기간": "20년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 70,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(1)남자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "종신",
+            "납입기간": "20년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 70,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(2)여자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "종신",
+            "납입기간": "25년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 65,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(1)남자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "종신",
+            "납입기간": "25년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 65,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(2)여자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "종신",
+            "납입기간": "30년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 60,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(1)남자"
+          },
+          {
+            "명칭": "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "명칭_1": "경증이상치매 보장계약",
+            "보험종목": "해약환급금 미지급형",
+            "보험기간": "종신",
+            "납입기간": "30년납",
+            "주피보험자최소가입연령": 15,
+            "주피보험자최대가입연령": 60,
+            "주피보험자최소가입연령구분코드": "(2)만연령",
+            "주피보험자최대가입연령구분코드": "(1)보험연령",
+            "주피보험자가입성별": "(2)여자"
+          },
+          "...(+90 items)"
+        ],
+        "total_count": 120,
+        "generation_stats": {
+          "groups_processed": 2,
+          "matched_definitions": 4,
+          "unmatched_definitions": 0,
+          "total_generated": 120
+        },
+        "llm_usage_stats": {
+          "formula_evaluation": {
+            "call_count": 0,
+            "cache_hits": 0,
+            "total_prompt_tokens": 0,
+            "total_completion_tokens": 0,
+            "total_tokens": 0,
+            "total_time_ms": 0,
+            "average_time_ms": 0,
+            "estimated_cost_usd": 0
+          }
+        }
+      },
+      "ts": 1765930307.3142688
+    },
+    {
+      "event": "task_validated",
+      "task_id": "task5",
+      "task_type": "combination_generation",
+      "is_valid": false,
+      "confidence": 0.9,
+      "errors": [
+        "Generated definitions missing core column (보종명)"
+      ],
+      "suggestions": [
+        "Check combination generator's column mapping"
+      ],
+      "root_cause_task_id": "task5",
+      "root_cause_reasoning_preview": "현재 작업의 오류는 'Generated definitions missing core column (보종명)'입니다. 이는 '보종명'이라는 핵심 컬럼이 생성된 정의에서 누락되었음을 의미합니다. 이전 작업들 중 task5는 'definitions'를 생성하는 작업으로, 이 작업의 출력에서 '보종명' 컬럼이 포함되지 않았습니다. 따라서, task5가 필요한 데이터를 누락하여 현재 작업이 실패하게 된 것입니다. task5의 출력이 현재 작업의 기대와 불일치하여 오류가 발생했으므로, task5가 근본 원인입니다.",
+      "ts": 1765930311.2071779
+    },
+    {
+      "event": "backtrack_marked",
+      "from_task_id": "task5",
+      "to_task_id": "task5",
+      "reasoning_preview": "현재 작업의 오류는 'Generated definitions missing core column (보종명)'입니다. 이는 '보종명'이라는 핵심 컬럼이 생성된 정의에서 누락되었음을 의미합니다. 이전 작업들 중 task5는 'definitions'를 생성하는 작업으로, 이 작업의 출력에서 '보종명' 컬럼이 포함되지 않았습니다. 따라서, task5가 필요한 데이터를 누락하여 현재 작업이 실패하게 된 것입니다. task5의 출력이 현재 작업의 기대와 불일치하여 오류가 발생했으므로, task5가 근본 원인입니다.",
+      "ts": 1765930311.2081885
+    },
+    {
+      "event": "backtrack_requested",
+      "backtrack_to_task_id": "task5",
+      "backtrack_reasoning": "현재 작업의 오류는 'Generated definitions missing core column (보종명)'입니다. 이는 '보종명'이라는 핵심 컬럼이 생성된 정의에서 누락되었음을 의미합니다. 이전 작업들 중 task5는 'definitions'를 생성하는 작업으로, 이 작업의 출력에서 '보종명' 컬럼이 포함되지 않았습니다. 따라서, task5가 필요한 데이터를 누락하여 현재 작업이 실패하게 된 것입니다. task5의 출력이 현재 작업의 기대와 불일치하여 오류가 발생했으므로, task5가 근본 원인입니다.",
+      "task_results_count_before": 6,
+      "ts": 1765930311.2081885
+    },
+    {
+      "event": "backtrack_applied",
+      "backtrack_to_task_id": "task5",
+      "tasks_to_rerun": [
+        "task5"
+      ],
+      "kept_task_results_count": 5,
+      "ts": 1765930311.2081885
+    },
+    {
+      "event": "retry_reset",
+      "task_id": "task5",
+      "previous_retry_count": 1,
+      "ts": 1765930311.2096055
+    },
+    {
+      "event": "planner_response",
+      "action": "next_task",
+      "reasoning_preview": "The previous attempt at extracting definitions failed to include the '보종명' column, which is essential for the subsequent tasks. Re-extracting the definitions with the necessary column will resolve the issue and allow the workflow to proceed correctly.",
+      "task_results_count": 5,
+      "ts": 1765930314.2986002
+    },
+    {
+      "event": "task_scheduled",
+      "task_id": "task5",
+      "task_type": "extract_definitions",
+      "tool_name": "definition_extract_v2",
+      "fallback_tool": null,
+      "dependencies": [
+        "task0"
+      ],
+      "parameters_preview": {
+        "sections": "$sections",
+        "core_indices": "{task0.data.definition_core}",
+        "instruction": "Ensure '보종명' column is included in the extracted definitions."
+      },
+      "ts": 1765930314.2996101
+    },
+    {
+      "event": "task_execute_start",
+      "task_id": "task5",
+      "task_type": "extract_definitions",
+      "tool_name": "definition_extract_v2",
+      "ts": 1765930314.3008058
+    },
+    {
+      "event": "task_execute_end",
+      "task_id": "task5",
+      "task_type": "extract_definitions",
+      "tool_used": "definition_extract_v2",
+      "success": true,
+      "execution_time": 2.3334,
+      "error_preview": null,
+      "resolved_params_preview": {
+        "sections": [
+          {
+            "index": 0,
+            "title": "1. 보험종목의 명칭",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 1,
+            "title": "2. 특약의 부가대상",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 2,
+            "title": "3. 보험기간, 보험료 납입기간, 피보험자 가입나이 및 보험료 납입주기",
+            "content": [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 3,
+            "title": "4. 의무가입에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 4,
+            "title": "5. 배당에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 5,
+            "title": "6. 보험료에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 6,
+            "title": "7. 보험료 할인에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 7,
+            "title": "8. 보험료 선납에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 8,
+            "title": "9. 해지특약의 부활(효력회복)에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 9,
+            "title": "10. 연체이율에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 10,
+            "title": "11. 중도인출에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 11,
+            "title": "12. 공시이율에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 12,
+            "title": "13. 보험계약대출에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 13,
+            "title": "14. “해약환급금 미지급형”의 해약환급금에 관한 사항",
+            "content": [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 14,
+            "title": "15. 보험금 대리청구에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 15,
+            "title": "16. 특약의 중도 가입에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 16,
+            "title": "17. 기   타",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          }
+        ],
+        "core_indices": [
+          0
+        ],
+        "instruction": "Ensure '보종명' column is included in the extracted definitions."
+      },
+      "output_preview": {
+        "header": [
+          "명칭",
+          "명칭_1",
+          "보험종목"
+        ],
+        "data": [
+          [
+            "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "경증이상치매 보장계약",
+            "해약환급금 미지급형"
+          ],
+          [
+            "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "중등도이상치매 보장계약",
+            "해약환급금 미지급형"
+          ],
+          [
+            "경증이상치매보장특약(무배당)",
+            "경증이상치매 보장계약",
+            "일반형"
+          ],
+          [
+            "경증이상치매보장특약(무배당)",
+            "중등도이상치매 보장계약",
+            "일반형"
+          ]
+        ],
+        "extraction_method": "v2_classifier_based",
+        "llm_usage_stats": {
+          "extract": {
+            "call_count": 0,
+            "total_prompt_tokens": 0,
+            "total_completion_tokens": 0,
+            "total_tokens": 0,
+            "total_time_ms": 0,
+            "average_time_ms": 0,
+            "estimated_cost_usd": 0
+          },
+          "merge": {
+            "call_count": 3,
+            "total_prompt_tokens": 8475,
+            "total_completion_tokens": 1053,
+            "total_tokens": 9528,
+            "total_time_ms": 12469.419717788696,
+            "average_time_ms": 4156.4732392628985,
+            "estimated_cost_usd": 0.031717
+          }
+        }
+      },
+      "ts": 1765930316.6352308
+    },
+    {
+      "event": "task_validated",
+      "task_id": "task5",
+      "task_type": "extract_definitions",
+      "is_valid": true,
+      "confidence": 0.95,
+      "errors": [],
+      "suggestions": [],
+      "root_cause_task_id": null,
+      "root_cause_reasoning_preview": "",
+      "ts": 1765930322.274384
+    },
+    {
+      "event": "planner_response",
+      "action": "next_task",
+      "reasoning_preview": "현재까지 조건 추출과 그룹핑은 완료되었으나, 최종 조합 생성을 위해 정의 테이블의 셀 분리가 필요합니다. 이를 통해 다중 값 셀을 처리하여 데이터의 정확성을 높이고, 이후 작업에서의 조합 생성을 원활히 할 수 있습니다.",
+      "task_results_count": 6,
+      "ts": 1765930328.7678044
+    },
+    {
+      "event": "task_scheduled",
+      "task_id": "task6",
+      "task_type": "table_split",
+      "tool_name": "llm_table_split",
+      "fallback_tool": "rule_table_split",
+      "dependencies": [
+        "task1"
+      ],
+      "parameters_preview": {
+        "header": "{task1.data.header}",
+        "data": "{task1.data.data}",
+        "instruction": "다중 값 셀을 적절히 분리하여 데이터의 정확성을 높이세요."
+      },
+      "ts": 1765930328.768815
+    },
+    {
+      "event": "task_execute_start",
+      "task_id": "task6",
+      "task_type": "table_split",
+      "tool_name": "llm_table_split",
+      "ts": 1765930328.7709293
+    },
+    {
+      "event": "task_execute_end",
+      "task_id": "task6",
+      "task_type": "table_split",
+      "tool_used": "llm_table_split",
+      "success": true,
+      "execution_time": 7.3143,
+      "error_preview": null,
+      "resolved_params_preview": {
+        "header": [
+          "명칭",
+          "명칭_1",
+          "보험종목"
+        ],
+        "data": [
+          [
+            "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "경증이상치매 보장계약",
+            "해약환급금 미지급형"
+          ],
+          [
+            "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "중등도이상치매 보장계약",
+            "해약환급금 미지급형"
+          ],
+          [
+            "경증이상치매보장특약(무배당)",
+            "경증이상치매 보장계약",
+            "일반형"
+          ],
+          [
+            "경증이상치매보장특약(무배당)",
+            "중등도이상치매 보장계약",
+            "일반형"
+          ]
+        ],
+        "instruction": "다중 값 셀을 적절히 분리하여 데이터의 정확성을 높이세요."
+      },
+      "output_preview": {
+        "header": [
+          "보종명",
+          "유형1",
+          "유형2"
+        ],
+        "data": [
+          [
+            "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "경증이상치매 보장계약",
+            "해약환급금 미지급형"
+          ],
+          [
+            "경증이상치매보장특약 (무배당, 해약환급금 미지급형)",
+            "중등도이상치매 보장계약",
+            "해약환급금 미지급형"
+          ],
+          [
+            "경증이상치매보장특약(무배당)",
+            "경증이상치매 보장계약",
+            "일반형"
+          ],
+          [
+            "경증이상치매보장특약(무배당)",
+            "중등도이상치매 보장계약",
+            "일반형"
+          ]
+        ],
+        "notes": "",
+        "llm_usage_stats": {
+          "split": {
+            "call_count": 1,
+            "total_prompt_tokens": 1912,
+            "total_completion_tokens": 244,
+            "total_tokens": 2156,
+            "total_time_ms": 7311.6114139556885,
+            "average_time_ms": 7311.6114139556885,
+            "estimated_cost_usd": 0.00722
+          }
+        }
+      },
+      "ts": 1765930336.08621
+    },
+    {
+      "event": "task_validated",
+      "task_id": "task6",
+      "task_type": "table_split",
+      "is_valid": true,
+      "confidence": 1.0,
+      "errors": [],
+      "suggestions": [],
+      "root_cause_task_id": null,
+      "root_cause_reasoning_preview": "",
+      "ts": 1765930340.3267996
+    },
+    {
+      "event": "planner_response",
+      "action": "next_task",
+      "reasoning_preview": "The previous tasks have successfully extracted and transformed the necessary data. Now, we need to generate the final combinations using the grouping logic to complete the process.",
+      "task_results_count": 7,
+      "ts": 1765930346.0022907
+    },
+    {
+      "event": "task_scheduled",
+      "task_id": "task7",
+      "task_type": "combination_generation",
+      "tool_name": "combination_generator",
+      "fallback_tool": null,
+      "dependencies": [
+        "task6",
+        "task3",
+        "task5"
+      ],
+      "parameters_preview": {
+        "definition_header": "{task6.data.header}",
+        "definition_data": "{task6.data.data}",
+        "condition_header": "{task3.data.header}",
+        "condition_data": "{task3.data.data}",
+        "grouping_logic": "{task5.data.groups}"
+      },
+      "ts": 1765930346.003401
+    },
+    {
+      "event": "task_execute_start",
+      "task_id": "task7",
+      "task_type": "combination_generation",
+      "tool_name": "combination_generator",
+      "ts": 1765930346.0045178
+    },
+    {
+      "event": "task_validated",
+      "task_id": "task7",
+      "task_type": "combination_generation",
+      "is_valid": false,
+      "confidence": 1.0,
+      "errors": [
+        "Final combination generation produced no definitions"
+      ],
+      "suggestions": [
+        "Check grouping logic",
+        "Review combination generator logic"
+      ],
+      "root_cause_task_id": null,
+      "root_cause_reasoning_preview": "",
+      "ts": 1765930352.3015792
+    },
+    {
+      "event": "planner_response",
+      "action": "next_task",
+      "reasoning_preview": "The previous combination generation task failed, producing no definitions. We need to retry the combination generation task, ensuring that the grouping logic is correctly applied and the combination generator logic is reviewed to successfully produce the final definitions.",
+      "task_results_count": 7,
+      "ts": 1765930356.3954804
+    },
+    {
+      "event": "task_scheduled",
+      "task_id": "task7",
+      "task_type": "combination_generation",
+      "tool_name": "combination_generator",
+      "fallback_tool": null,
+      "dependencies": [
+        "task6",
+        "task3",
+        "task4"
+      ],
+      "parameters_preview": {
+        "definition_header": "{task6.data.header}",
+        "definition_data": "{task6.data.data}",
+        "condition_header": "{task3.data.header}",
+        "condition_data": "{task3.data.data}",
+        "grouping_logic": "{task4.data.groups}"
+      },
+      "ts": 1765930356.3968174
+    }
+  ],
+  "planner_llm_stats": {
+    "generate_next_task": {
+      "call_count": 10,
+      "total_prompt_tokens": 42000,
+      "total_completion_tokens": 2131,
+      "total_tokens": 44131,
+      "total_time_ms": 52918,
+      "estimated_cost_usd": 0.12631
+    }
+  },
+  "validator_llm_stats": {
+    "validate_section_classifier": {
+      "call_count": 1,
+      "total_prompt_tokens": 1645,
+      "total_completion_tokens": 96,
+      "total_tokens": 1741,
+      "total_time_ms": 4335,
+      "estimated_cost_usd": 0.005072
+    },
+    "validate_definition_extract_v2": {
+      "call_count": 2,
+      "total_prompt_tokens": 2364,
+      "total_completion_tokens": 266,
+      "total_tokens": 2630,
+      "total_time_ms": 8890,
+      "estimated_cost_usd": 0.00857
+    },
+    "validate_table_split": {
+      "call_count": 1,
+      "total_prompt_tokens": 1734,
+      "total_completion_tokens": 155,
+      "total_tokens": 1889,
+      "total_time_ms": 4236,
+      "estimated_cost_usd": 0.005885
+    },
+    "validate_condition_transform": {
+      "call_count": 1,
+      "total_prompt_tokens": 2246,
+      "total_completion_tokens": 144,
+      "total_tokens": 2390,
+      "total_time_ms": 7789,
+      "estimated_cost_usd": 0.007055
+    },
+    "validate_transform": {
+      "call_count": 0,
+      "total_prompt_tokens": 0,
+      "total_completion_tokens": 0,
+      "total_tokens": 0,
+      "total_time_ms": 0,
+      "estimated_cost_usd": 0.0
+    },
+    "validate_condition_extract": {
+      "call_count": 0,
+      "total_prompt_tokens": 0,
+      "total_completion_tokens": 0,
+      "total_tokens": 0,
+      "total_time_ms": 0,
+      "estimated_cost_usd": 0.0
+    },
+    "validate_grouping_logic": {
+      "call_count": 1,
+      "total_prompt_tokens": 3058,
+      "total_completion_tokens": 125,
+      "total_tokens": 3183,
+      "total_time_ms": 6323,
+      "estimated_cost_usd": 0.008895
+    },
+    "analyze_root_cause": {
+      "call_count": 2,
+      "total_prompt_tokens": 3164,
+      "total_completion_tokens": 272,
+      "total_tokens": 3436,
+      "total_time_ms": 10181,
+      "estimated_cost_usd": 0.01063
+    }
+  }
+}

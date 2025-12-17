@@ -1,0 +1,1148 @@
+{
+  "success": false,
+  "error": "No condition data provided (header or data is empty)",
+  "task_log": [
+    {
+      "step": 1,
+      "task_id": "task0",
+      "success": true,
+      "tool_used": "section_classifier",
+      "execution_time": 4.2,
+      "error": null
+    },
+    {
+      "step": 2,
+      "task_id": "task1",
+      "success": true,
+      "tool_used": "definition_extract_v2",
+      "execution_time": 7.82,
+      "error": null
+    },
+    {
+      "step": 3,
+      "task_id": "task2",
+      "success": true,
+      "tool_used": "condition_extract",
+      "execution_time": 2.84,
+      "error": null
+    },
+    {
+      "step": 4,
+      "task_id": "task3",
+      "success": false,
+      "tool_used": "condition_transform",
+      "execution_time": 0.0,
+      "error": "No condition data provided (header or data is empty)"
+    }
+  ],
+  "final_data": null,
+  "task_results": [
+    {
+      "task_id": "task0",
+      "success": true,
+      "data": {
+        "definition_core": [
+          0
+        ],
+        "definition_annotation": [
+          1,
+          2
+        ],
+        "condition": [
+          3
+        ],
+        "other": [
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ],
+        "reasoning": "Section 0은 보험종목의 명칭과 구조를 정의하는 테이블이 포함되어 있어 definition_core로 분류됩니다. Section 1은 특약의 부가대상에 대한 설명으로, 정의에 대한 주석이므로 definition_annotation으로 분류됩니다. Section 2는 보험기간, 납입기간 등 가입 조건을 설명하는 테이블이 포함되어 있어 condition으로 분류됩니다. 나머지 섹션들은 보험료, 해지, 중도인출 등 기타 사항에 대한 설명으로, other로 분류됩니다.",
+        "llm_usage_stats": {
+          "classify": {
+            "call_count": 1,
+            "total_prompt_tokens": 3277,
+            "total_completion_tokens": 192,
+            "total_tokens": 3469,
+            "total_time_ms": 4198.593854904175,
+            "average_time_ms": 4198.593854904175,
+            "estimated_cost_usd": 0.010112
+          }
+        }
+      },
+      "tool_used": "section_classifier",
+      "execution_time": 4.200079679489136,
+      "error": null
+    },
+    {
+      "task_id": "task1",
+      "success": true,
+      "data": {
+        "header": [
+          "명칭",
+          "보험종목",
+          "보험종목_1",
+          "보장계약"
+        ],
+        "data": [
+          [
+            "통합암(전이포함)진단특약TC (무배당, 해약환급금 미지급형)",
+            "해약환급금 미지급형",
+            "간편심사형 / 일반심사형",
+            "두경부암(전이포함), 위암 및 식도암(전이포함), 소장·대장·항문암 및 기타암(전이포함), 간·담낭·담도암 및 췌장암(전이포함), 폐암(전이포함), 흉곽내기관·중피성암 및 연조직암(전이포함), 골·피부 등 전신부위암(전이포함), 유방·비뇨기관·부신암 및 내분비선암(전이포함), 남성/여성생식기암(전이포함), 뇌암 및 중추신경계통암(전이포함), 혈액암(전이포함)"
+          ],
+          [
+            "통합암(전이포함)진단특약TC (무배당)",
+            "일반형",
+            "간편심사형 / 일반심사형",
+            "두경부암(전이포함), 위암 및 식도암(전이포함), 소장·대장·항문암 및 기타암(전이포함), 간·담낭·담도암 및 췌장암(전이포함), 폐암(전이포함), 흉곽내기관·중피성암 및 연조직암(전이포함), 골·피부 등 전신부위암(전이포함), 유방·비뇨기관·부신암 및 내분비선암(전이포함), 남성/여성생식기암(전이포함), 뇌암 및 중추신경계통암(전이포함), 혈액암(전이포함)"
+          ]
+        ],
+        "extraction_method": "v2_classifier_based",
+        "llm_usage_stats": {
+          "extract": {
+            "call_count": 0,
+            "total_prompt_tokens": 0,
+            "total_completion_tokens": 0,
+            "total_tokens": 0,
+            "total_time_ms": 0,
+            "average_time_ms": 0,
+            "estimated_cost_usd": 0
+          },
+          "merge": {
+            "call_count": 1,
+            "total_prompt_tokens": 6302,
+            "total_completion_tokens": 587,
+            "total_tokens": 6889,
+            "total_time_ms": 7823.133945465088,
+            "average_time_ms": 7823.133945465088,
+            "estimated_cost_usd": 0.021625
+          }
+        }
+      },
+      "tool_used": "definition_extract_v2",
+      "execution_time": 7.823133945465088,
+      "error": null
+    },
+    {
+      "task_id": "task2",
+      "success": true,
+      "data": {
+        "header": [],
+        "data": [],
+        "reasoning": "주어진 입력 데이터에는 '가입 가능 조건'에 해당하는 테이블이 존재하지 않습니다. '가입 가능 조건' 테이블을 식별할 수 있는 'table_title'이나 'title'이 없으며, 제공된 섹션에는 '가입 가능 조건'에 대한 정보가 포함되어 있지 않습니다. 따라서 추출할 수 있는 데이터가 없습니다.",
+        "llm_usage_stats": {
+          "extract": {
+            "call_count": 1,
+            "total_prompt_tokens": 1616,
+            "total_completion_tokens": 95,
+            "total_tokens": 1711,
+            "total_time_ms": 2844.3946838378906,
+            "average_time_ms": 2844.3946838378906,
+            "estimated_cost_usd": 0.00499
+          }
+        }
+      },
+      "tool_used": "condition_extract",
+      "execution_time": 2.8443946838378906,
+      "error": null
+    },
+    {
+      "task_id": "task3",
+      "success": false,
+      "data": null,
+      "tool_used": "condition_transform",
+      "execution_time": 0.0,
+      "error": "No condition data provided (header or data is empty)"
+    }
+  ],
+  "task_history": [],
+  "event_history": [
+    {
+      "event": "planner_response",
+      "action": "next_task",
+      "reasoning_preview": "첫 번째 단계로 문서의 섹션을 분류하여 '정의'와 '조건' 섹션을 식별해야 합니다. 이를 통해 이후 단계에서 필요한 데이터를 정확히 추출할 수 있습니다.",
+      "task_results_count": 0,
+      "ts": 1765930179.0956903
+    },
+    {
+      "event": "task_scheduled",
+      "task_id": "task0",
+      "task_type": "classify_sections",
+      "tool_name": "section_classifier",
+      "fallback_tool": null,
+      "dependencies": [],
+      "parameters_preview": {
+        "sections": "$sections",
+        "instruction": "추가 지시사항을 task.parameters.instruction 필드로 반드시 넣어라"
+      },
+      "ts": 1765930179.0956903
+    },
+    {
+      "event": "task_execute_start",
+      "task_id": "task0",
+      "task_type": "classify_sections",
+      "tool_name": "section_classifier",
+      "ts": 1765930179.0969336
+    },
+    {
+      "event": "task_execute_end",
+      "task_id": "task0",
+      "task_type": "classify_sections",
+      "tool_used": "section_classifier",
+      "success": true,
+      "execution_time": 4.2001,
+      "error_preview": null,
+      "resolved_params_preview": {
+        "sections": [
+          {
+            "index": 0,
+            "title": "1. 보험종목의 명칭",
+            "content": [
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 1,
+            "title": "2. 특약의 부가대상",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 2,
+            "title": "3. 보험기간, 보험료 납입기간, 피보험자 가입나이 및 보험료 납입주기",
+            "content": [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 3,
+            "title": "4. 의무가입에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 4,
+            "title": "5. 배당에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 5,
+            "title": "6. 보험료에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 6,
+            "title": "7. 보험료 할인에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 7,
+            "title": "8. 보험료 선납에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 8,
+            "title": "9. 해지특약의 부활(효력회복)에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 9,
+            "title": "10. 연체이율에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 10,
+            "title": "11. 중도인출에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 11,
+            "title": "12. 공시이율에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 12,
+            "title": "13. 보험계약대출에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 13,
+            "title": "14. “해약환급금 미지급형”의 해약환급금에 관한 사항",
+            "content": [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 14,
+            "title": "15. 특약의 중도 가입에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 15,
+            "title": "16. 기   타",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          }
+        ],
+        "instruction": "추가 지시사항을 task.parameters.instruction 필드로 반드시 넣어라"
+      },
+      "output_preview": {
+        "definition_core": [
+          0
+        ],
+        "definition_annotation": [
+          1,
+          2
+        ],
+        "condition": [
+          3
+        ],
+        "other": [
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ],
+        "reasoning": "Section 0은 보험종목의 명칭과 구조를 정의하는 테이블이 포함되어 있어 definition_core로 분류됩니다. Section 1은 특약의 부가대상에 대한 설명으로, 정의에 대한 주석이므로 definition_annotation으로 분류됩니다. Section 2는 보험기간, 납입기간 등 가입 조건을 설명하는 테이블이 포함되어 있어 condition으로 분류됩니다. 나머지 섹션들은 보험료, 해지, 중도인출 등 기타 사항에 대한 설명으로, other로 분류됩니다.",
+        "llm_usage_stats": {
+          "classify": {
+            "call_count": 1,
+            "total_prompt_tokens": 3277,
+            "total_completion_tokens": 192,
+            "total_tokens": 3469,
+            "total_time_ms": 4198.593854904175,
+            "average_time_ms": 4198.593854904175,
+            "estimated_cost_usd": 0.010112
+          }
+        }
+      },
+      "ts": 1765930183.2970133
+    },
+    {
+      "event": "task_validated",
+      "task_id": "task0",
+      "task_type": "classify_sections",
+      "is_valid": true,
+      "confidence": 0.9,
+      "errors": [],
+      "suggestions": [],
+      "root_cause_task_id": null,
+      "root_cause_reasoning_preview": "",
+      "ts": 1765930186.9460566
+    },
+    {
+      "event": "planner_response",
+      "action": "next_task",
+      "reasoning_preview": "The next step after classifying sections is to extract the definition table from the identified core and annotation sections. This is necessary to proceed with the normalization and grouping of the data.",
+      "task_results_count": 1,
+      "ts": 1765930190.3097966
+    },
+    {
+      "event": "task_scheduled",
+      "task_id": "task1",
+      "task_type": "extract_definitions",
+      "tool_name": "definition_extract_v2",
+      "fallback_tool": null,
+      "dependencies": [
+        "task0"
+      ],
+      "parameters_preview": {
+        "sections": "$sections",
+        "core_indices": "{task0.data.definition_core}",
+        "annotation_indices": "{task0.data.definition_annotation}"
+      },
+      "ts": 1765930190.3109388
+    },
+    {
+      "event": "task_execute_start",
+      "task_id": "task1",
+      "task_type": "extract_definitions",
+      "tool_name": "definition_extract_v2",
+      "ts": 1765930190.3123293
+    },
+    {
+      "event": "task_execute_end",
+      "task_id": "task1",
+      "task_type": "extract_definitions",
+      "tool_used": "definition_extract_v2",
+      "success": true,
+      "execution_time": 7.8231,
+      "error_preview": null,
+      "resolved_params_preview": {
+        "sections": [
+          {
+            "index": 0,
+            "title": "1. 보험종목의 명칭",
+            "content": [
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 1,
+            "title": "2. 특약의 부가대상",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 2,
+            "title": "3. 보험기간, 보험료 납입기간, 피보험자 가입나이 및 보험료 납입주기",
+            "content": [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 3,
+            "title": "4. 의무가입에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 4,
+            "title": "5. 배당에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 5,
+            "title": "6. 보험료에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 6,
+            "title": "7. 보험료 할인에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 7,
+            "title": "8. 보험료 선납에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 8,
+            "title": "9. 해지특약의 부활(효력회복)에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 9,
+            "title": "10. 연체이율에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 10,
+            "title": "11. 중도인출에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 11,
+            "title": "12. 공시이율에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 12,
+            "title": "13. 보험계약대출에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 13,
+            "title": "14. “해약환급금 미지급형”의 해약환급금에 관한 사항",
+            "content": [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 14,
+            "title": "15. 특약의 중도 가입에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 15,
+            "title": "16. 기   타",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          }
+        ],
+        "core_indices": [
+          0
+        ],
+        "annotation_indices": [
+          1,
+          2
+        ]
+      },
+      "output_preview": {
+        "header": [
+          "명칭",
+          "보험종목",
+          "보험종목_1",
+          "보장계약"
+        ],
+        "data": [
+          [
+            "통합암(전이포함)진단특약TC (무배당, 해약환급금 미지급형)",
+            "해약환급금 미지급형",
+            "간편심사형 / 일반심사형",
+            "두경부암(전이포함), 위암 및 식도암(전이포함), 소장·대장·항문암 및 기타암(전이포함), 간·담낭·담도암 및 췌장암(전이포함), 폐암(전이포함), 흉곽내기관·중피성암 및 연조직암(전이포함), 골·피부 등 전신부위암(전이포함), 유방·비뇨기관·부신암 및 내분비선암(전이포함), 남성/여성생식기암(전이포함), 뇌암 및 중추신경계통암(전이포함), 혈액암(전이포함)"
+          ],
+          [
+            "통합암(전이포함)진단특약TC (무배당)",
+            "일반형",
+            "간편심사형 / 일반심사형",
+            "두경부암(전이포함), 위암 및 식도암(전이포함), 소장·대장·항문암 및 기타암(전이포함), 간·담낭·담도암 및 췌장암(전이포함), 폐암(전이포함), 흉곽내기관·중피성암 및 연조직암(전이포함), 골·피부 등 전신부위암(전이포함), 유방·비뇨기관·부신암 및 내분비선암(전이포함), 남성/여성생식기암(전이포함), 뇌암 및 중추신경계통암(전이포함), 혈액암(전이포함)"
+          ]
+        ],
+        "extraction_method": "v2_classifier_based",
+        "llm_usage_stats": {
+          "extract": {
+            "call_count": 0,
+            "total_prompt_tokens": 0,
+            "total_completion_tokens": 0,
+            "total_tokens": 0,
+            "total_time_ms": 0,
+            "average_time_ms": 0,
+            "estimated_cost_usd": 0
+          },
+          "merge": {
+            "call_count": 1,
+            "total_prompt_tokens": 6302,
+            "total_completion_tokens": 587,
+            "total_tokens": 6889,
+            "total_time_ms": 7823.133945465088,
+            "average_time_ms": 7823.133945465088,
+            "estimated_cost_usd": 0.021625
+          }
+        }
+      },
+      "ts": 1765930198.137012
+    },
+    {
+      "event": "task_validated",
+      "task_id": "task1",
+      "task_type": "extract_definitions",
+      "is_valid": true,
+      "confidence": 0.95,
+      "errors": [],
+      "suggestions": [],
+      "root_cause_task_id": null,
+      "root_cause_reasoning_preview": "",
+      "ts": 1765930201.4154007
+    },
+    {
+      "event": "planner_response",
+      "action": "next_task",
+      "reasoning_preview": "The next logical step is to extract the conditions from the sections classified as condition sections. This is necessary to proceed with the grouping and final combination generation tasks.",
+      "task_results_count": 2,
+      "ts": 1765930208.3567865
+    },
+    {
+      "event": "task_scheduled",
+      "task_id": "task2",
+      "task_type": "condition_extraction",
+      "tool_name": "condition_extract",
+      "fallback_tool": null,
+      "dependencies": [
+        "task0",
+        "task1"
+      ],
+      "parameters_preview": {
+        "sections": "$sections",
+        "condition_indices": "{task0.data.condition}",
+        "definition_core_indices": "{task0.data.definition_core}",
+        "definition_annotation_indices": "{task0.data.definition_annotation}",
+        "instruction": "Ensure all condition columns are extracted accurately and cross-reference with definition annotations if necessary."
+      },
+      "ts": 1765930208.3580577
+    },
+    {
+      "event": "task_execute_start",
+      "task_id": "task2",
+      "task_type": "condition_extraction",
+      "tool_name": "condition_extract",
+      "ts": 1765930208.3605585
+    },
+    {
+      "event": "task_execute_end",
+      "task_id": "task2",
+      "task_type": "condition_extraction",
+      "tool_used": "condition_extract",
+      "success": true,
+      "execution_time": 2.8444,
+      "error_preview": null,
+      "resolved_params_preview": {
+        "sections": [
+          {
+            "index": 0,
+            "title": "1. 보험종목의 명칭",
+            "content": [
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 1,
+            "title": "2. 특약의 부가대상",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 2,
+            "title": "3. 보험기간, 보험료 납입기간, 피보험자 가입나이 및 보험료 납입주기",
+            "content": [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 3,
+            "title": "4. 의무가입에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 4,
+            "title": "5. 배당에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 5,
+            "title": "6. 보험료에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 6,
+            "title": "7. 보험료 할인에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 7,
+            "title": "8. 보험료 선납에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 8,
+            "title": "9. 해지특약의 부활(효력회복)에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 9,
+            "title": "10. 연체이율에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 10,
+            "title": "11. 중도인출에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 11,
+            "title": "12. 공시이율에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 12,
+            "title": "13. 보험계약대출에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 13,
+            "title": "14. “해약환급금 미지급형”의 해약환급금에 관한 사항",
+            "content": [
+              "<max_depth>",
+              "<max_depth>",
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 14,
+            "title": "15. 특약의 중도 가입에 관한 사항",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          },
+          {
+            "index": 15,
+            "title": "16. 기   타",
+            "content": [
+              "<max_depth>"
+            ],
+            "raw": {
+              "title": "<max_depth>",
+              "paragraphs": "<max_depth>"
+            }
+          }
+        ],
+        "condition_indices": [
+          3
+        ],
+        "definition_core_indices": [
+          0
+        ],
+        "definition_annotation_indices": [
+          1,
+          2
+        ],
+        "instruction": "Ensure all condition columns are extracted accurately and cross-reference with definition annotations if necessary."
+      },
+      "output_preview": {
+        "header": [],
+        "data": [],
+        "reasoning": "주어진 입력 데이터에는 '가입 가능 조건'에 해당하는 테이블이 존재하지 않습니다. '가입 가능 조건' 테이블을 식별할 수 있는 'table_title'이나 'title'이 없으며, 제공된 섹션에는 '가입 가능 조건'에 대한 정보가 포함되어 있지 않습니다. 따라서 추출할 수 있는 데이터가 없습니다.",
+        "llm_usage_stats": {
+          "extract": {
+            "call_count": 1,
+            "total_prompt_tokens": 1616,
+            "total_completion_tokens": 95,
+            "total_tokens": 1711,
+            "total_time_ms": 2844.3946838378906,
+            "average_time_ms": 2844.3946838378906,
+            "estimated_cost_usd": 0.00499
+          }
+        }
+      },
+      "ts": 1765930211.2068212
+    },
+    {
+      "event": "task_validated",
+      "task_id": "task2",
+      "task_type": "condition_extraction",
+      "is_valid": true,
+      "confidence": 1.0,
+      "errors": [],
+      "suggestions": [],
+      "root_cause_task_id": null,
+      "root_cause_reasoning_preview": "",
+      "ts": 1765930211.2089891
+    },
+    {
+      "event": "planner_response",
+      "action": "next_task",
+      "reasoning_preview": "The next step after extracting conditions is to transform the condition table into a standard schema and ensure values are split appropriately. This is necessary for accurate grouping and combination generation in subsequent steps.",
+      "task_results_count": 3,
+      "ts": 1765930215.489
+    },
+    {
+      "event": "task_scheduled",
+      "task_id": "task3",
+      "task_type": "condition_transform",
+      "tool_name": "condition_transform",
+      "fallback_tool": null,
+      "dependencies": [
+        "task2"
+      ],
+      "parameters_preview": {
+        "header": "{task2.data.header}",
+        "data": "{task2.data.data}",
+        "instruction": ""
+      },
+      "ts": 1765930215.489
+    },
+    {
+      "event": "task_execute_start",
+      "task_id": "task3",
+      "task_type": "condition_transform",
+      "tool_name": "condition_transform",
+      "ts": 1765930215.4912071
+    },
+    {
+      "event": "task_execute_end",
+      "task_id": "task3",
+      "task_type": "condition_transform",
+      "tool_used": "condition_transform",
+      "success": false,
+      "execution_time": 0.0,
+      "error_preview": "No condition data provided (header or data is empty)",
+      "resolved_params_preview": {
+        "header": [],
+        "data": [],
+        "instruction": ""
+      },
+      "output_preview": null,
+      "ts": 1765930215.4912071
+    },
+    {
+      "event": "planner_response",
+      "action": "next_task",
+      "reasoning_preview": "The previous attempt at condition transformation was unsuccessful. We need to retry this step to ensure that the condition data is correctly transformed and mapped to the standard schema before proceeding to the next stages.",
+      "task_results_count": 4,
+      "ts": 1765930223.911493
+    },
+    {
+      "event": "task_scheduled",
+      "task_id": "task3",
+      "task_type": "condition_transform",
+      "tool_name": "condition_transform",
+      "fallback_tool": null,
+      "dependencies": [
+        "task2"
+      ],
+      "parameters_preview": {
+        "header": "{task2.data.header}",
+        "data": "{task2.data.data}",
+        "instruction": "Ensure to split values correctly and parse any age formulas. Map the data to the standard schema as per the previous feedback."
+      },
+      "ts": 1765930223.911493
+    }
+  ],
+  "planner_llm_stats": {
+    "generate_next_task": {
+      "call_count": 5,
+      "total_prompt_tokens": 20109,
+      "total_completion_tokens": 964,
+      "total_tokens": 21073,
+      "total_time_ms": 38136,
+      "estimated_cost_usd": 0.059912
+    }
+  },
+  "validator_llm_stats": {
+    "validate_section_classifier": {
+      "call_count": 1,
+      "total_prompt_tokens": 1645,
+      "total_completion_tokens": 131,
+      "total_tokens": 1776,
+      "total_time_ms": 3645,
+      "estimated_cost_usd": 0.005423
+    },
+    "validate_definition_extract_v2": {
+      "call_count": 1,
+      "total_prompt_tokens": 1447,
+      "total_completion_tokens": 140,
+      "total_tokens": 1587,
+      "total_time_ms": 3275,
+      "estimated_cost_usd": 0.005017
+    },
+    "validate_table_split": {
+      "call_count": 0,
+      "total_prompt_tokens": 0,
+      "total_completion_tokens": 0,
+      "total_tokens": 0,
+      "total_time_ms": 0,
+      "estimated_cost_usd": 0.0
+    },
+    "validate_condition_transform": {
+      "call_count": 0,
+      "total_prompt_tokens": 0,
+      "total_completion_tokens": 0,
+      "total_tokens": 0,
+      "total_time_ms": 0,
+      "estimated_cost_usd": 0.0
+    },
+    "validate_transform": {
+      "call_count": 0,
+      "total_prompt_tokens": 0,
+      "total_completion_tokens": 0,
+      "total_tokens": 0,
+      "total_time_ms": 0,
+      "estimated_cost_usd": 0.0
+    },
+    "validate_condition_extract": {
+      "call_count": 0,
+      "total_prompt_tokens": 0,
+      "total_completion_tokens": 0,
+      "total_tokens": 0,
+      "total_time_ms": 0,
+      "estimated_cost_usd": 0.0
+    },
+    "validate_grouping_logic": {
+      "call_count": 0,
+      "total_prompt_tokens": 0,
+      "total_completion_tokens": 0,
+      "total_tokens": 0,
+      "total_time_ms": 0,
+      "estimated_cost_usd": 0.0
+    },
+    "analyze_root_cause": {
+      "call_count": 0,
+      "total_prompt_tokens": 0,
+      "total_completion_tokens": 0,
+      "total_tokens": 0,
+      "total_time_ms": 0,
+      "estimated_cost_usd": 0.0
+    }
+  }
+}

@@ -29,6 +29,16 @@ from tools.hybrid_tools import (
 )
 
 # Helper class for tool results
+def has_unresolved_template(x):
+    if isinstance(x, str):
+        return "{{" in x and "}}" in x
+    if isinstance(x, dict):
+        return any(has_unresolved_template(v) for v in x.values())
+    if isinstance(x, list):
+        return any(has_unresolved_template(v) for v in x)
+    return False
+
+
 class ToolResult:
     """A simple class to encapsulate the result of a tool execution."""
     def __init__(self, success: bool, data: Any = None, error: str = None):
@@ -247,21 +257,33 @@ def resolve_templates(params: Dict[str, Any], task_results: list, document: Any,
 
     def resolve_value(value: Any) -> Any:
         if isinstance(value, str):
-            template_pattern = r'{{([^}}]+)}}'
-            matches = re.findall(template_pattern, value)
-
-            if not matches:
-                if value == "$sections":
-                    return sections
-                return value
+            template_pattern = r'{{([^}]+)}}'          # {{ ... }}
+            single_brace_pattern = r'^\{([^{}]+)\}$'   # "{ ... }" 단독일 때만
 
             result = value
+
+            # 1) {{...}} 먼저 찾기
+            matches = re.findall(template_pattern, value)
+
+            # 2) 없으면 { ... } 단독 템플릿도 허용
+            if not matches:
+                m = re.match(single_brace_pattern, value.strip())
+                if m:
+                    matches = [m.group(1)]
+                    # 이후 로직이 {{...}}를 기대하니까 정규화
+                    result = f"{{{{{matches[0]}}}}}"
+                else:
+                    if value == "$sections":
+                        return sections
+                    return value
+
             for match in matches:
                 match = match.strip()
 
                 if match == "document":
                     doc_str = json.dumps(document, ensure_ascii=False) if isinstance(document, (dict, list)) else str(document)
                     result = result.replace(f"{{{{{match}}}}}", doc_str)
+
                 elif match.startswith("task"):
                     try:
                         parts = match.split(".")
@@ -277,13 +299,27 @@ def resolve_templates(params: Dict[str, Any], task_results: list, document: Any,
                                 clean.append(clean_field)
                         field_path = clean
 
-                        task_result = next((tr for tr in task_results if tr.get("task_id") == task_id), None)
+                        task_result = next(
+                            (tr for tr in reversed(task_results)
+                            if tr.get("task_id") == task_id and tr.get("success") is True),
+                            None
+                        )
+                        if not task_result:
+                            task_result = next(
+                                (tr for tr in reversed(task_results)
+                                if tr.get("task_id") == task_id),
+                                None
+                            )
 
                         if not task_result:
                             print(f"[WARN] Template resolution: task '{task_id}' not found in results")
                             continue
 
                         current = task_result.get("data")
+                        if current is None:
+                            print(f"[WARN] Template resolution: task '{task_id}' has no data (likely failed)")
+                            continue
+
                         for field in field_path:
                             if isinstance(current, dict):
                                 current = current.get(field)
@@ -293,22 +329,29 @@ def resolve_templates(params: Dict[str, Any], task_results: list, document: Any,
                                 print(f"[WARN] Template resolution: field '{field}' not found in path {'.'.join(field_path)}")
                                 current = None
                                 break
-                        
+
                         if current is not None:
                             if result == f"{{{{{match}}}}}":
                                 return current
                             else:
-                                result = result.replace(f"{{{{{match}}}}}", json.dumps(current, ensure_ascii=False) if not isinstance(current, str) else current)
+                                result = result.replace(
+                                    f"{{{{{match}}}}}",
+                                    json.dumps(current, ensure_ascii=False) if not isinstance(current, str) else current
+                                )
+
                     except Exception as e:
                         print(f"[WARN] Template resolution error for '{match}': {e}")
                         continue
+
             return result
+
         elif isinstance(value, dict):
             return {k: resolve_value(v) for k, v in value.items()}
         elif isinstance(value, list):
             return [resolve_value(v) for v in value]
         else:
             return value
+
 
     return resolve_value(params)
 
@@ -537,6 +580,8 @@ def execute_task_node(state: AgentState) -> Dict[str, Any]:
     # ========== STEP 2: Template Resolution (with error classification) ==========
     try:
         resolved_params = resolve_templates(current_task.get('parameters', {}), task_results, document, sections)
+        if has_unresolved_template(resolved_params):
+            raise ValueError("Unresolved template remains in task parameters")
         print(f"[INFO] Parameters resolved: {len(str(resolved_params))} chars")
     except KeyError as e:
         # Template reference to non-existent task → Task Definition Error
