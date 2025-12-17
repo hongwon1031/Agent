@@ -278,7 +278,7 @@ def main():
     else:
         # Default to new_results directory
         #path = Path(r"E:\work\work\Agent\prototype_8_4o\4o")
-        path = Path(r'C:\Users\NT-165\Desktop\Project\Toy\prototype_8_4o\4o')
+        path = Path(r'E:\work\work\Agent\prototype_8_4o_backup\4o')
 
     if not path.exists():
         print(f"❌ Path not found: {path}")

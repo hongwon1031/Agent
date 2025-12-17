@@ -131,7 +131,7 @@ def main():
     # Select agent
 
     print("\n🚀 Using Prototype 7: Dynamic Task Execution Agent")
-    results_dir = Path(r"C:\Users\NT-165\Desktop\Project\Toy\prototype_8_4o\사업방법서_주계약_parser")
+    results_dir = Path(r"E:\work\work\Agent\prototype_8_4o_backup\추가데이터_pred")
     #results_dir = Path(r"E:\work\work\Agent\prototype_8_cost\4o")
 
 

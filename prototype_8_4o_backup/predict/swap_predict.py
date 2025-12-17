@@ -41,12 +41,13 @@ block_primary = ["보종명","유형1","유형2","보험기간","납입기간","
 block_fallback = ["보종명","유형1","유형2","보험기간","납입기간"]
 
 weights = {
-    "보종명": 3.0,
-    "유형1": 2.0,
-    "유형2": 2.0,
-    "보험기간": 2.0,
-    "납입기간": 2.0,
-    "주피보험자가입성별": 2.0,
+    "보종명": 1.0,
+    "유형1": 1.0,
+    "유형2": 1.0,
+    "유형3": 1.0,
+    "보험기간": 1.0,
+    "납입기간": 1.0,
+    "주피보험자가입성별": 1.0,
     "주피보험자최소가입연령": 1.0,
     "주피보험자최대가입연령": 1.0,
     "주피보험자최소가입연령구분코드": 1.0,
@@ -234,7 +235,7 @@ def evaluate_records(
     block_fields_primary: List[str],
     block_fields_fallback: Optional[List[str]] = None,
     weights: Optional[Dict[str, float]] = None,
-    match_threshold: float = 0.85,
+    match_threshold: float = 1.0,
 ):
     """
     반환:
@@ -394,8 +395,8 @@ def evaluate_records(
         "non_exact_pairs": non_exact_pairs[:50],
     }
 
-gtpath = r"C:\Users\NT-165\Desktop\Project\Toy\prototype_8_4o\GT\추출결과\신한SOL암보험(무배당, 해약환급금 미지급형)_가입가능조건.json"
-predpath = r"C:\Users\NT-165\Desktop\Project\Toy\prototype_8_4o\4o\신한SOL암보험(무배당, 해약환급금 미지급형)_parsed_single_result.json"
+gtpath = r"E:\work\work\Agent\data\토이프로젝트_데이터\추출결과\신한SOL암보험(무배당, 해약환급금 미지급형)_가입가능조건.json"
+predpath = r"E:\work\work\Agent\prototype_8_4o_backup\4o\신한SOL암보험(무배당, 해약환급금 미지급형)_parsed_single_result.json"
 
 gt_path = Path(gtpath)
 pred_path = Path(predpath)
@@ -448,7 +449,7 @@ report = evaluate_records(
     block_fields_primary=block_primary,
     block_fields_fallback=block_fallback,
     weights=weights,
-    match_threshold=0.85,
+    match_threshold=1.0,
 )
 
 print(report["record_metrics"])
