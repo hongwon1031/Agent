@@ -25,7 +25,7 @@ def main():
     #     max_output_tokens=4000,
     # )
 
-    resp = client.responses.create(
+    response = self.client.responses.create(
         model="gpt-5-mini",
         input=prompt,
         text={"format": {"type": "json_object"}},   # ✅ 여기로 옮김
@@ -35,7 +35,8 @@ def main():
 
     #content = resp.output_text
     content = resp.output_text
-    
+    prompt_tokens
+    completion_tokens
     # stats["total_prompt_tokens"] += usage.input_tokens
     # stats["total_completion_tokens"] += usage.output_tokens
     

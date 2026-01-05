@@ -18,19 +18,20 @@ block_primary = ["보종명","유형1","유형2","보험기간","납입기간","
 block_fallback = ["보종명","유형1","유형2","보험기간","납입기간"]
 
 weights = {
-    "보종명": 3.0,
-    "유형1": 2.0,
-    "유형2": 2.0,
-    "보험기간": 2.0,
-    "납입기간": 2.0,
-    "주피보험자가입성별": 2.0,
+    "보종명": 1.0,
+    "유형1": 1.0,
+    "유형2": 1.0,
+    "유형3": 1.0,
+    "보험기간": 1.0,
+    "납입기간": 1.0,
+    "주피보험자가입성별": 1.0,
     "주피보험자최소가입연령": 1.0,
     "주피보험자최대가입연령": 1.0,
     "주피보험자최소가입연령구분코드": 1.0,
     "주피보험자최대가입연령구분코드": 1.0,
 }
 
-MATCH_THRESHOLD = 0.85
+MATCH_THRESHOLD = 1.0
 
 # gt_path = Path(r"C:\Users\NT-165\Desktop\Project\Toy\prototype_8_4o_backup\GT\추가데이터_정답\008.신한놀라운종신보험(무배당, 해약환급금 일부지급형)_가입가능조건.json")
 # pred_path = Path(r"C:\Users\NT-165\Desktop\Project\Toy\prototype_8_4o_backup\추가데이터_pred\008.사업방법서_신한놀라운종신보험(무배당__해약환급금_일부지급형)_250401_parsed_new_result.json")
@@ -38,8 +39,8 @@ MATCH_THRESHOLD = 0.85
 # gt_path = Path(r"C:\Users\NT-165\Desktop\Project\Toy\prototype_8_4o_backup\GT\추가데이터_정답\056.신한(간편가입)종신보험 세븐Plus(무배당, 해약환급금 일부지급형)_가입가능조건.json")
 # pred_path = Path(r"C:\Users\NT-165\Desktop\Project\Toy\prototype_8_4o_backup\추가데이터_pred\056.사업방법서_신한(간편가입)종신보험세븐Plus(무배당__해약환급금_일부지급형)_20250401_parsed_new_result.json")
 
-gt_path = Path(r"C:\Users\NT-165\Desktop\Project\Toy\prototype_8_4o\GT\추가데이터_정답\114.(간편)일반암진단특약(무배당, 해약환급금 미지급형)_가입가능조건.json")
-pred_path = Path(r"C:\Users\NT-165\Desktop\Project\Toy\prototype_8_4o\추가데이터_pred\114.사업방법서_(간편)일반암진단특약(무배당__해약환급금_미지급형)_250401_parsed_new_result.json")
+gt_path = Path(r"C:\Users\NT-165\Desktop\Project\Toy\prototype_8_4o_backup\추가데이터_GT\056.신한(간편가입)종신보험 세븐Plus(무배당, 해약환급금 일부지급형)_가입가능조건.json")
+pred_path = Path(r"C:\Users\NT-165\Desktop\Project\Toy\prototype_8_4o_backup\추가데이터_pred\056.사업방법서_신한(간편가입)종신보험세븐Plus(무배당__해약환급금_일부지급형)_20250401_parsed_new_result.json")
 
 # gt_path = Path(r"C:\Users\NT-165\Desktop\Project\Toy\prototype_8_4o_backup\GT\추가데이터_정답\286.(N)남녀특정암진단특약(무배당, 해약환급금 미지급형)_가입가능조건.json")
 # pred_path = Path(r"C:\Users\NT-165\Desktop\Project\Toy\prototype_8_4o_backup\추가데이터_pred\286.사업방법서_(N)남녀특정암진단특약(무배당__해약환급금_미지급형)_250401_v2_parsed_new_result.json")

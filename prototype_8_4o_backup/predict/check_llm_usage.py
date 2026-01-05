@@ -278,7 +278,7 @@ def main():
     else:
         # Default to new_results directory
         #path = Path(r"E:\work\work\Agent\prototype_8_4o\4o")
-        path = Path(r'C:\Users\NT-165\Desktop\Project\Toy\prototype_8_4o\4o')
+        path = Path(r'C:\Users\NT-165\Desktop\Project\Toy\prototype_8_4o_backup\추가데이터_pred\423.사업방법서_(간편)암주요치료비특약(무배당__해약환급금_미지급형)_250401_parsed_new_result.json')
 
     if not path.exists():
         print(f"❌ Path not found: {path}")
